@@ -1,0 +1,23 @@
+# クラつく — notes for working on this repo
+
+片手で遊べるJ1クラブ経営シミュレーション。GitHub Pages で公開: https://yuthy8345.github.io/kuratsuku/
+同じゲームは Claude のアーティファクトとしても公開している（`dev/dist/touchline.html` を publish、URL https://claude.ai/artifact/4Jd2aRS9rhaZUvATXRBqVD）。
+
+## Layout
+- repo root = 公開サイト（`index.html`, `manifest.webmanifest`, `sw.js`, アイコン, `lz-string.min.js`）。**手で編集しない**。`dev/build.js` が生成する。
+- `dev/src/engine.js` — ゲームロジック（DOMなし）。`dev/src/app.js` — UI。`dev/src/template.html` — CSSとページ骨格。
+- `dev/raw/*.txt` — 2026/27 J1 登録選手（Jリーグ公式/クラブ公式から取得）。`dev/build_data.js` が能力値・格を付けて `dev/data.json` を作る。
+- `dev/icons/real.py` — アプリアイコン（SVG生成）。PNGはリポジトリ直下。
+
+## Build & deploy
+```
+cd dev && node build_data.js && node build.js   # data.json → index.html / sw.js / manifest をリポジトリ直下に生成
+git add -A && git commit && git push             # Pages が1分ほどで反映
+```
+- `sw.js` のキャッシュ名はビルドごとに変わる。index.html はネットワーク優先なので、修正はオンラインなら次回起動で反映。
+- セーブは localStorage キー `touchline.j1.save`（変えない）。端末間の移動は「引き継ぎコード」（`KTK1.` + lz圧縮JSON）。
+- 既存セーブの互換: `Engine.migrate(S, DATA)` で能力値・格・生年月日の更新を流し込む。格の計算式を変えたら `PRES_BASE` に旧値を残して `presV` を上げる。
+
+## Checks
+- `node dev/test/sim.js 2 <clubId>` — シーズン自動シミュ（1試合平均2.4〜2.6点、優勝勝点70〜85程度が目安）
+- `python3 dev/test/dev_ui.py` — ブラウザ回帰テスト（スクロール固定、育成画面、旧セーブ移行）
