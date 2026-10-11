@@ -416,7 +416,7 @@ function newGame(DATA, clubId, managerName, todayISO) {
     season: sy, date: DATA.start, my: clubId, manager: managerName || '監督',
     clubs: {}, players: {}, order: [], nextPid: 100000,
     fixtures: [], news: [], inbox: [], history: [], records: [],
-    board: 60, settings: { autoSubs: true, speed: 1 }, training: 'bal',
+    board: 60, settings: { autoSubs: true, subRate: 'mid', speed: 1 }, training: 'bal',
     fired: null, seasonEnd: null, lastResult: null, nextInboxId: 1, tick: 0,
   };
   for (const c of DATA.clubs) addClub(S, c);
@@ -846,10 +846,11 @@ function stepMatch(S, M) {
       }
     }
   }
-  // AI (and auto) substitutions
+  // AI (and auto) substitutions; my side follows the chosen frequency (交代の頻度), AI clubs the old pattern
   for (const k of ['h', 'a']) {
     const auto = M.userSide !== k || S.settings.autoSubs;
-    if (auto && [58, 66, 74, 82].includes(M.min)) aiSubs(S, M, k, push);
+    const rate = M.userSide === k ? subRate(S) : SUB_RATE.ai;
+    if (auto && rate.mins.includes(M.min)) aiSubs(S, M, k, push, rate);
   }
   if (M.min === 45) { push({ t: 'ht', text: `前半終了　${M.hg} - ${M.ag}` }); M.half = 2; }
   if (M.min >= 90 + (M.extra || 0)) {
@@ -933,18 +934,32 @@ function forceSub(S, M, k, pid, push) {
   if (inn && sd.subs < 5) doSub(S, M, k, pid, inn, push);
   else { sd.sent.push(pid); }
 }
-function aiSubs(S, M, k, push) {
+// how readily the bench is used. mins: when to look; two: from which minute two changes at a time; cond: before 'late', change a
+// player only when his condition is at or under this (in-match condition only falls to ~85 by full time, so 'late' is what
+// mostly sets the timing); tol: how much worse the sub may be; max: changes it makes by itself (injuries not counted).
+// My side follows S.settings.subRate; AI clubs keep the old pattern ('ai') so the league balance does not move.
+const SUB_RATE = {
+  low: { jp: '少なめ', sub: '終盤に1〜2人だけ。先発を長く使う', mins: [70, 80], two: 99, cond: 70, late: 70, tol: 4, max: 2 },
+  mid: { jp: 'ふつう', sub: '60分ごろから順に3〜4人', mins: [60, 70, 78], two: 78, cond: 78, late: 60, tol: 6, max: 4 },
+  high: { jp: '多め', sub: '早めに動いて5人とも使う。新しい脚で押し切る', mins: [55, 63, 71, 79], two: 55, cond: 85, late: 55, tol: 15, max: 5 },
+  ai: { mins: [58, 66, 74, 82], two: 74, cond: 72, late: 80, tol: 4, max: 5 },
+};
+function subRate(S) { return SUB_RATE[S.settings && S.settings.subRate] || SUB_RATE.mid; }
+function aiSubs(S, M, k, push, rate) {
+  const R0 = rate || SUB_RATE.ai;
   const sd = M[k];
-  if (sd.subs >= 5) return;
+  const made = () => sd.subLog.filter(([o]) => !(M.pm[o] && M.pm[o].inj)).length;  // injury changes don't count
+  if (sd.subs >= 5 || made() >= R0.max) return;
   const cands = onPitch(sd).filter(s => s.role !== 'GK').map(s => ({ s, c: sd.cond[s.pid], rt: M.pm[s.pid].rt }))
     .sort((x, y) => (x.c + x.rt * 4) - (y.c + y.rt * 4));
-  const n = M.min >= 74 ? 2 : 1;
+  const n = M.min >= R0.two ? 2 : 1;
   for (let i = 0; i < n && i < cands.length; i++) {
+    if (made() >= R0.max) return;
     const { s, c } = cands[i];
-    if (c > 72 && M.min < 80) continue;
+    if (c > R0.cond && M.min < R0.late) continue;
     const inn = bestSubFor(S, M, k, s);
     if (!inn) return;
-    if (effective(S.players[inn], s.role) < effective(S.players[s.pid], s.role, c) - 4) continue;
+    if (effective(S.players[inn], s.role) < effective(S.players[s.pid], s.role, c) - R0.tol) continue;
     doSub(S, M, k, s.pid, inn, push);
   }
 }
@@ -1768,7 +1783,7 @@ const API = {
   createMatch, stepMatch, simulateFull, finishMatch, doSub, benchOptions, onPitch, setMentality, bestSubFor, setCounter, mentLabel,
   advance, nextDay, simAIToday, myFixtureToday, nextMyFixture, todaysFixtures, inWindow, windowEnd, nextWindowStart,
   acceptOffer, rejectOffer, bid, decideRetirements, shortlist, shortEntry, unshort, bidBlock,
-  CUPS, CUP_PRIZE, NATIONAL, fxLabel, cupResult, cupWinner, hypeMatch, HYPE, bigGame, rivalry, SCOUT, sendScout, playShare, marketList, ensureFreeAgents, upgrade, facCost, takeJob, rollover, endSeason, news, fire,
+  CUPS, CUP_PRIZE, NATIONAL, fxLabel, cupResult, cupWinner, hypeMatch, HYPE, SUB_RATE, subRate, bigGame, rivalry, SCOUT, sendScout, playShare, marketList, ensureFreeAgents, upgrade, facCost, takeJob, rollover, endSeason, news, fire,
 };
 if (typeof module !== 'undefined' && module.exports) module.exports = API; else root.Engine = API;
 })(typeof window !== 'undefined' ? window : globalThis);

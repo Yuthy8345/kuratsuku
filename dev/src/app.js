@@ -412,6 +412,12 @@ function viewSquad() {
     <ul class="list">${list.map(p => prow(p)).join('') || '<li class="empty">該当する選手がいません</li>'}</ul>
     ${sub}`;
 }
+// 交代の頻度 (only while 交代はおまかせ is on)
+function subRateCtl() {
+  if (!S.settings.autoSubs) return '';
+  const cur = E.SUB_RATE[S.settings.subRate] ? S.settings.subRate : 'mid';
+  return `<div class="ctlrow"><label>交代の頻度</label><div class="seg">${['low', 'mid', 'high'].map(k => `<button data-act="subRate" data-k="${k}" aria-pressed="${cur === k}">${E.SUB_RATE[k].jp}</button>`).join('')}</div><span class="fine">${E.SUB_RATE[cur].sub}</span></div>`;
+}
 function sheetPlayer(id) {
   const p = S.players[id]; if (!p) return;
   sheetState = { type: 'player', id };
@@ -512,6 +518,7 @@ function viewTactics() {
     <button class="toggle" role="switch" aria-checked="${!!c.tac.ctr}" data-act="ctr"><span><b>カウンターを狙う</b><br><span class="small muted">${CTR_DESC}</span></span><span class="sw"></span></button>
     <div class="ctlrow"><label>プレスの強度（高いほど中盤で優位、ただし消耗）</label>${seg('press', c.tac.press, [['low', '低'], ['mid', '中'], ['high', '高']])}</div>
     <button class="toggle" role="switch" aria-checked="${!!S.settings.autoSubs}" data-act="autoSubs"><span><b>交代はおまかせ</b><br><span class="small muted">オフにすると試合中に自分で交代を選びます</span></span><span class="sw"></span></button>
+    ${subRateCtl()}
     <h3 class="sec-h">ベンチ（${c.tac.bench.length}/${E.BENCH_SIZE}人）<small>自動では入れ替わりません</small></h3>
     <p class="fine" style="margin:-6px 0 0">選手をタップすると、ベンチ外の選手と入れ替えられます。</p>
     <ul class="list">${c.tac.bench.map(id => benchRow(S.players[id])).join('')}${c.tac.bench.length < E.BENCH_SIZE ? `<li><button class="prow addrow" data-act="benchPick" data-id="0"><span class="no">+</span><span class="nm"><b>ベンチに加える</b><span>空き ${E.BENCH_SIZE - c.tac.bench.length}枠</span></span></button></li>` : ''}</ul>
@@ -1131,6 +1138,7 @@ function sheetMatchTactics() {
     <div class="ctlrow"><label>攻撃の姿勢</label><div class="seg">${MENT_OPTS.map(([x, l]) => `<button data-act="mMent" data-k="${x}" aria-pressed="${sd.ment === x}">${l}</button>`).join('')}</div><span class="fine">${MENT_DESC[sd.ment] || ''}</span></div>
     <button class="toggle" role="switch" aria-checked="${!!sd.ctr}" data-act="mCtr"><span><b>カウンターを狙う</b><br><span class="small muted">${CTR_DESC}</span></span><span class="sw"></span></button>
     <button class="toggle" role="switch" aria-checked="${!!S.settings.autoSubs}" data-act="autoSubs"><span><b>交代はおまかせ</b><br><span class="small muted">残り交代 ${left}回</span></span><span class="sw"></span></button>
+    ${subRateCtl()}
     <div class="eyebrow">${sel ? 'OUT：' + esc(S.players[sel].name) + ' → 入れる選手を選ぶ' : '下げる選手を選ぶ'}</div>
     ${sel ? `<ul class="list">${bench.map(id => { const p = S.players[id]; return `<li><button class="prow" data-act="mIn" data-id="${id}"><span class="no">${p.num}</span>${posTag(p)}<span class="nm"><b>${esc(p.name)}</b><span>${Math.round(p.cond)}%</span></span><span class="rt"><span class="ovr ${oc(p.ovr)}">${E.ovr(p)}</span></span></button></li>`; }).join('') || '<li class="empty">控えがいません</li>'}</ul><button class="btn ghost block" data-act="mOut" data-id="">選び直す</button>`
       : `<ul class="list">${onp.map(s => { const p = S.players[s.pid]; const pm = M.pm[s.pid]; return `<li><button class="prow" data-act="mOut" data-id="${s.pid}" ${left <= 0 ? 'disabled' : ''}><span class="no">${p.num}</span>${posTag(p)}<span class="nm"><b>${esc(p.name)}</b><span>${E.ROLE[s.role].jp}・体力 ${Math.round(sd.cond[s.pid] || 0)}%</span></span><span class="rt"><span class="rating ${ratingCls(pm.rt)}">${pm.rt.toFixed(1)}</span></span></button></li>`; }).join('')}</ul>`}`,
@@ -1182,6 +1190,7 @@ const ACT = {
   ctr() { const t = S.clubs[S.my].tac; t.ctr = !t.ctr; persist(false); render(); },
   press(d) { S.clubs[S.my].tac.press = d.k; persist(false); render(); },
   autoSubs() { S.settings.autoSubs = !S.settings.autoSubs; persist(false); if (sheetState && sheetState.type === 'msub') refreshSheet(); else render(); },
+  subRate(d) { S.settings.subRate = d.k; persist(false); if (sheetState && sheetState.type === 'msub') refreshSheet(); else render(); },
   autoXI() { E.autoLineup(S, S.my); persist(false); render(); toast('ベストメンバーを組みました'); },
   benchPick(d) { sheetBench(Number(d.id)); },
   benchIn(d) {

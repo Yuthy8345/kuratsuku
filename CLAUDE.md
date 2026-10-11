@@ -15,6 +15,7 @@
 - カップ戦: `S.cups`（天皇杯 `ec` = J1 20 + J2 12、Lカップ `lc` = J1 20）。試合は `S.fixtures` に `cup`/`cr` 付きで入る（リーグ表・節表示は `cup` を除外）。一発勝負、同点はPK（`M.pk`→`f.pk`）。ラウンド終了の翌朝 `progressCups` が次の組み合わせを作る。弱いクラブがホーム、決勝は国立。J2クラブは `S.order` に入らない `S.clubs` として選手を持つ（降格クラブも同じ。旧 `J2:` 付きは移行済み）。
 - 大一番: `hypeMatch` がダービー（`RIVALRY` の名前付きカード → 同じ都道府県 → 同じ地方（`REGION`：関西・東海・九州）→ オリジナル10対決 の順で判定）・上位/残留の直接対決・カップ戦・リベンジ・古巣対決を判定し、試合当日だけ `p.hot`（+10）を付ける。格下ほど起きやすい。確率と人数は `HYPE`（2026-10-12 から案D「お祭り」: 大一番で燃えやすく最大3人、相手が4以上強いと「格上挑戦」、普段の試合にも少しチャンス。上がり幅 `boost` 10、燃えた選手がいる間のチーム全体の上乗せ `team` 1.5）。攻撃の姿勢 `tac.ment`（def/bal/att）とは別に `tac.ctr`（カウンターを狙う）。カウンターはチャンス数が減る代わりに決定率が上がり、相手の保持率が高いほど・相手が攻撃的なほど効く（`counterQ`）。AIは格上相手に守備的＋カウンターなど（`aiMentality`）。
 - スカウト: `sendScout` → 期日に FA の若手3人（`p.found`）＋ inbox `type:'scout'`。30日で期限切れ。施設 `fac.scout` で伸びしろが上がる。成長は出場時間の割合（`playShare`）で伸び、23歳以下ほど大きい。
+- 交代はおまかせ: `S.settings.autoSubs` がオンのとき、自クラブは `S.settings.subRate`（`SUB_RATE` の low/mid/high＝少なめ・ふつう・多め、無ければ mid）の頻度で `aiSubs` が交代する。1試合あたり 少なめ 約1.5人（70分〜）・ふつう 約3.4人（60分〜）・多め ほぼ5人（55分〜）。AIクラブは以前の交代のまま（`SUB_RATE.ai`）なのでリーグのバランスは変わらない。試合中の体力は90分で92→84程度しか落ちないので、交代の時間は主に `late`（その分以降は体力に関係なく交代候補）で決まる。UIは戦術画面と試合中の采配シート（おまかせがオンのときだけ表示）。
 - ショートリスト: 入札した選手は `bid` の中で `noteBid` が `S.shortlist`（`{pid, since, last, n, fee, res, guide, club}`、res は club/player/thin/funds/full）に入れる。獲得は `moveP` で自クラブに来たとき `unshort`、引退（club が RET）は `shortlist()` が外す。他クラブへ移った選手は残る（入札時のクラブを `club` に保持）。本人に断られた期間は `bidBlock` で入札ボタンを出さない。UI はクラブ → 移籍市場 の「ショートリスト」。`S.v` 6 で旧セーブの `S._bids` から作る。
 - デザイン: 「作戦ボード」。既定は緑の黒板、クラブ → ボードの見た目 でホワイトボード（`<html data-board="white">`、端末ごとの localStorage `kuratsuku.board`、セーブとは別）。色は `template.html` の `:root` と `:root[data-board="white"]` のトークンで、OSのダークモードには追従しない。クラブ・選手は丸いマグネット、ボタンはマグネットプレート。フォントは見出し Dela Gothic One、ラベル（`.eyebrow`）Yusei Magic（チョーク）、本文 Zen Kaku Gothic New、試合のスコアボードだけ DotGothic16。
 - タイトル: 常に黒板で、ボード全体がピッチ。相手（黄・4-4-2）と味方（青・4-2-3-1）のマグネットが11個ずつ実際の位置に並び、両チームのチョークの指示線（`TB_ARROWS`、白=味方・黄=相手）がある。座標は 362×816 の設計ボード基準（`TB_OPP`/`TB_OWN`、%に換算）。ボードは `.tb-dim` で暗くして、ロゴとボタンを前面に置く（ボタンの裏のマグネットは隠れてよい）。「つづきから」の丸は自クラブの色、「新しく始める」は青い NEW マグネット。
@@ -40,6 +41,7 @@ git add -A && git commit && git push             # Pages が1分ほどで反映
 - `python3 dev/test/retire.py` — 引退選手のポップアップ（黒板/ホワイトボード）とシーズン移行
 - `python3 dev/test/iphones.py` — タイトルとクラブ画面が現行の全iPhone（SE〜Pro Max、ホーム画面アプリとSafari）で1画面に収まり、ノッチ・ホームバーに掛からないこと（安全領域は px で再現。`KTK_FONTS` に @fontsource を指すと本物の書体でスクショ）
 - `node dev/test/shortlist.js` / `python3 dev/test/shortlist.py` — ショートリスト（入札で入る・獲得と引退で外れる・移籍しても残る・旧セーブ移行／画面・保存・外す）
+- `node dev/test/subrate.js` / `python3 dev/test/subrate.py` — 交代の頻度（段階ごとの交代人数・タイミング、AIは変わらない／戦術画面と采配シートの切り替え・保存・旧セーブ）
 - `python3 dev/test/presets.py` — 戦術の保存・読み込み（出場停止の選手が入ったまま読み込まれ、試合に進めないこと）
 - `python3 dev/test/cups.py` — カップ戦の表示・PK・大一番（燃えている選手）・カウンター・スカウト
 - `node dev/test/hype.js <now|A|B|C|D> <シーズン数>` — ビッグプレーヤー（燃える選手）の発動の比較。確率・人数・上がり幅は `Engine.HYPE`（k・cap・maxN・more・decay・upTag・floor・former・boost・team）で決まり、パターンはその上書き。番狂わせ率は40シーズンでも±2ポイントほどぶれるので、比べるときは100シーズン以上回す
