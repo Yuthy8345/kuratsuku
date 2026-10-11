@@ -52,9 +52,12 @@ async def main():
                 m = await page.evaluate('''() => { const r = s => document.querySelector(s).getBoundingClientRect();
                   const board = r('.tboard'), logo = r('.tb-logo h1'), menu = r('.tb-menu'), links = r('.tb-links');
                   return { sh: document.scrollingElement.scrollHeight, ih: innerHeight, sw: document.scrollingElement.scrollWidth, iw: innerWidth,
+                    pos: getComputedStyle(document.querySelector('.tb-wrap')).position,
                     board: [board.top, board.bottom, board.width], logoBottom: r('.tb-logo svg').bottom, logoW: logo.width, menuTop: menu.top, linksBottom: links.bottom,
                     plates: document.querySelectorAll('.tb-menu .plate').length }; }''')
                 problems = []
+                if m['pos'] != 'fixed': problems.append('title not position:fixed (vh/dvh are wrong at launch in iOS home-screen apps)')
+                if abs(m['board'][1] - (h - bot - 10)) > 1: problems.append(f"board bottom {m['board'][1]:.0f} not 10px above the home bar ({h - bot - 10})")
                 if m['sh'] > m['ih'] + 1: problems.append(f"scrolls {m['sh']}>{m['ih']}")
                 if m['sw'] > m['iw'] + 1: problems.append('horizontal scroll')
                 if m['board'][1] > h - bot + 0.5: problems.append(f"board bottom {m['board'][1]:.0f} under home bar ({h - bot})")

@@ -276,7 +276,7 @@ table.tbl { border-collapse: collapse; width: 100%; font-size: 13px; }
 /* sheet */
 .scrim { position: fixed; inset: 0; background: var(--scrim); z-index: 60; opacity: 0; transition: opacity .18s; touch-action: none; }
 .scrim.on { opacity: 1; }
-.sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 61; max-height: 86vh; display: flex; flex-direction: column; background-color: var(--bg); background-image: var(--tex); background-size: auto, auto, 4px 4px; border-radius: 16px 16px 0 0; border-top: 3px solid #C9CDD1; box-shadow: var(--shadow); transform: translateY(100%); transition: transform .22s cubic-bezier(.2,.8,.2,1); max-width: 520px; margin: 0 auto; }
+.sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 61; max-height: 86%; display: flex; flex-direction: column; background-color: var(--bg); background-image: var(--tex); background-size: auto, auto, 4px 4px; border-radius: 16px 16px 0 0; border-top: 3px solid #C9CDD1; box-shadow: var(--shadow); transform: translateY(100%); transition: transform .22s cubic-bezier(.2,.8,.2,1); max-width: 520px; margin: 0 auto; }
 .sheet.on { transform: none; }
 .sheet-grip { width: 40px; height: 5px; border-radius: 3px; background: var(--line); margin: 8px auto 2px; flex: none; }
 .sheet-body { overflow-y: auto; padding: 8px 16px 12px; display: flex; flex-direction: column; gap: 14px; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-y; flex: 1 1 auto; min-height: 0; }
@@ -356,8 +356,10 @@ button.apc:not(:disabled):active { transform: scale(.97); }
 .toast.on { opacity: 1; transform: translate(-50%, 0); }
 
 /* title: the tactics board itself (always the green chalkboard in its aluminium frame) */
-/* exactly one screen: the PWA shell pads :root with the safe areas; the frame runs on under the home bar, the board stays above it */
-.tb-wrap { min-height: calc(100vh - var(--sat)); min-height: calc(100dvh - var(--sat)); padding: 10px max(10px, env(safe-area-inset-right, 0px)) calc(10px + var(--sab)) max(10px, env(safe-area-inset-left, 0px)); background: linear-gradient(135deg, #D7DBDF 0%, #9EA4AA 45%, #C9CDD1 70%, #8C9298 100%); display: flex; }
+/* exactly one screen, pinned with position:fixed. No vh/dvh: in an iOS home-screen app with viewport-fit=cover they come out
+   short by the notch at launch and only correct themselves after a scroll (WebKit bug 254868). The frame runs on under the
+   status bar and the home bar; the board stays clear of both. */
+.tb-wrap { position: fixed; inset: 0; overflow-y: auto; overscroll-behavior: contain; padding: calc(var(--sat) + 10px) max(10px, env(safe-area-inset-right, 0px)) calc(var(--sab) + 10px) max(10px, env(safe-area-inset-left, 0px)); background: linear-gradient(135deg, #D7DBDF 0%, #9EA4AA 45%, #C9CDD1 70%, #8C9298 100%); display: flex; }
 .tboard { position: relative; flex: 1; width: 100%; max-width: 520px; min-height: 440px; margin: 0 auto; border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; color: #F4F1E6;
   background-color: #1E4A39; background-image: radial-gradient(ellipse at 30% 20%, rgba(255,255,255,.07) 0%, rgba(255,255,255,0) 40%), radial-gradient(ellipse at 75% 70%, rgba(255,255,255,.05) 0%, rgba(255,255,255,0) 45%), radial-gradient(circle, rgba(255,255,255,.035) 0 1px, rgba(0,0,0,0) 1.4px); background-size: auto, auto, 4px 4px;
   box-shadow: inset 0 0 0 2px #163A2C, inset 0 0 60px rgba(0,0,0,.45); }
@@ -383,7 +385,7 @@ button.apc:not(:disabled):active { transform: scale(.97); }
 .tb-logo { position: absolute; left: 0; right: 0; top: 16.5%; z-index: 1; display: grid; justify-items: center; pointer-events: none; }
 .tb-logo h1 { margin: 0; font-family: var(--f-display); font-weight: 400; font-size: clamp(56px, 18.5vw, 78px); line-height: 1.05; color: #F4F1E6; transform: rotate(-4deg); text-shadow: 0 0 1px rgba(244,241,230,.8), 2px 3px 0 rgba(0,0,0,.3), 0 0 22px rgba(8,22,17,.85); letter-spacing: .01em; }
 .tb-logo svg { width: 60%; max-width: 250px; height: auto; transform: rotate(-4deg); margin-top: 2px; }
-.tb-menu { position: relative; z-index: 1; padding: 0 6.6% max(14px, 2.4vh); display: grid; gap: 12px; }
+.tb-menu { position: relative; z-index: 1; padding: 0 6.6% 16px; display: grid; gap: 12px; }
 .tb-menu .plate { margin: 0 7%; }
 .plate { display: flex; align-items: center; gap: 14px; min-height: 66px; padding: 8px 18px; border-radius: 10px; text-align: left; font-family: var(--f-body); transition: transform .06s; }
 .plate b { display: block; font-size: 19px; font-weight: 900; letter-spacing: .06em; line-height: 1.3; }
