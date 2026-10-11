@@ -93,7 +93,13 @@ const TRAINING = {
   hard: { jp: 'ハード', grow: 1.35, rec: -2 },
   tact: { jp: '戦術理解', grow: 0.8, rec: 0, team: 1 },
   rest: { jp: 'コンディション重視', grow: 0.6, rec: 3 },
+  youth: { jp: '若手育成', grow: 1.0, rec: 0, young: 1.4, rest: 0.85 },  // 23歳以下 x1.4, the others x0.85
 };
+// growth tuning: young players (23 or under) grow with playing time far more than before, and their ceiling itself
+// rises when they play (開花): about +2 potential a season for a 21-or-under regular (scaled by how well they play; only with
+// 25%+ of the minutes), +6 in a career. Other clubs' youngsters bloom at 40% of that (they don't plan minutes around them),
+// which keeps the league from filling up with stars over the seasons.
+const GROW = { youngBase: 0.9, youngPlay: 1.3, oldBase: 0.8, oldPlay: 0.45, gMax: 0.08, bloom21: 0.045, bloom23: 0.02, bloomMin: 0.25, bloomMax: 6, bloomAI: 0.4, potMax: 93 };
 const FACILITY = {
   train: { jp: '練習場', desc: '選手の成長スピードが上がる' },
   youth: { jp: 'ユース', desc: '昇格してくる若手の質と人数が上がる' },
@@ -211,10 +217,24 @@ const INTENS = {
 };
 function calcOvr(p) { const w = AW[p.pos]; let s0 = 0; for (let i = 0; i < 9; i++) s0 += w[i] * p.at[i]; return s0; }
 function roleScore(p, role) { const w = RW[role]; let s0 = 0; for (let i = 0; i < 9; i++) s0 += w[i] * p.at[i]; return s0; }
+// playing styles from the data (p.sty): how the same overall rating is split. Order as ATTR.
+const STYLE = {
+  tech: [2, 8, 7, -4, 0, -9, -6, 7, 0],     // 技術・視野で勝負、球際とフィジカルはこれから
+  phys: [-2, -4, -3, 4, 2, 7, 5, -3, 0],    // 体の強さと走力
+  speed: [2, -3, 3, -3, 9, -2, 2, -4, 0],   // スピード
+};
+function applyStyle(p) {  // tilt the attributes by the style, keeping the overall rating
+  const sv = STYLE[p.sty]; if (!sv || !p.at) return;
+  const v = p.at.map((x, i) => x + sv[i]);
+  const w = AW[p.pos]; let ws = 0; for (let i = 0; i < 9; i++) ws += w[i] * v[i];
+  const shift = calcOvr(p) - ws;
+  p.at = v.map(x => Math.round(clamp(x + shift, 20, 96) * 10) / 10);
+}
 function initAttrs(p) {
   let h = hash(p.name + p.birth + p.pos);
   const db = DP_BIAS[p.pp] || null;
-  const bias = ATTR_BIAS[p.pos].map((b, i) => b + (db && DP_CAT[p.pp] === p.pos ? db[i] : 0));
+  const sv = STYLE[p.sty] || null;
+  const bias = ATTR_BIAS[p.pos].map((b, i) => b + (db && DP_CAT[p.pp] === p.pos ? db[i] : 0) + (sv ? sv[i] : 0));
   const v = bias.map(b => { h = Math.imul(h ^ (h >>> 15), 2246822507) >>> 0; return p.ovr + b + ((h % 13) - 6); });
   // a signature strength and a weakness, so players of the same level differ
   h = Math.imul(h ^ (h >>> 13), 3266489909) >>> 0; const up = h % 8; h = Math.imul(h ^ (h >>> 16), 2246822507) >>> 0; const dn = h % 8;
@@ -223,7 +243,7 @@ function initAttrs(p) {
   const shift = p.ovr - ws;
   p.at = v.map(x => Math.round(clamp(x + shift, 20, 96) * 10) / 10);
   p.ovr = calcOvr(p);
-  p.at0 = p.at.slice(); p.ovr0 = p.ovr;
+  p.at0 = p.at.slice(); p.ovr0 = p.ovr; p.pot0 = p.pot;
   if (!p.tf) p.tf = 'auto';
   if (!p.ti) p.ti = 'norm';
 }
@@ -261,6 +281,26 @@ function migrate(S, DATA) {
   for (const p of Object.values(S.players)) if (!p.at) initAttrs(p);
   // data corrections (e.g. verified birthdates) flow into existing saves
   if (DATA && DATA.players) for (const d of DATA.players) { const q = S.players[d.id]; if (q && q.name === d.name && q.birth !== d.birth) q.birth = d.birth; }
+  // rating corrections by data revision (d.fix = {r, d}: added to the rating in that revision). Growth since then is kept.
+  if (DATA && DATA.players && (S.dataRev || 1) < (DATA.rev || 1)) {
+    const from = S.dataRev || 1; let n = 0;
+    for (const d of DATA.players) {
+      const q = S.players[d.id]; if (!q || q.name !== d.name || !d.fix || d.fix.r <= from) continue;
+      if (!q.at) initAttrs(q);
+      const k = d.fix.d || 0;
+      if (k) {
+        q.at = q.at.map(x => Math.round(clamp(x + k, 15, 97) * 100) / 100); q.ovr = clamp(calcOvr(q), 30, 95);
+        if (q.at0) q.at0 = q.at0.map(x => Math.round(clamp(x + k, 15, 97) * 100) / 100);
+        if (q.ovr0 != null) q.ovr0 += k;
+      }
+      const pb = q.pot; q.pot = Math.max(q.pot, d.pot, Math.ceil(q.ovr));
+      if (q.pot0 != null) q.pot0 += q.pot - pb;  // a data correction is not 開花
+      if (d.sty && q.sty !== d.sty) { q.sty = d.sty; applyStyle(q); }
+      n++;
+    }
+    S.dataRev = DATA.rev;
+    if (n) for (const cid of S.order) if (cid !== S.my && S.clubs[cid]) autoLineup(S, cid);
+  }
   const src = {}; if (DATA && DATA.clubs) for (const c of DATA.clubs) src[c.id] = c; for (const c of J2) src[c.id] = src[c.id] || c;
   let added = false;
   // v4 prestige (all-time titles + a bonus for the last 15 seasons). Keep whatever a club gained or lost in-game.
@@ -325,7 +365,12 @@ function migrate(S, DATA) {
       S.shortlist.push({ pid: p.id, since: b.date, last: b.date, n: 1, club: p.club, res: b.refused ? 'player' : 'club' });
     }
   }
-  S.v = Math.max(S.v || 1, 6);
+  // v7: growth chart (one point a month) starts now for my squad and my loanees
+  if ((S.v || 1) < 7) for (const p of Object.values(S.players)) {
+    if (p.pot0 == null) p.pot0 = p.pot;  // 開花 is measured from here
+    if (p.at && (p.club === S.my || (p.loan && p.loan.from === S.my))) track(S, p);
+  }
+  S.v = Math.max(S.v || 1, 7);
   return S;
 }
 // how good the player is in each detailed position (rested, form left out)
@@ -349,10 +394,26 @@ function devWeek(S, p, dry) {
   if (gap > 0) {
     const k = a <= 19 ? 0.055 : a <= 22 ? 0.045 : a <= 25 ? 0.03 : 0.015;
     // playing time: regulars grow faster, young regulars much faster
-    const sh = playShare(S, p);
-    const playing = sh == null ? 1 : a <= 23 ? 0.75 + sh * 0.9 : 0.8 + sh * 0.45;
-    g = gap * k / 4.33 * (1 + (c.fac.train - 2) * 0.12) * (isMy ? TRAINING[S.training].grow : 1) * it.g * playing;
+    const sh = shareFor(S, p);
+    const playing = sh == null ? 1 : a <= 23 ? GROW.youngBase + sh * GROW.youngPlay : GROW.oldBase + sh * GROW.oldPlay;
+    const tr = isMy ? TRAINING[S.training] || TRAINING.bal : TRAINING.bal;
+    const trg = tr.young ? (a <= 23 ? tr.young : tr.rest) : tr.grow;
+    const fac = p.loan ? 2 : c.fac.train;  // on loan: an average J2 training ground
+    // a big gap (a 16-year-old prodigy) closes over a few seasons rather than in one: the base rate is capped,
+    // and playing time, the team menu and the intensity still multiply on top
+    g = Math.min(gap * k / 4.33 * (1 + (fac - 2) * 0.12), GROW.gMax) * playing * trg * it.g;
     if (p.learn) g *= 0.75;
+  }
+  // 開花: playing young players raise their own ceiling (how much depends on minutes and how well they play)
+  if (!dry && a <= 23) {
+    const sh = shareFor(S, p);
+    if (sh != null && sh >= GROW.bloomMin) {
+      const apps = p.st.apps || 0, avg = apps ? p.st.rt / apps : 6.5;
+      const perf = apps >= 3 ? clamp(1 + (avg - 6.5) * 0.6, 0.5, 1.6) : 1;
+      const add = sh * (a <= 21 ? GROW.bloom21 : GROW.bloom23) * perf * (isMy || p.loan ? 1 : GROW.bloomAI);
+      const room = Math.min(GROW.potMax - p.pot, GROW.bloomMax - (p.bloom || 0));
+      if (room > 0) { const x = Math.min(add, room); p.pot += x; p.bloom = (p.bloom || 0) + x; }
+    }
   }
   const w = AW[p.pos]; const f = FOCUS[tf] && FOCUS[tf].v;
   const d = w.map((wi, i) => f ? 0.4 * wi + 0.6 * (f[i] || 0) : wi);
@@ -392,6 +453,46 @@ function devWeek(S, p, dry) {
   }
   return null;
 }
+const r1 = x => Math.round(x * 10) / 10;
+// one point a month for the growth chart: [YYYY-MM, ovr, pot] (4 years kept)
+function track(S, p) {
+  const m = S.date.slice(0, 7), pt = [m, r1(p.ovr), r1(p.pot)];
+  p.trk = p.trk || [];
+  if (p.trk.length && p.trk[p.trk.length - 1][0] === m) p.trk[p.trk.length - 1] = pt; else p.trk.push(pt);
+  if (p.trk.length > 48) p.trk.splice(0, p.trk.length - 48);
+}
+// what-if growth: play `weeks` weeks with `share` of the minutes (at my club, or on loan at `loanTo`); returns {ovr, pot}
+function growthOutlook(S, p, share, weeks, loanTo) {
+  const q = JSON.parse(JSON.stringify(p)); const S2 = Object.create(S); let d = Date.parse(S.date);
+  if (loanTo) { q.club = loanTo; q.loan = { share, from: S.my }; } else q._share = share;
+  const mine = p.club === S.my || (p.loan && p.loan.from === S.my) || !!loanTo;
+  for (let w = 0; w < weeks; w++) {
+    S2.date = new Date(d).toISOString().slice(0, 10); d += 7 * 864e5;
+    const r = devWeek(S2, q, true); if (!r) break;
+    q.at = q.at.map((x, i) => x + r.dAt[i]); q.ovr = calcOvr(q);
+    const a = age(q, S2.date);
+    if (a <= 23 && share >= GROW.bloomMin) { const add = share * (a <= 21 ? GROW.bloom21 : GROW.bloom23) * (mine ? 1 : GROW.bloomAI); const room = Math.min(GROW.potMax - q.pot, GROW.bloomMax - (q.bloom || 0)); if (room > 0) { q.pot += Math.min(add, room); q.bloom = (q.bloom || 0) + Math.min(add, room); } }
+    if (q.ovr > q.pot) q.pot = q.ovr;
+  }
+  return { ovr: q.ovr, pot: q.pot };
+}
+// weeks left in this season (to the end of May)
+function weeksLeft(S) { return Math.max(0, Math.round((Date.parse((S.season + 1) + '-05-31') - Date.parse(S.date)) / (7 * 864e5))); }
+// about how many years until he reaches `target` with `share` of the minutes (null: not within 5 years)
+function yearsTo(S, p, share, target) {
+  if (p.ovr >= target) return 0;
+  const q = JSON.parse(JSON.stringify(p)); const S2 = Object.create(S); let d = Date.parse(S.date);
+  q._share = share;
+  for (let w = 1; w <= 260; w++) {
+    S2.date = new Date(d).toISOString().slice(0, 10); d += 7 * 864e5;
+    const r = devWeek(S2, q, true); if (!r) return null;
+    q.at = q.at.map((x, i) => x + r.dAt[i]); q.ovr = calcOvr(q);
+    const a = age(q, S2.date);
+    if (a <= 23 && share >= GROW.bloomMin) { const add = share * (a <= 21 ? GROW.bloom21 : GROW.bloom23); const room = Math.min(GROW.potMax - q.pot, GROW.bloomMax - (q.bloom || 0)); if (room > 0) { q.pot += Math.min(add, room); q.bloom = (q.bloom || 0) + Math.min(add, room); } }
+    if (q.ovr >= target) return Math.round(w / 52 * 2) / 2 || 0.5;
+  }
+  return null;
+}
 function weekly(S) {
   for (const p of Object.values(S.players)) { if (!S.clubs[p.club] || !p.at) continue; devWeek(S, p, false); }
 }
@@ -416,15 +517,17 @@ function newGame(DATA, clubId, managerName, todayISO) {
     season: sy, date: DATA.start, my: clubId, manager: managerName || '監督',
     clubs: {}, players: {}, order: [], nextPid: 100000,
     fixtures: [], news: [], inbox: [], history: [], records: [],
-    board: 60, settings: { autoSubs: true, subRate: 'mid', speed: 1 }, training: 'bal',
+    board: 60, settings: { autoSubs: true, subRate: 'mid', speed: 1 }, training: 'bal', dataRev: DATA.rev || 1,
     fired: null, seasonEnd: null, lastResult: null, nextInboxId: 1, tick: 0,
   };
   for (const c of DATA.clubs) addClub(S, c);
   for (const p of DATA.players) {
     S.players[p.id] = { ...p, cond: 100, form: 6.5, inj: 0, sus: 0, ycAcc: 0, listed: false, st: blankStats(), hist: [], joined: DATA.start };
+    delete S.players[p.id].fix;
     initAttrs(S.players[p.id]);
   }
-  S.v = 6; S.presV = 4;
+  S.v = 7; S.presV = 4;
+  for (const p of squad(S, clubId)) track(S, p);
   for (const id of S.order) autoLineup(S, id);
   S.fixtures = genFixtures(S.order, DATA.round1, sy);
   setupCups(S);
@@ -557,7 +660,8 @@ function effective(p, role, cond) {
 function autoLineup(S, cid, opts) {
   const c = S.clubs[cid];
   const slots = FORMATIONS[c.tac.form];
-  const pool = squad(S, cid).filter(available);
+  const opp = opts && opts.opp;
+  const pool = squad(S, cid).filter(p => available(p) && !(opp && p.loan && p.loan.from === opp));  // loanees sit out against their parent club
   const used = new Set(); const xi = new Array(11).fill(null);
   const restCond = opts && opts.rotate ? 82 : 72;
   // order: GK, ST/W, CB/FB, MF
@@ -1122,7 +1226,7 @@ function matchdayPrep(S) {
   for (const f of today) hypeMatch(S, f);
   for (const f of today) for (const [cid, opp] of [[f.h, f.a], [f.a, f.h]]) {
     if (cid === S.my || !S.clubs[cid]) continue;
-    autoLineup(S, cid, { rotate: true });
+    autoLineup(S, cid, { rotate: true, opp });
     const plan = aiMentality(S, cid, opp); S.clubs[cid].tac.ment = plan.ment; S.clubs[cid].tac.ctr = plan.ctr;
   }
   if (today.some(f => f.h === S.my || f.a === S.my)) validateLineup(S, S.my);
@@ -1143,6 +1247,18 @@ function monthly(S) {
   const downs = mine.map(shown).filter(x => x.b < x.a).sort((x, y) => (x.b - x.a) - (y.b - y.a)).slice(0, 3);
   if (downs.length) news(S, `衰えが見える：` + downs.map(x => `${x.p.name} ${x.a}→${x.b}`).join('、'), 'warn');
   for (const p of mine) p.ovrM = p.ovr;
+  // growth chart points + 若手の成長レポート (my young players and the ones out on loan; last month = previous chart point)
+  const rows = [];
+  for (const p of mine.concat(myLoans(S).filter(p => p.at))) {
+    const prev = p.trk && p.trk.length ? p.trk[p.trk.length - 1] : null;
+    track(S, p);
+    if (prev && prev[0] !== S.date.slice(0, 7) && age(p, S.date) <= LOAN.maxAge) { const sh = shareFor(S, p); rows.push({ pid: p.id, a: prev[1], b: r1(p.ovr), pa: prev[2], pb: r1(p.pot), sh: sh == null ? null : Math.round(sh * 100) / 100, loan: p.loan ? p.loan.to : null }); }
+  }
+  S.inbox = S.inbox.filter(x => x.type !== 'youth');
+  if (rows.length) {
+    rows.sort((x, y) => (y.b - y.a) - (x.b - x.a) || (y.pb - y.pa) - (x.pb - x.pa) || y.b - x.b);
+    S.inbox.unshift({ id: S.nextInboxId++, type: 'youth', m: D.m(S.date) === 1 ? 12 : D.m(S.date) - 1, rows, d: S.date, seen: true, done: false });
+  }
   const my = S.clubs[S.my];
   news(S, `${D.m(S.date)}月の収支：スポンサー収入 ${money(my.spon || 0)}／人件費 ${money(Math.round(squad(S, S.my).reduce((a, p) => a + wage(p), 0) / 12))}`, 'money');
   if (my.funds < 0) { S.board = clamp(S.board - 6, 0, 100); news(S, '資金がマイナスになっている。フロントは財政を懸念している。', 'warn'); }
@@ -1191,7 +1307,8 @@ function moveP(S, p, toCid, fee) {
   const oldClub = p.club;
   if (S.clubs[oldClub]) p.prev = oldClub; // for 古巣対決
   p.club = toCid; p.listed = false; p.joined = S.date; p.cond = Math.min(p.cond, 90);
-  if (toCid === S.my) unshort(S, p.id);  // signed: off the shortlist
+  if (toCid === S.my) { unshort(S, p.id); delete p.trk; track(S, p); }  // signed: off the shortlist, growth chart starts
+  else if (oldClub === S.my) delete p.trk;
   // shirt number
   const used = new Set(squad(S, toCid).filter(x => x.id !== p.id).map(x => x.num));
   if (used.has(p.num)) { let n = 13; while (used.has(n)) n++; p.num = n; }
@@ -1205,7 +1322,7 @@ function aiTransfer(S) {
   const pos = pick(['DF', 'MF', 'FW', 'FW', 'MF']);
   const bs = squad(S, buyer).filter(p => p.pos === pos).map(p => p.ovr).sort((a, b) => b - a);
   const bar = bs[1] || 60;
-  const targets = Object.values(S.players).filter(p => p.club !== buyer && p.club !== S.my && S.clubs[p.club] && p.pos === pos && p.ovr > bar && p.ovr < bar + 6 && squad(S, p.club).length > 24);
+  const targets = Object.values(S.players).filter(p => p.club !== buyer && p.club !== S.my && !p.loan && S.clubs[p.club] && p.pos === pos && p.ovr > bar && p.ovr < bar + 6 && squad(S, p.club).length > 24);
   if (!targets.length) return;
   const t = pick(targets);
   const fee = Math.round(value(t, S.date) * (0.9 + R() * 0.3) / 100) * 100;
@@ -1216,7 +1333,7 @@ function aiTransfer(S) {
 }
 function marketList(S, filter) {
   const f = filter || {};
-  return Object.values(S.players).filter(p => p.club !== S.my && !p.retire && (S.clubs[p.club] || p.club === 'FA'))
+  return Object.values(S.players).filter(p => p.club !== S.my && !p.retire && !p.loan && (S.clubs[p.club] || p.club === 'FA'))
     .filter(p => !f.pos || p.pos === f.pos)
     .filter(p => !f.q || p.name.replace(/\s/g, '').includes(f.q.replace(/\s/g, '')) || (S.clubs[p.club] && S.clubs[p.club].short.includes(f.q)))
     .sort((a, b) => b.ovr - a.ovr);
@@ -1225,6 +1342,7 @@ function marketList(S, filter) {
 function bid(S, pid, mult) {
   const p = S.players[pid]; if (!p) return { ok: false, msg: '選手が見つかりません' };
   if (p.retire) return { ok: false, msg: `${p.name}は今季限りでの引退が決まっています` };
+  if (p.loan) return { ok: false, msg: `${p.name}は期限付き移籍中の選手です` };
   const my = S.clubs[S.my];
   if (p.club === 'FA') {
     if (squad(S, S.my).length >= 40) { noteBid(S, p, 0, 'full'); return { ok: false, msg: '登録上限（40人）に達しています' }; }
@@ -1260,6 +1378,60 @@ function bid(S, pid, mult) {
   news(S, `${p.name}（${fromName}）を獲得！ 移籍金 ${money(fee)}。`, 'transfer');
   return { ok: true, msg: `${p.name}を獲得しました` };
 }
+/* ---------- loans (期限付き移籍): a young player goes to a J2 club until the end of the season ----------
+   He belongs to the loan club meanwhile (p.club = loan club, p.loan = {from, to, since, share, ovr0, pot0}), so he is off my
+   squad, lineups, wages and registration. He grows as if he got p.loan.share of the minutes there (shareFor) and comes back in
+   rollover with his J2 record. Only in a transfer window, only 23 or under, at most LOAN.max at once. */
+const LOAN = { maxAge: 23, max: 6 };
+// ユースの逸材: chance per season (mine: base + lv × ユースLv → Lv1 11% … Lv5 31%; other clubs 4%), potential GEM.pot+
+const GEM = { base: 0.06, lv: 0.05, ai: 0.04, pot: 80 };
+function myLoans(S) { return Object.values(S.players).filter(p => p.loan && p.loan.from === S.my); }
+function loanClubs(S) { return Object.keys(S.clubs).filter(cid => !S.order.includes(cid) && J2.some(j => j.id === cid)); }
+function loanShare(S, p, cid) { const lv = strength(S, cid); return clamp(0.62 + (p.ovr - (lv - 7)) * 0.06, 0.2, 0.95); }
+function loanCan(S, p) {
+  if (!p || p.club !== S.my) return { ok: false, msg: '自クラブの選手ではありません' };
+  if (age(p, S.date) > LOAN.maxAge) return { ok: false, msg: `期限付き移籍に出せるのは${LOAN.maxAge}歳以下の選手です` };
+  if (p.retire) return { ok: false, msg: '引退が決まっている選手です' };
+  if (!inWindow(S.date)) return { ok: false, msg: `移籍期間外です（次は${jdate(nextWindowStart(S.date))}から）` };
+  if (myLoans(S).length >= LOAN.max) return { ok: false, msg: `期限付き移籍に出せるのは同時に${LOAN.max}人までです` };
+  return { ok: true };
+}
+// three J2 clubs to choose from: how much he would play there
+function loanOptions(S, pid) {
+  const p = S.players[pid]; if (!p) return [];
+  const all = loanClubs(S).map(cid => ({ cid, share: loanShare(S, p, cid) })).sort((a, b) => b.share - a.share);
+  if (all.length <= 3) return all;
+  const pickAt = f => all[Math.min(all.length - 1, Math.round(f * (all.length - 1)))];
+  const out = []; for (const f of [0, 0.5, 1]) { const o = pickAt(f); if (!out.includes(o)) out.push(o); }
+  return out;
+}
+function loanOut(S, pid, cid) {
+  const p = S.players[pid]; const can = loanCan(S, p); if (!can.ok) return can;
+  if (!loanClubs(S).includes(cid)) return { ok: false, msg: '貸し出し先が見つかりません' };
+  const from = S.clubs[S.my];
+  from.tac.xi = from.tac.xi.map(x => x === p.id ? null : x); from.tac.bench = from.tac.bench.filter(x => x !== p.id);
+  p.loan = { from: S.my, to: cid, since: S.date, share: Math.round(loanShare(S, p, cid) * 100) / 100, ovr0: Math.round(p.ovr * 10) / 10, pot0: Math.round(p.pot * 10) / 10 };
+  p.club = cid; p.listed = false;
+  unshort(S, p.id);
+  news(S, `${p.name}が${S.clubs[cid].name}（J2）へ期限付き移籍（シーズン終了まで）。`, 'transfer');
+  return { ok: true, msg: `${p.name}を${S.clubs[cid].short}へ期限付き移籍に出しました` };
+}
+// at the end of the season: his record at the loan club (the J2 season is not simulated match by match)
+function loanSeason(S, p) {
+  const L = p.loan, wks = Math.max(1, (Date.parse(S.date) - Date.parse(L.since)) / (7 * 864e5)), part = clamp(wks / 44, 0.2, 1);
+  const apps = Math.round(42 * part * clamp(L.share + (R() - 0.5) * 0.15, 0.05, 1));
+  const gpa = { FW: 0.32, MF: 0.1, DF: 0.03, GK: 0 }[p.pos] * Math.pow(p.ovr / 66, 3);
+  let g = 0; for (let i = 0; i < apps; i++) if (R() < gpa) g++;
+  const a = Math.round(apps * ({ FW: 0.08, MF: 0.12, DF: 0.05, GK: 0 }[p.pos]) * (0.6 + R() * 0.8));
+  p.st = Object.assign(blankStats(), { apps, g, a, mins: Math.round(apps * 80), rt: Math.round(apps * (6.2 + (p.ovr - 62) * 0.04) * 100) / 100 });
+}
+function loanReturn(S, p) {
+  const L = p.loan, club = S.clubs[L.to];
+  const used = new Set(squad(S, L.from).map(x => x.num)); if (used.has(p.num)) { let n = 13; while (used.has(n)) n++; p.num = n; }
+  p.club = L.from; delete p.loan;
+  if (L.from === S.my) news(S, `${p.name}がレンタル先の${club ? club.short : 'J2'}から復帰（${p.hist[0] && p.hist[0].apps != null ? `J2で${p.hist[0].apps}試合${p.hist[0].g}得点・` : ''}能力 ${Math.round(L.ovr0)}→${Math.round(p.ovr)}）。`, 'grow');
+}
+
 /* shortlist: the players I bid on, newest bid first. Signing a player (moveP) takes him off; so does retiring. */
 function noteBid(S, p, fee, res, guide) {
   S.shortlist = S.shortlist || [];
@@ -1295,6 +1467,7 @@ function genPlayer(S, cid, opts) {
   let num = o.num || ri(2, 49); while (used.has(num)) num++;
   const parts = name.split(' ');
   const p = { id: S.nextPid++, club: cid, pos, pp: o.pp || (pos === 'GK' ? 'GK' : genPP(pos)), num, name, short: foreign ? parts[1] : parts[0], birth, nat: foreign ? 'BRA' : 'JPN', ovr: ov, pot, cond: 100, form: 6.5, inj: 0, sus: 0, ycAcc: 0, listed: false, st: blankStats(), hist: [], joined: S.date, gen: true };
+  if (o.sty && STYLE[o.sty]) p.sty = o.sty;
   initAttrs(p);
   S.players[p.id] = p;
   return p;
@@ -1332,7 +1505,7 @@ function takeJob(S, cid) {
   const from = S.my;
   S.my = cid; S.fired = null; S.board = 55;
   S.inbox = S.inbox.filter(x => x.done);
-  for (const p of Object.values(S.players)) if (p.club === from) p.listed = false;
+  for (const p of Object.values(S.players)) { if (p.club === from) p.listed = false; if (p.club === from || (p.loan && p.loan.from === from)) delete p.trk; if (p.club === cid) track(S, p); }
   autoLineup(S, cid);
   if (S.clubs[from]) autoLineup(S, from);
   setExpectations(S);
@@ -1640,6 +1813,8 @@ function clubGames(S, cid) {
   return _cg[cid] || 0;
 }
 // share of the club's minutes this season (0..1)
+// growth uses this: a loaned player's share is what he gets at the loan club (p.loan.share)
+function shareFor(S, p) { return p._share != null ? p._share : p.loan ? p.loan.share : playShare(S, p); }  // _share: what-if (growthOutlook)
 function playShare(S, p) { const gp = clubGames(S, p.club); return gp < 3 ? null : clamp(p.st.mins / (90 * gp), 0, 1); }
 
 /* ---------- season end & rollover ---------- */
@@ -1716,13 +1891,17 @@ function rollover(S) {
   // retirements (decided at the end of the season)
   decideRetirements(S);
   for (const p of Object.values(S.players)) if (p.retire) { if (p.club === S.my) news(S, `${p.name}が現役引退。お疲れさまでした。`, 'info'); p.club = 'RET'; }
+  // players out on loan: their season at the loan club goes into the record, then they come back
+  const back = Object.values(S.players).filter(p => p.loan);
+  for (const p of back) loanSeason(S, p);
   // season stats archive
   for (const p of Object.values(S.players)) {
     if (p.st.apps || p.club === S.my) p.hist.unshift({ s: seasonLabel(S.season), c: p.club, ovr: Math.round(p.ovr), ...p.st });
-    if (p.at) { p.at0 = p.at.slice(); p.ovr0 = p.ovr; }
+    if (p.at) { p.at0 = p.at.slice(); p.ovr0 = p.ovr; p.pot0 = p.pot; }
     if (p.hist.length > 8) p.hist.length = 8;
     p.st = blankStats(); p.ycAcc = 0; p.sus = 0; delete p.cs; delete p.hot;
   }
+  for (const p of back) if (S.players[p.id] && p.loan) loanReturn(S, p);
   // relegation / promotion
   const promoted = [];
   const pool = J2.filter(c => !S.clubs[c.id] || !S.order.includes(c.id));
@@ -1743,7 +1922,15 @@ function rollover(S) {
     const base = Math.round(strength(S, cid));
     for (let i = 0; i < k; i++) {
       const pr = genPlayer(S, cid, { age: 18, foreign: false, ovr: base - 15 + (cid === S.my ? c.fac.youth : 2) + ri(-2, 2), pot: base - 4 + ri(0, 8) + (cid === S.my ? c.fac.youth * 2 : 3) });
-      if (cid === S.my) news(S, `ユースから${pr.name}（${pr.pos}）がトップ昇格。`, 'grow');
+      if (cid === S.my) { news(S, `ユースから${pr.name}（${pr.pos}）がトップ昇格。`, 'grow'); track(S, pr); }
+    }
+    // ユースの逸材: now and then a 16-17-year-old with a huge ceiling (a better academy finds them more often)
+    const gemP = cid === S.my ? GEM.base + GEM.lv * c.fac.youth : GEM.ai;
+    if (R() < gemP) {
+      const lv = cid === S.my ? c.fac.youth : 2;
+      const pr = genPlayer(S, cid, { age: 16, foreign: false, pos: wpick(['DF', 'MF', 'FW'], x => ({ DF: 2.6, MF: 3.4, FW: 2.6 })[x]), ovr: base - 11 + Math.round(lv / 2) + ri(-2, 2), pot: Math.min(GROW.potMax, GEM.pot + ri(0, 5) + lv), sty: pick(['tech', 'tech', 'speed', 'phys', '']) });
+      pr.gem = true;
+      if (cid === S.my) { news(S, `ユースの逸材、${pr.name}（${age(pr, S.date)}歳・${pr.pos}）がトップ昇格。早くから注目されてきた才能だ。`, 'big'); track(S, pr); }
     }
   }
   // trim oversized AI squads (release weakest veterans to free agency)
@@ -1783,7 +1970,7 @@ const API = {
   createMatch, stepMatch, simulateFull, finishMatch, doSub, benchOptions, onPitch, setMentality, bestSubFor, setCounter, mentLabel,
   advance, nextDay, simAIToday, myFixtureToday, nextMyFixture, todaysFixtures, inWindow, windowEnd, nextWindowStart,
   acceptOffer, rejectOffer, bid, decideRetirements, shortlist, shortEntry, unshort, bidBlock,
-  CUPS, CUP_PRIZE, NATIONAL, fxLabel, cupResult, cupWinner, hypeMatch, HYPE, SUB_RATE, subRate, bigGame, rivalry, SCOUT, sendScout, playShare, marketList, ensureFreeAgents, upgrade, facCost, takeJob, rollover, endSeason, news, fire,
+  CUPS, CUP_PRIZE, NATIONAL, fxLabel, cupResult, cupWinner, hypeMatch, HYPE, SUB_RATE, subRate, STYLE, GROW, shareFor, LOAN, GEM, myLoans, loanCan, loanOptions, loanOut, growthOutlook, weeksLeft, yearsTo, bigGame, rivalry, SCOUT, sendScout, playShare, marketList, ensureFreeAgents, upgrade, facCost, takeJob, rollover, endSeason, news, fire,
 };
 if (typeof module !== 'undefined' && module.exports) module.exports = API; else root.Engine = API;
 })(typeof window !== 'undefined' ? window : globalThis);

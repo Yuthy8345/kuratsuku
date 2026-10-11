@@ -288,6 +288,7 @@ function viewHome() {
   }
   const offers = S.inbox.filter(x => x.type === 'offer' && !x.done);
   if (offers.length) { out.push(`<h3 class="sec-h">移籍オファー<small>${offers.length}件</small></h3>`); offers.forEach(o => { out.push(offerCard(o)); o.seen = true; }); }
+  const yc = youthCard(); if (yc) out.push(yc);
   if (S.lastResult) {
     const f = S.fixtures.find(x => x.id === S.lastResult.fid);
     if (f && f.played) out.push(`<button class="card" data-act="fxDetail" data-id="${f.id}" style="text-align:left;display:grid;gap:4px"><div class="eyebrow">前の試合の結果</div><div class="row"><span class="res res-${S.lastResult.res}">${{ W: '勝', D: '分', L: '敗' }[S.lastResult.res]}</span><b>${esc(S.clubs[f.h].short)} ${f.hg} - ${f.ag} ${esc(S.clubs[f.a].short)}${pkText(f)}</b><span class="spacer"></span><span class="small muted">${E.fxLabel(f)}</span></div></button>`);
@@ -360,7 +361,7 @@ function aptGrid(p, interactive) {
   };
   return `<div class="aptgrid">${rows.map(([cat, dps]) => `<div class="aprow"><span class="apcat pos-${cat}">${cat}</span><div class="apcells" style="grid-template-columns:repeat(${dps.length},1fr)">${dps.map(cell).join('')}</div></div>`).join('')}</div>`;
 }
-const TEAM_TRAIN_DESC = { bal: '成長と回復のバランス型。', hard: '全員がよく伸びる代わりに疲れが抜けにくい。', tact: '連携が深まり試合で中盤がやや有利に。成長は控えめ。', rest: '疲労回復を最優先。成長はゆっくり。' };
+const TEAM_TRAIN_DESC = { bal: '成長と回復のバランス型。', hard: '全員がよく伸びる代わりに疲れが抜けにくい。', tact: '連携が深まり試合で中盤がやや有利に。成長は控えめ。', rest: '疲労回復を最優先。成長はゆっくり。', youth: '23歳以下の成長が約1.4倍。それ以外の選手は少し伸びにくくなる。' };
 // whole-number change; with soft=true a small move that doesn't change the shown number reads as 微増/微減
 function dlt(x, soft) {
   const v = Math.round(x);
@@ -378,6 +379,8 @@ function devRow(p) {
   const chips = [`${a}歳`, `<span class="chip ${p.tf && p.tf !== 'auto' ? 'acc' : ''}">${F.jp}</span>`];
   if (p.ti && p.ti !== 'norm') chips.push(`<span class="chip ${p.ti === 'hard' ? 'warn' : ''}">${I.jp}</span>`);
   if (p.learn) chips.push(`<span class="chip ok">${p.learn.pos}習得中 ${Math.floor(E.apt(p, p.learn.pos))}</span>`);
+  if (bloomed(p)) chips.push('<span class="chip ok">開花</span>');
+  if (p.gem && a <= 19) chips.push('<span class="chip acc">逸材</span>');
   if (p.inj > 0) chips.push(`<span class="chip warn">負傷</span>`);
   const d = p.ovr0 != null ? shownDiff(p.ovr, p.ovr0) : 0;
   return `<li><button class="prow" data-act="train" data-id="${p.id}"><span class="no">${p.num}</span>${posTag(p)}<span class="nm"><b>${esc(p.name)}</b><span>${chips.join('')}</span></span><span class="rt"><span class="ovr ${oc(p.ovr)}">${E.ovr(p)}</span>${dlt(d)}</span></button></li>`;
@@ -395,7 +398,8 @@ function viewDev() {
     </section>
     <div class="row"><div class="seg" style="flex:1">${[['all', '全員'], ['young', '23歳以下']].map(([k, l]) => `<button data-act="devFilter" data-k="${k}" aria-pressed="${(UI.sq.dev || 'all') === k}">${l}</button>`).join('')}</div>${custom ? `<button class="btn ghost" data-act="devReset" style="min-height:48px">全員おまかせ</button>` : ''}</div>
     <p class="fine" style="margin-top:-6px">右の数字は総合力と、今季開幕時からの増減です。</p>
-    <ul class="list">${list.map(devRow).join('') || '<li class="empty">該当する選手がいません</li>'}</ul>`;
+    <ul class="list">${list.map(devRow).join('') || '<li class="empty">該当する選手がいません</li>'}</ul>
+    ${loanSection()}`;
 }
 function viewSquad() {
   const sub = `<div class="subnav"><div class="seg">${[['list', '選手一覧'], ['dev', '育成']].map(([k, l]) => `<button data-act="sqView" data-k="${k}" aria-pressed="${(UI.sq.view || 'list') === k}">${l}</button>`).join('')}</div></div>`;
@@ -410,6 +414,7 @@ function viewSquad() {
     <div class="seg" role="group" aria-label="ポジション">${['ALL', 'GK', 'DF', 'MF', 'FW'].map(k => `<button data-act="sqPos" data-k="${k}" aria-pressed="${UI.sq.pos === k}">${k === 'ALL' ? '全員' : k}</button>`).join('')}</div>
     <div class="seg" role="group" aria-label="並び順">${sorts.map(([k, l]) => `<button data-act="sqSort" data-k="${k}" aria-pressed="${so === k}">${l}</button>`).join('')}</div>
     <ul class="list">${list.map(p => prow(p)).join('') || '<li class="empty">該当する選手がいません</li>'}</ul>
+    ${loanSection()}
     ${sub}`;
 }
 // 交代の頻度 (only while 交代はおまかせ is on)
@@ -422,6 +427,7 @@ function sheetPlayer(id) {
   const p = S.players[id]; if (!p) return;
   sheetState = { type: 'player', id };
   const mine = p.club === S.my; const club = S.clubs[p.club];
+  const lent = !!(p.loan && p.loan.from === S.my);  // out on loan from my club
   const a = E.age(p, S.date); const v = E.value(p, S.date);
   const avgR = p.st.apps ? (p.st.rt / p.st.apps).toFixed(2) : '—';
   const status = [];
@@ -429,6 +435,9 @@ function sheetPlayer(id) {
   if (p.sus > 0) status.push('<span class="chip warn">出場停止</span>');
   if (p.listed) status.push('<span class="chip acc">放出リスト登録中</span>');
   if (p.retire) status.push('<span class="chip">今季限りで引退</span>');
+  if (lent) status.push('<span class="chip acc">期限付き移籍中（シーズン終了まで）</span>');
+  if (p.gem && a <= 19) status.push('<span class="chip acc">ユースの逸材</span>');
+  if ((mine || lent) && bloomed(p)) status.push(`<span class="chip ok">開花（伸びしろ ${Math.round(p.pot0)}→${Math.round(p.pot)}）</span>`);
   if (p.hot) status.push(`<span class="chip fire">燃えている（${esc(p.hot.why)}）</span>`);
   if (E.bigGame(p)) status.push('<span class="chip">大舞台に強い</span>');
   if (p.found && p.club === 'FA') status.push('<span class="chip acc">スカウト推薦</span>');
@@ -436,7 +445,9 @@ function sheetPlayer(id) {
   if (se) status.push('<span class="chip acc">ショートリスト</span>');
   const hist = p.hist && p.hist.length ? `<div><div class="eyebrow" style="margin-bottom:6px">過去の成績</div><ul class="list">${p.hist.map(h => `<li><div class="row" style="padding:9px 12px;font-size:13px"><b>${h.s}</b><span class="muted">${esc(S.clubs[h.c] ? S.clubs[h.c].short : '')}</span><span class="spacer"></span><span class="tnum">${h.apps}試合 ${h.g}得点 ${h.a}A</span></div></li>`).join('')}</ul></div>` : '';
   let foot;
-  if (mine) {
+  if (lent) {
+    foot = `<div class="small muted">シーズンが終わると${esc(S.clubs[S.my].short)}に戻ってきます。</div><button class="btn ghost block" data-act="closeSheet">閉じる</button>`;
+  } else if (mine) {
     foot = `<button class="btn primary block" data-act="train" data-id="${p.id}">トレーニングを設定</button><div class="grid2">${p.retire ? '<button class="btn ghost" disabled>引退が決まっています</button>' : `<button class="btn ghost" data-act="toggleList" data-id="${p.id}">${p.listed ? '放出リストから外す' : '放出リストに載せる'}</button>`}<button class="btn ghost" data-act="closeSheet">閉じる</button></div>`;
   } else if (p.club === 'FA') {
     const sign = Math.round(E.wage(p) * 0.5 / 10) * 10;
@@ -450,16 +461,115 @@ function sheetPlayer(id) {
       : blk && blk.why === 'player' ? `${last}${shortFoot(se, p)}`
       : `${last}<div class="small muted">移籍金を提示（${club ? esc(club.short) : ''}・〜${jd(E.windowEnd(S.date))}）${blk ? '・同じ日の再入札はできません' : ''}</div><div class="grid2">${mults.map(m => `<button class="btn ${m === 1.2 ? 'primary' : ''}" data-act="bid" data-id="${p.id}" data-m="${m}" ${blk ? 'disabled' : ''}>${E.money(Math.round(v * m / 100) * 100)}</button>`).join('')}</div>${shortFoot(se, p)}`;
   }
-  openSheet(`<div class="row">${posTag(p)}<span class="small muted">#${p.num}・${club ? esc(club.name) : 'フリー'}・${a}歳 ${natChip(p)}</span></div>
+  openSheet(`<div class="row">${posTag(p)}<span class="small muted">#${p.num}・${club ? esc(club.name) : 'フリー'}${lent ? `（${esc(S.clubs[S.my].short)}から期限付き移籍）` : ''}・${a}歳 ${natChip(p)}</span></div>
     <h2>${esc(p.name)}</h2>
     ${status.length ? `<div class="row wrap">${status.join('')}</div>` : ''}
-    <div class="bigovr"><span class="ovr ${oc(p.ovr)}">${E.ovr(p)}</span><dl class="kv" style="flex:1"><dt>伸びしろ</dt><dd><span class="stars">${potStars(p)}</span>${mine ? `（最大 ${p.pot}）` : p.found ? `（見立て ${p.pot - 3}〜${p.pot + 3}）` : ''}</dd><dt>市場価値</dt><dd>${E.money(v)}</dd><dt>年俸</dt><dd>${E.money(E.wage(p))}</dd></dl></div>
-    ${attrRows(p, mine)}
+    <div class="bigovr"><span class="ovr ${oc(p.ovr)}">${E.ovr(p)}</span><dl class="kv" style="flex:1"><dt>伸びしろ</dt><dd><span class="stars">${potStars(p)}</span>${mine || lent ? `（最大 ${Math.round(p.pot)}）` : p.found ? `（見立て ${Math.round(p.pot) - 3}〜${Math.round(p.pot) + 3}）` : ''}</dd><dt>市場価値</dt><dd>${E.money(v)}</dd><dt>年俸</dt><dd>${E.money(E.wage(p))}</dd></dl></div>
+    ${attrRows(p, mine || lent)}
+    ${mine || lent ? growthBlock(p, lent) : ''}
     <div><div class="eyebrow" style="margin-bottom:6px">ポジション</div><div class="small" style="margin-bottom:8px">本職 <b>${dpOf(p)}</b>（${E.DP_JP[dpOf(p)]}）${p.learn ? `・<span class="muted">${p.learn.pos}を習得中</span>` : ''}</div>${p.pos === 'GK' ? '' : aptGrid(p, false)}
       <div class="row wrap" style="margin-top:8px"><span class="small muted">実力の目安</span>${rolesLine(p)}</div></div>
-    <div><div class="eyebrow" style="margin-bottom:6px">今季の成績</div><div class="statgrid"><div><small>出場</small><b>${p.st.apps}</b></div><div><small>得点</small><b>${p.st.g}</b></div><div><small>アシスト</small><b>${p.st.a}</b></div><div><small>平均評価</small><b>${avgR}</b></div><div><small>警告</small><b>${p.st.yc}</b></div></div>${p.cs && p.cs.apps ? `<div class="small muted" style="margin-top:6px">カップ戦 ${p.cs.apps}試合 ${p.cs.g}得点 ${p.cs.a}アシスト</div>` : ''}</div>
+    <div><div class="eyebrow" style="margin-bottom:6px">今季の成績</div><div class="statgrid"><div><small>出場</small><b>${p.st.apps}</b></div><div><small>得点</small><b>${p.st.g}</b></div><div><small>アシスト</small><b>${p.st.a}</b></div><div><small>平均評価</small><b>${avgR}</b></div><div><small>警告</small><b>${p.st.yc}</b></div></div>${lent ? '<div class="small muted" style="margin-top:6px">J2での成績はシーズン終了時にまとめて記録されます。</div>' : ''}${p.cs && p.cs.apps ? `<div class="small muted" style="margin-top:6px">カップ戦 ${p.cs.apps}試合 ${p.cs.g}得点 ${p.cs.a}アシスト</div>` : ''}</div>
     ${mine ? `<div class="row small muted">コンディション ${Math.round(p.cond)}%<span class="spacer"></span><span style="display:block;width:120px">${condBar(p.cond)}</span></div>` : ''}
     ${hist}`, foot);
+}
+
+const pct = x => Math.round(x * 100);
+const bloomed = p => p.pot0 != null && Math.round(p.pot) > Math.round(p.pot0);
+// share of the minutes so far; before the club's 3rd game, a guess from the lineup (est)
+function paceOf(p) {
+  const sh = E.shareFor(S, p); if (sh != null) return { v: sh, est: false };
+  const c = S.clubs[S.my]; return { v: c.tac.xi.includes(p.id) ? 0.85 : c.tac.bench.includes(p.id) ? 0.2 : 0.03, est: true };
+}
+const yearsText = y => y == null ? '5年以上' : y <= 0.5 ? '約半年' : `約${y}年`;
+// monthly growth chart (p.trk + this month): overall (solid), ceiling (dashed), 主力級 line (dotted)
+function growthChart(p, target) {
+  const m = S.date.slice(0, 7), pts = (p.trk || []).slice(), now = [m, p.ovr, p.pot];
+  if (pts.length && pts[pts.length - 1][0] === m) pts[pts.length - 1] = now; else pts.push(now);
+  if (pts.length < 2) return '';
+  const W = 300, H = 116, L = 4, RW = 54, T = 9, B = 20;
+  const vals = pts.flatMap(x => [x[1], x[2]]).concat(target ? [target] : []);
+  let lo = Math.floor(Math.min(...vals) - 2), hi = Math.ceil(Math.max(...vals) + 2);
+  if (hi - lo < 12) { lo = Math.floor((hi + lo) / 2 - 6); hi = lo + 12; }
+  const X = i => L + i * (W - L - RW) / (pts.length - 1), Y = v => T + (hi - v) * (H - T - B) / (hi - lo);
+  const path = k => pts.map((x, i) => `${i ? 'L' : 'M'}${X(i).toFixed(1)} ${Y(x[k]).toFixed(1)}`).join('');
+  const oneYear = pts[0][0].slice(0, 4) === m.slice(0, 4);
+  const mlab = s => { const [y, mm] = s.split('-').map(Number); return oneYear ? `${mm}月` : `${String(y).slice(2)}年${mm}月`; };
+  const xe = X(pts.length - 1), last = pts[pts.length - 1];
+  // right-hand labels, pushed apart so they never overlap
+  const labs = [{ y: Y(last[1]), t: Math.round(last[1]), c: 'gc-v' }, { y: Y(last[2]), t: `最大${Math.round(last[2])}`, c: 'gc-pl' }];
+  if (target) labs.push({ y: Y(target), t: `主力級${target}`, c: 'gc-tl' });
+  labs.sort((a, b) => a.y - b.y); for (let i = 1; i < labs.length; i++) labs[i].y = Math.max(labs[i].y, labs[i - 1].y + 12);
+  const over = labs[labs.length - 1].y - (H - B); if (over > 0) labs.forEach(l => { l.y -= over; });
+  return `<svg class="gchart" viewBox="0 0 ${W} ${H}" role="img" aria-label="総合力の推移 ${Math.round(pts[0][1])}から${Math.round(last[1])}">
+    <line class="gc-ax" x1="${L}" x2="${xe}" y1="${H - B + 2}" y2="${H - B + 2}"/>
+    ${target ? `<line class="gc-tg" x1="${L}" x2="${xe}" y1="${Y(target).toFixed(1)}" y2="${Y(target).toFixed(1)}"/>` : ''}
+    <path class="gc-pot" d="${path(2)}"/><path class="gc-ovr" d="${path(1)}"/>
+    <circle class="gc-dot" cx="${xe.toFixed(1)}" cy="${Y(last[1]).toFixed(1)}" r="3.6"/>
+    ${labs.map(l => `<text class="${l.c}" x="${(xe + 7).toFixed(1)}" y="${(l.y + 4).toFixed(1)}">${l.t}</text>`).join('')}
+    <text class="gc-x" x="${L}" y="${H - 5}">${mlab(pts[0][0])}</text><text class="gc-x" x="${xe.toFixed(1)}" y="${H - 5}" text-anchor="end">${mlab(m)}</text>
+  </svg>`;
+}
+// 成長の記録: chart, how long until he is a regular, and (young players) the loan option
+function growthBlock(p, lent) {
+  const a = E.age(p, S.date), young = a <= E.LOAN.maxAge;
+  const target = Math.round(E.strength(S, S.my));
+  let eta = '';
+  if (young && p.ovr >= target) eta = `<p class="small" style="margin:0">すでに主力級です（チームの上位14人の平均 ${target}）。</p>`;
+  else if (young) {
+    const pc = paceOf(p), cur = pc.v;
+    const yC = E.yearsTo(S, p, cur, target), yR = cur < 0.8 ? E.yearsTo(S, p, 0.85, target) : null;
+    eta = `<p class="small" style="margin:0">主力級（${target}）まで：${lent ? 'レンタル先' : '今'}の出場ペース（${pc.est ? '見込み ' : ''}${pct(cur)}%）なら<b>${yearsText(yC)}</b>${cur < 0.8 ? `・主力で使えば<b>${yearsText(yR)}</b>` : ''}</p>`;
+  }
+  const loanBtn = young && !lent && !p.retire ? `<button class="btn ghost block" data-act="loanSheet" data-id="${p.id}">期限付き移籍（J2）を検討する</button>` : '';
+  const legend = `<div class="gc-leg small muted"><span><i class="l-ovr"></i>総合力</span><span><i class="l-pot"></i>伸びしろ</span><span><i class="l-tg"></i>主力級</span></div>`;
+  const chart = growthChart(p, target);
+  return `<div style="display:grid;gap:8px"><div class="eyebrow">成長の記録</div>${chart ? chart + legend : '<p class="fine" style="margin:0">成長の記録は毎月1日に付けています。来月からグラフになります。</p>'}${eta}
+    ${young ? '<p class="fine" style="margin:0">23歳以下は試合に出るほど伸び、よく出てよく活躍すると伸びしろそのものが広がります（開花）。</p>' : ''}${loanBtn}</div>`;
+}
+// 期限付き移籍: three J2 clubs with how much he would play and where he would be at the end of the season
+function sheetLoan(id) {
+  const p = S.players[id]; if (!p || p.club !== S.my) return;
+  sheetState = { type: 'loan', id };
+  const can = E.loanCan(S, p), wk = E.weeksLeft(S);
+  const pc = paceOf(p), cur = pc.v;
+  const stay = E.growthOutlook(S, p, cur, wk), reg = E.growthOutlook(S, p, 0.85, wk);
+  const potTxt = g => Math.round(g.pot) > Math.round(p.pot) ? `<div class="small" style="color:var(--win)">伸びしろ ${Math.round(p.pot)}→${Math.round(g.pot)}</div>` : '';
+  const opt = o => {
+    const c = S.clubs[o.cid], g = E.growthOutlook(S, p, o.share, wk, o.cid);
+    return `<li><div class="row" style="padding:12px;gap:10px;align-items:center">${kit(o.cid)}<div style="flex:1;min-width:0"><b>${esc(c.name)}</b><div class="small muted">J2・出場機会 約${pct(o.share)}%</div></div>
+      <div style="text-align:right;white-space:nowrap"><span class="small muted">シーズン終了時</span><br><span class="ovr ${oc(g.ovr)}">${Math.round(g.ovr)}</span>${dlt(g.ovr - p.ovr, true)}${potTxt(g)}</div></div>
+      <div style="padding:0 12px 12px"><button class="btn ${o === best ? 'primary' : ''} block" data-act="loanGo" data-id="${p.id}" data-k="${o.cid}" ${can.ok ? '' : 'disabled'}>${esc(c.short)}へ出す</button></div></li>`;
+  };
+  const opts = E.loanOptions(S, p.id); const best = opts[0];
+  openSheet(`<div class="row">${posTag(p)}<span class="small muted">#${p.num}・${E.age(p, S.date)}歳・総合力 ${E.ovr(p)}（最大 ${Math.round(p.pot)}）</span></div>
+    <h2>期限付き移籍（J2）</h2>
+    <p class="small" style="margin:0">${esc(p.name)}をシーズン終了まで（あと約${wk}週）J2のクラブへ貸し出します。期間中はこちらの試合には出られず、年俸は貸し出し先が負担します。</p>
+    <dl class="kv"><dt>残った場合</dt><dd>出場機会 ${pc.est ? '見込み ' : ''}${pct(cur)}% → シーズン終了時 <b>${Math.round(stay.ovr)}</b>${dlt(stay.ovr - p.ovr, true)}</dd><dt>主力で使った場合</dt><dd>出場機会 85% → <b>${Math.round(reg.ovr)}</b>${dlt(reg.ovr - p.ovr, true)}</dd></dl>
+    ${can.ok ? '' : `<p class="small" style="margin:0;color:var(--loss)">${esc(can.msg)}</p>`}
+    <ul class="list">${opts.map(opt).join('') || '<li class="empty">貸し出し先が見つかりません</li>'}</ul>
+    <p class="fine" style="margin:0">出場機会は選手の実力と貸し出し先の層の厚さで決まります。期限付き移籍に出せるのは${E.LOAN.maxAge}歳以下、同時に${E.LOAN.max}人まで（いま${E.myLoans(S).length}人）。</p>`,
+    `<div class="grid2"><button class="btn ghost" data-act="player" data-id="${p.id}">戻る</button><button class="btn ghost" data-act="closeSheet">閉じる</button></div>`);
+}
+function loanRow(p) {
+  const L = p.loan, c = S.clubs[L.to];
+  return `<li><button class="prow" data-act="player" data-id="${p.id}">${kit(L.to)}${posTag(p)}<span class="nm"><b>${esc(p.name)}</b><span>${c ? esc(c.short) : 'J2'}・${E.age(p, S.date)}歳・出場機会 約${pct(L.share)}%${bloomed(p) ? '<span class="chip ok">開花</span>' : ''}</span></span><span class="rt"><span class="ovr ${oc(p.ovr)}">${E.ovr(p)}</span>${dlt(shownDiff(p.ovr, L.ovr0))}</span></button></li>`;
+}
+function loanSection() {
+  const ls = E.myLoans(S); if (!ls.length) return '';
+  return `<h3 class="sec-h">期限付き移籍中<small>${ls.length}人・シーズン終了まで</small></h3><ul class="list">${ls.sort((a, b) => b.ovr - a.ovr).map(loanRow).join('')}</ul>`;
+}
+// 若手の成長レポート (monthly): 23 and under + players out on loan, change since last month
+function youthCard() {
+  const it = S.inbox.find(x => x.type === 'youth' && !x.done); if (!it) return '';
+  const rows = it.rows.filter(r => { const p = S.players[r.pid]; return p && (p.club === S.my || (p.loan && p.loan.from === S.my)); });
+  if (!rows.length) return '';
+  const show = rows.slice(0, 6);
+  return `<section class="card" style="display:grid;gap:8px"><div class="row"><div class="eyebrow">若手の成長レポート・${it.m}月</div><span class="spacer"></span><button class="btn ghost" data-act="youthDone" data-id="${it.id}" style="min-height:36px;padding:0 12px">閉じる</button></div>
+    <ul class="list">${show.map(r => { const p = S.players[r.pid]; const bl = Math.round(r.pb) > Math.round(r.pa);
+      const where = r.loan ? `${S.clubs[r.loan] ? esc(S.clubs[r.loan].short) : 'J2'}へレンタル中` : `出場機会 ${r.sh == null ? '—' : pct(r.sh) + '%'}`;
+      return `<li><button class="prow" data-act="player" data-id="${p.id}"><span class="no">${p.num}</span>${posTag(p)}<span class="nm"><b>${esc(p.name)}</b><span>${E.age(p, S.date)}歳・${where}${bl ? `<span class="chip ok">伸びしろ ${Math.round(r.pa)}→${Math.round(r.pb)}</span>` : ''}${p.gem ? '<span class="chip acc">逸材</span>' : ''}</span></span><span class="rt"><span class="ovr ${oc(r.b)}">${Math.round(r.b)}</span>${dlt(r.b - r.a, true)}</span></button></li>`; }).join('')}</ul>
+    <p class="fine" style="margin:0">23歳以下と期限付き移籍中の選手の、先月からの変化${rows.length > show.length ? `（ほか${rows.length - show.length}人）` : ''}。試合に出ている選手ほど伸びます。</p></section>`;
 }
 
 function sheetTrain(id) {
@@ -475,7 +585,7 @@ function sheetTrain(id) {
   const note = gap <= 0.3 && a < 30 ? 'すでに伸びしろの上限近くまで成長しています。' : a >= 30 ? '30歳を過ぎるとスピードやスタミナから衰え始めます。判断力はまだ伸びます。' : '';
   openSheet(`<div class="row">${posTag(p)}<span class="small muted">#${p.num}・${a}歳・コンディション ${Math.round(p.cond)}%</span></div>
     <h2>${esc(p.name)}</h2>
-    <div class="bigovr"><span class="ovr ${oc(p.ovr)}">${E.ovr(p)}</span><dl class="kv" style="flex:1"><dt>今季の増減</dt><dd>${dlt(shownDiff(p.ovr, p.ovr0 != null ? p.ovr0 : p.ovr))}</dd><dt>伸びしろ</dt><dd><span class="stars">${potStars(p)}</span>（最大 ${p.pot}）</dd><dt>1か月の見込み</dt><dd>${pv ? dlt(pv.dOvr, true) : '—'}</dd><dt>出場機会</dt><dd>${(() => { const sh = E.playShare(S, p); return sh == null ? '—' : Math.round(sh * 100) + '%'; })()}</dd></dl></div>
+    <div class="bigovr"><span class="ovr ${oc(p.ovr)}">${E.ovr(p)}</span><dl class="kv" style="flex:1"><dt>今季の増減</dt><dd>${dlt(shownDiff(p.ovr, p.ovr0 != null ? p.ovr0 : p.ovr))}</dd><dt>伸びしろ</dt><dd><span class="stars">${potStars(p)}</span>（最大 ${Math.round(p.pot)}）</dd><dt>1か月の見込み</dt><dd>${pv ? dlt(pv.dOvr, true) : '—'}</dd><dt>出場機会</dt><dd>${(() => { const sh = E.playShare(S, p); return sh == null ? '—' : Math.round(sh * 100) + '%'; })()}</dd></dl></div>
     ${top.length ? `<p class="fine" style="margin:-4px 0 0">このメニューだと1か月で ${top.map(x => `${E.ATTR[x.i]} ${x.d > 0 ? '+' : ''}${x.d}`).join('、')} ほど。</p>` : pv && pv.dAt.some(d => d >= 0.15) ? '<p class="fine" style="margin:-4px 0 0">1か月では目に見える変化は小さく、少しずつ伸びていきます。</p>' : ''}
     ${note ? `<p class="fine" style="margin:-4px 0 0">${note}</p>` : ''}
     <p class="fine" style="margin:-4px 0 0">出場機会はクラブの試合時間のうち出ていた割合。試合に出るほど成長が速く、23歳以下は特に伸びます。</p>
@@ -945,6 +1055,7 @@ function refreshSheet() {
   if (!sheetState) return;
   const s = sheetState;
   if (s.type === 'presets') return sheetPresets();
+  if (s.type === 'loan') return S.players[s.id] && S.players[s.id].club === S.my ? sheetLoan(s.id) : sheetPlayer(s.id);
   if (s.type === 'player') sheetPlayer(s.id); else if (s.type === 'train') sheetTrain(s.id); else if (s.type === 'bench') sheetBench(s.id); else if (s.type === 'slot') sheetSlot(s.i); else if (s.type === 'pre') sheetPrematch(s.id); else if (s.type === 'msub') sheetMatchTactics();
 }
 let toastT = null;
@@ -1154,7 +1265,7 @@ function go() {
   persist(false);
   render();
   if (st.stop === 'match') sheetPrematch(st.fid);
-  else if (st.stop === 'inbox') { const it = S.inbox[0]; UI.tab = 'home'; render(); window.scrollTo(0, 0); toast(it && it.type === 'scout' ? 'スカウトが戻りました' : '移籍オファーが届きました'); }
+  else if (st.stop === 'inbox') { const it = S.inbox.find(x => x.type !== 'youth'); UI.tab = 'home'; render(); window.scrollTo(0, 0); toast(it && it.type === 'scout' ? 'スカウトが戻りました' : '移籍オファーが届きました'); }
   else if (st.stop === 'note') toast(st.text);
   else if (st.stop === 'seasonEnd') { persist(true); render(); sheetSeasonEnd(); }
   else if (st.stop === 'fired') { persist(true); render(); sheetFired(); }
@@ -1243,6 +1354,9 @@ const ACT = {
   mkPos(d) { UI.mk.pos = d.k; render(); },
   mkFA() { UI.mk.fa = !UI.mk.fa; render(); },
   mkView(d) { UI.mk.view = d.k; render(); },
+  loanSheet(d) { sheetLoan(Number(d.id)); },
+  loanGo(d) { const r = E.loanOut(S, Number(d.id), d.k); toast(r.msg); if (r.ok) { persist(true); sheetPlayer(Number(d.id)); render(); } else refreshSheet(); },
+  youthDone(d) { const it = S.inbox.find(x => x.id === Number(d.id)); if (it) it.done = true; persist(false); render(); },
   unshort(d) { const p = S.players[d.id]; E.unshort(S, Number(d.id)); persist(false); toast(`${p ? p.name : '選手'}をショートリストから外しました`); refreshSheet(); render(); },
   upgrade(d) { const r = E.upgrade(S, d.k); toast(r.msg); if (r.ok) { persist(true); render(); } },
   training(d) { S.training = d.k; persist(false); render(); },

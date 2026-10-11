@@ -40,7 +40,7 @@
   --f-chalk: "Yusei Magic", "Zen Kaku Gothic New", "Hiragino Sans", sans-serif;
   --f-led: "DotGothic16", ui-monospace, "Courier New", monospace;
   --dock-h: 124px;
-  --sat: env(safe-area-inset-top, 0px); --sab: env(safe-area-inset-bottom, 0px); /* notch / home bar (the PWA shell already pads :root by these) */ /* notch / home bar (the PWA shell already pads :root by these) */
+  --sat: env(safe-area-inset-top, 0px); --sab: env(safe-area-inset-bottom, 0px); /* notch / home bar (the PWA shell already pads :root by these) */
   color-scheme: dark;
 }
 :root[data-board="white"] {
@@ -324,6 +324,21 @@ button.apc:not(:disabled):active { transform: scale(.97); }
 .statgrid div { background: var(--surface2); border-radius: 10px; padding: 6px 2px; }
 .statgrid small { display: block; font-size: 10px; color: var(--muted); font-weight: 700; }
 .statgrid b { font-size: 17px; font-variant-numeric: tabular-nums; }
+/* growth chart (成長の記録): chalk lines on the board */
+.gchart { display: block; width: 100%; height: auto; overflow: visible; }
+.gchart .gc-ax { stroke: var(--line); stroke-width: 1.2; }
+.gchart .gc-ovr { fill: none; stroke: var(--accent); stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.gchart .gc-pot { fill: none; stroke: var(--muted); stroke-width: 1.6; stroke-dasharray: 5 4; stroke-linecap: round; }
+.gchart .gc-tg { stroke: var(--win); stroke-width: 1.6; stroke-dasharray: .5 4.5; stroke-linecap: round; }
+.gchart .gc-dot { fill: var(--accent); }
+.gchart text { font-family: var(--f-body); font-size: 10.5px; fill: var(--muted); font-weight: 700; }
+.gchart .gc-v { fill: var(--ink); font-size: 13px; }
+.gchart .gc-tl { fill: var(--win); }
+.gc-leg { display: flex; gap: 14px; flex-wrap: wrap; margin-top: -2px; }
+.gc-leg span { display: inline-flex; align-items: center; gap: 5px; }
+.gc-leg i { display: inline-block; width: 18px; height: 0; border-top: 2.6px solid var(--accent); border-radius: 2px; }
+.gc-leg i.l-pot { border-top: 1.6px dashed var(--muted); }
+.gc-leg i.l-tg { border-top: 2px dotted var(--win); }
 .bigovr { display: flex; align-items: flex-end; gap: 14px; }
 .bigovr .ovr { font-size: 48px; }
 .cmp { display: grid; grid-template-columns: 40px 1fr 70px 1fr 40px; align-items: center; gap: 6px; font-size: 13px; }

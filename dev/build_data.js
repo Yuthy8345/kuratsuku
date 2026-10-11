@@ -202,6 +202,44 @@ for (const list of Object.values(byClub)) {
   for (const p of list) if (cnt[p.short] > 1 && p.nat === 'JPN') { const given = p.name.split(' ')[1]; if (given) p.short = p.short + given[0]; }
 }
 
+// ---------- young players: what they really do now (data revision 2, 2026-10-12) ----------
+// The age rule above rates every teenager about 15 below the club, which badly undersells the ones already playing.
+// 1) Starts: a 23-or-under player with starting appearances in 2026/27 (Football LAB, as of 2026-09-21) is rated at
+//    least club base - 6 + 0.9 per start (up to 8), and keeps an age-fitting growth margin above that.
+// 2) Youth internationals and stand-outs (ソーイの評価, from match reports and the 2026 squads):
+//    アジア競技大会2026（U-21）: ピサノ・荒木・永野・森・大関・保田・中島・嶋本・横山 / U-17（AFC U17アジアカップ2026・リモージュ国際大会）: 元砂・長南・和田・エゼモクェ
+//    三井寺眞（横浜FM・16歳）: J1開幕戦で史上最年少先発・先制点を含む3得点に関与、第6節まで全試合出場（5先発）2得点。技術と視野は抜群、球際とフィジカルが課題。
+const YOUTH = {
+  三井寺眞: [70, 88], 嶋本悠大: [69, 81], 中島洋太朗: [73, 83], 横山夢樹: [71, 80], 大関友翔: [72, 80], 保田堅心: [68, 78],
+  ピサノアレックス幸冬堀尾: [69, 80], 永野修都: [65, 78], 森壮一朗: [63, 77], 荒木琉偉: [62, 79],
+  元砂晏翔仁ウデンバ: [60, 78], 長南開史: [58, 78], 和田武士: [58, 77], エゼモクェチメヅェ海: [57, 77],
+};
+// playing style (ability split; see STYLE in engine.js)
+const STYLE = { 三井寺眞: 'tech' };
+const DATA_REV = 2;
+const FLA = {};
+for (const l of fs.readFileSync(path.join(__dirname, 'positions_footballlab.txt'), 'utf8').split('\n')) {
+  if (!l || l[0] === '#') continue;
+  const [club, , list] = l.split('|');
+  for (const e of list.split(', ')) { const mm = e.match(/^(.*) (\d+)$/); const k = club + ':' + mm[1].replace(/\s/g, ''); FLA[k] = (FLA[k] || 0) + Number(mm[2]); }
+}
+const youthStat = { starts: 0, picked: 0 };
+const baseOf = Object.fromEntries(clubs.map(c => [c.id, c.base]));
+for (const p of players) {
+  const key = p.name.replace(/\s/g, '');
+  const a = ageAt(p.birth.replace(/-/g, '/'));
+  if (a > 23) continue;
+  const old = { ovr: p.ovr, pot: p.pot };
+  const st = FLA[p.club + ':' + key] || 0;
+  if (st) { const floor = Math.round(baseOf[p.club] - 6 + Math.min(st, 8) * 0.9); if (floor > p.ovr) { p.ovr = floor; youthStat.starts++; } }
+  if (YOUTH[key]) { [p.ovr, p.pot] = YOUTH[key]; youthStat.picked++; }
+  const margin = a <= 17 ? 14 : a <= 19 ? 10 : a <= 21 ? 7 : a <= 22 ? 4 : 2;
+  p.pot = Math.max(p.pot, p.ovr + (p.ovr > old.ovr ? margin : 0), p.ovr);
+  if (STYLE[key]) p.sty = STYLE[key];
+  if (p.ovr !== old.ovr || p.pot !== old.pot || p.sty) p.fix = { r: DATA_REV, d: p.ovr - old.ovr };
+}
+console.log('young players re-rated', youthStat, 'changed', players.filter(p => p.fix).length);
+
 // ---------- detailed positions: 本職 (pp) and extra aptitude (ap) ----------
 // CB SB / DMF CMF OMF SH / CF ST(セカンドトップ・シャドー) WG
 // Source 1: Football LAB formation pages (2026/27 starting slots per player, positions_footballlab.txt).
@@ -290,7 +328,7 @@ console.log('positions', ppStat);
 const round1 = [['yokohamafm', 'kashima'], ['kashiwa', 'mito'], ['fctokyo', 'machida'], ['tokyov', 'kawasakif'], ['nagoya', 'shimizu'], ['gosaka', 'urawa'], ['cosaka', 'okayama'], ['hiroshima', 'chiba'], ['fukuoka', 'kobe'], ['nagasaki', 'kyoto']];
 
 const j2 = Object.fromEntries(Object.entries(HISTORY_J2).map(([id, h]) => [id, { pres: presFrom(h), titles: { j1: h.j1, lc: h.lc, ec: h.ec + h.ecOld, acl: h.acl } }]));
-const out = { season: '2026/27', start: '2026-08-07', round1, clubs, players, j2, presV: 4 };
+const out = { season: '2026/27', start: '2026-08-07', round1, clubs, players, j2, presV: 4, rev: DATA_REV };
 fs.writeFileSync(path.join(__dirname, 'data.json'), JSON.stringify(out));
 console.log('clubs', clubs.length, 'players', players.length, 'bytes', JSON.stringify(out).length);
 const avg = {};
