@@ -1124,12 +1124,21 @@ function finishMatch(S, M) {
     const myS = strength(S, S.my), opS = strength(S, opp) - (k === 'h' ? 1 : -1);
     const expPts = clamp(1.35 + (myS - opS) * 0.18, 0.4, 2.4);
     const pts = res[k] === 'W' ? 3 : res[k] === 'D' ? 1 : 0;
-    S.board = clamp(Math.round(S.board + (pts - expPts) * (cup ? 1.6 : 3.2)), 0, 100);
+    const B = boardLv(S), b0 = S.board;
+    S.board = clamp(Math.round(S.board + (pts - expPts) * B.match * (cup ? 0.5 : 1)), 0, 100);
     const pk = M.pk ? `（PK ${M.pk[0]}-${M.pk[1]}）` : '';
     S.lastResult = { fid: fx.id, res: res[k], text: `${S.clubs[fx.h].short} ${M.hg}-${M.ag} ${S.clubs[fx.a].short}${pk}` };
     const potm = Object.entries(M.pm).filter(([, pm]) => pm.side === k).sort((a, b) => b[1].final - a[1].final)[0];
     const giant = res[k] === 'W' && power(S, opp) - power(S, S.my) >= 4 ? '　ジャイアントキリング！' : '';
     news(S, `${fxLabel(fx)}　${S.clubs[fx.h].short} ${M.hg}-${M.ag} ${S.clubs[fx.a].short}${pk}（${res[k] === 'W' ? (cup ? '勝ち抜け' : '勝利') : res[k] === 'D' ? '引き分け' : '敗戦'}）${giant}` + (potm ? `　チーム最高評価：${S.players[potm[0]].name}（${potm[1].final.toFixed(1)}）` : ''), res[k] === 'W' ? 'win' : res[k] === 'L' ? 'loss' : 'draw');
+    // warnings on the way down (once each until it recovers)
+    const lv = B.warn.filter(w => S.board <= w).length;
+    if (S.board > B.warn[0] + 10) S.boardWarn = 0;
+    if (lv > (S.boardWarn || 0) && S.board < b0) {
+      S.boardWarn = lv;
+      news(S, lv >= 2 ? `フロントの信頼が${S.board}まで下がった。このまま負けが込むと解任もありうる。` : `フロントが成績を不安視している（信頼 ${S.board}）。`, 'warn');
+      S._stopNote = lv >= 2 ? 'フロントの信頼が危険水域です' : 'フロントが成績を不安視しています';
+    }
   }
   M.applied = true;
   return fx;
@@ -1216,7 +1225,11 @@ function nextDay(S) {
   if (D.d(S.date) === 1) monthly(S);
   if (isIn) transferDay(S);
   // board patience
-  if (S.board <= 8 && S.fixtures.filter(f => f.played && (f.h === S.my || f.a === S.my)).length >= 10) fire(S, '成績不振による解任');
+  { const B = boardLv(S);
+    if (S.board <= B.fireMid && S.fixtures.filter(f => f.played && !f.cup && (f.h === S.my || f.a === S.my)).length >= B.fireAfter) {
+      const t = table(S), pos = t.findIndex(r => r.id === S.my) + 1;
+      if (pos > t.length - B.zone) fire(S, '成績不振による解任');
+    } }
   matchdayPrep(S);
 }
 // the morning of a matchday: cup draws, who is on fire, and the other clubs' team sheets and game plans
@@ -1503,7 +1516,7 @@ function fire(S, reason) {
 }
 function takeJob(S, cid) {
   const from = S.my;
-  S.my = cid; S.fired = null; S.board = 55;
+  S.my = cid; S.fired = null; S.board = 55; S.boardWarn = 0;
   S.inbox = S.inbox.filter(x => x.done);
   for (const p of Object.values(S.players)) { if (p.club === from) p.listed = false; if (p.club === from || (p.loan && p.loan.from === from)) delete p.trk; if (p.club === cid) track(S, p); }
   autoLineup(S, cid);
@@ -1819,6 +1832,24 @@ function playShare(S, p) { const gp = clubGames(S, p.club); return gp < 3 ? null
 
 /* ---------- season end & rollover ---------- */
 const PRIZE = [30000, 12000, 6000, 3000, 2000, 1500, 1200, 1000, 900, 800, 700, 600, 500, 400, 300, 200, 100, 0, 0, 0]; // 万円
+/* フロントの信頼 (board), three levels of patience (S.settings.boardLv, ふつう when unset):
+   match   — after every league match: (points − what the squad should get) × match (cups half)
+   met/near/perPos/missMax — at the end of the season by the target: met +met, within nearBand +near, further off −perPos a place
+             (at most missMax; perPos 0 = a flat −missMax)
+   keep    — a new season starts from 55 + (board − 55) × keep (the slate is partly wiped)
+   fireEnd/grace — fired at the end of the season below fireEnd, except in the first `grace` seasons at a club (relegation always)
+   fireMid/fireAfter/zone — fired mid-season at fireMid or below after fireAfter league games, if in the bottom `zone`
+             places of the table
+   warn    — a warning in the news (and a stop) when it falls to these */
+const BOARD_LV = {
+  easy: { jp: 'やさしい', sub: '目標に届かなくても続けやすい。解任はほぼJ2降格のときだけ。', match: 1.4, met: 20, near: 0, nearBand: 3, perPos: 3, missMax: 12, keep: 0.5, fireEnd: 5, grace: 1, fireMid: 5, fireAfter: 19, zone: 3, warn: [25, 12] },
+  mid: { jp: 'ふつう', sub: '就任1年目は猶予あり。目標を大きく下回るシーズンが続くか、降格圏で信頼が尽きると解任。', match: 1.6, met: 20, near: 0, nearBand: 3, perPos: 4, missMax: 16, keep: 0.6, fireEnd: 10, grace: 1, fireMid: 8, fireAfter: 15, zone: 4, warn: [30, 16] },
+  hard: { jp: 'きびしい', sub: '1試合ごとの評価が大きく、目標未達ならすぐ解任もある（以前のルール）。', match: 3.2, met: 20, near: -5, nearBand: 3, perPos: 0, missMax: 25, keep: 1, fireEnd: 15, grace: 0, fireMid: 8, fireAfter: 10, zone: 99, warn: [30, 16] },
+};
+const BOARD = BOARD_LV.mid;  // overridable in tests (hard = the rules before 2026-10-12)
+function boardLv(S) { const k = S.settings && S.settings.boardLv; return k && BOARD_LV[k] ? BOARD_LV[k] : BOARD; }
+// seasons in a row at this club (the season just finished included)
+function tenure(S) { let n = 0; for (const h of S.history) { if (h.club !== S.my) break; n++; } return n; }
 function endSeason(S) {
   const t = table(S);
   const myPos = t.findIndex(r => r.id === S.my) + 1;
@@ -1840,13 +1871,14 @@ function endSeason(S) {
   const scorers = Object.values(S.players).filter(p => p.st.g > 0).sort((a, b) => b.st.g - a.st.g).slice(0, 5).map(p => ({ id: p.id, name: p.name, club: p.club, g: p.st.g }));
   const target = S.clubs[S.my].target;
   let verdict;
+  const B = boardLv(S);
   if (rel.includes(S.my)) verdict = 'relegated';
   else if (myPos <= target.pos) verdict = myPos === 1 ? 'champion' : 'met';
-  else if (myPos <= target.pos + 3) verdict = 'near';
+  else if (myPos <= target.pos + B.nearBand) verdict = 'near';
   else verdict = 'missed';
-  if (verdict === 'champion' || verdict === 'met') S.board = clamp(S.board + 20, 0, 100);
-  else if (verdict === 'near') S.board = clamp(S.board - 5, 0, 100);
-  else if (verdict === 'missed') S.board = clamp(S.board - 25, 0, 100);
+  if (verdict === 'champion' || verdict === 'met') S.board = clamp(S.board + B.met, 0, 100);
+  else if (verdict === 'near') S.board = clamp(S.board + B.near, 0, 100);
+  else if (verdict === 'missed') S.board = clamp(S.board - (B.perPos ? Math.min(B.missMax, B.perPos * (myPos - target.pos)) : B.missMax), 0, 100);
   const cups = S.cups ? Object.fromEntries(['ec', 'lc'].filter(k => S.cups[k]).map(k => [k, { champ: S.cups[k].champ, runner: S.cups[k].runner, my: cupResult(S, k, S.my) }])) : null;
   S.seasonEnd = { label: seasonLabel(S.season), champ, myPos, rel, scorers, verdict, prize: PRIZE[myPos - 1] || 0, pts: t[myPos - 1].pts, target: target.jp, cups };
   S.history.unshift({ season: seasonLabel(S.season), club: S.my, pos: myPos, pts: t[myPos - 1].pts, champ, verdict, ec: cups && cups.ec ? cups.ec.my : null, lc: cups && cups.lc ? cups.lc.my : null });
@@ -1886,7 +1918,8 @@ function decideRetirements(S) {
 function rollover(S) {
   const se = S.seasonEnd; if (!se) return;
   const myRelegated = se.rel.includes(S.my);
-  const fireMe = myRelegated || S.board < 15;
+  const B = boardLv(S);
+  const fireMe = myRelegated || (S.board < B.fireEnd && tenure(S) > B.grace);
   const newDate = (S.season + 1) + '-06-08';
   // retirements (decided at the end of the season)
   decideRetirements(S);
@@ -1957,6 +1990,7 @@ function rollover(S) {
   setExpectations(S);
   if (promoted.length) news(S, `J2から${promoted.map(c => S.clubs[c].short).join('・')}が昇格。`, 'info');
   news(S, `${seasonLabel(S.season)}シーズンへ。開幕は${jdate(S.fixtures[0].date)}。`, 'big');
+  if (!fireMe) { S.board = clamp(Math.round(55 + (S.board - 55) * B.keep), 0, 100); S.boardWarn = 0; }
   if (fireMe) fire(S, myRelegated ? 'J2降格の責任' : '目標未達');
   else news(S, `新シーズンの目標は「${S.clubs[S.my].target.jp}」。`, 'board');
 }
@@ -1970,7 +2004,7 @@ const API = {
   createMatch, stepMatch, simulateFull, finishMatch, doSub, benchOptions, onPitch, setMentality, bestSubFor, setCounter, mentLabel,
   advance, nextDay, simAIToday, myFixtureToday, nextMyFixture, todaysFixtures, inWindow, windowEnd, nextWindowStart,
   acceptOffer, rejectOffer, bid, decideRetirements, shortlist, shortEntry, unshort, bidBlock,
-  CUPS, CUP_PRIZE, NATIONAL, fxLabel, cupResult, cupWinner, hypeMatch, HYPE, SUB_RATE, subRate, STYLE, GROW, shareFor, LOAN, GEM, myLoans, loanCan, loanOptions, loanOut, growthOutlook, weeksLeft, yearsTo, bigGame, rivalry, SCOUT, sendScout, playShare, marketList, ensureFreeAgents, upgrade, facCost, takeJob, rollover, endSeason, news, fire,
+  BOARD, BOARD_LV, boardLv, tenure, CUPS, CUP_PRIZE, NATIONAL, fxLabel, cupResult, cupWinner, hypeMatch, HYPE, SUB_RATE, subRate, STYLE, GROW, shareFor, LOAN, GEM, myLoans, loanCan, loanOptions, loanOut, growthOutlook, weeksLeft, yearsTo, bigGame, rivalry, SCOUT, sendScout, playShare, marketList, ensureFreeAgents, upgrade, facCost, takeJob, rollover, endSeason, news, fire,
 };
 if (typeof module !== 'undefined' && module.exports) module.exports = API; else root.Engine = API;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -301,6 +301,7 @@ function viewHome() {
     <div class="row"><div class="eyebrow">フロントの信頼</div><span class="spacer"></span><b class="tnum">${S.board}</b></div>
     <div class="meter" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${S.board}"><i style="left:${S.board}%"></i></div>
     <div class="small muted">目標：${esc(c.target.jp)}　／　開幕前予想 ${c.pred}位</div>
+    ${boardAlert()}
   </section>`);
   out.push(`<div class="tbl-wrap"><table class="tbl"><thead><tr><th>#</th><th style="text-align:left">クラブ</th><th>試</th><th>差</th><th>勝点</th></tr></thead><tbody>${mini.map(r => { const i = t.indexOf(r) + 1; return `<tr class="${r.id === S.my ? 'me' : ''}"><td>${r.p ? i : '—'}</td><td class="club"><div>${kit(r.id, 'sm')}${esc(S.clubs[r.id].short)}</div></td><td>${r.p}</td><td>${r.gf - r.ga > 0 ? '+' : ''}${r.gf - r.ga}</td><td class="pts">${r.pts}</td></tr>`; }).join('')}</tbody></table></div>`);
   out.push(`<h3 class="sec-h">ニュース</h3><ul class="news">${S.news.slice(0, 18).map(n => `<li class="t-${n.type}"><time>${jd(n.d)}</time><span>${esc(n.text)}</span></li>`).join('')}</ul>`);
@@ -416,6 +417,16 @@ function viewSquad() {
     <ul class="list">${list.map(p => prow(p)).join('') || '<li class="empty">該当する選手がいません</li>'}</ul>
     ${loanSection()}
     ${sub}`;
+}
+// フロントの厳しさ (how patient the board is)
+function boardLvCtl() {
+  const cur = E.BOARD_LV[S.settings.boardLv] ? S.settings.boardLv : 'mid';
+  return `<div class="ctlrow"><label>フロントの厳しさ</label><div class="seg">${Object.entries(E.BOARD_LV).map(([k, b]) => `<button data-act="boardLv" data-k="${k}" aria-pressed="${cur === k}">${b.jp}</button>`).join('')}</div><span class="fine">${E.BOARD_LV[cur].sub}</span></div>`;
+}
+function boardAlert() {
+  const B = E.boardLv(S);
+  if (S.fired || S.board > B.warn[0]) return '';
+  return `<div class="small" style="color:var(--loss);font-weight:700">${S.board <= B.warn[1] ? '解任の危機。ここから巻き返さないと解任されるおそれがあります。' : 'フロントが成績を不安視しています。'}</div>`;
 }
 // 交代の頻度 (only while 交代はおまかせ is on)
 function subRateCtl() {
@@ -767,7 +778,8 @@ function viewClub() {
         <div class="row"><div class="eyebrow">フロントの信頼</div><span class="spacer"></span><b class="tnum">${S.board} / 100</b></div>
         <div class="meter"><i style="left:${S.board}%"></i></div>
         <dl class="kv"><dt>今季の目標</dt><dd>${esc(c.target.jp)}</dd><dt>開幕前の予想</dt><dd>${c.pred}位</dd><dt>現在</dt><dd>${rankOf(S.my)}${rankOf(S.my) === '—' ? '' : '位'}</dd></dl>
-        <p class="fine">信頼が尽きると解任されます。J2降格でも解任です。</p>
+        <p class="fine">試合ごとに、戦力から見込まれる勝点を上回れば上がり、下回れば下がります。シーズン終了時は目標の順位との差で増減します。信頼が尽きると解任、J2降格でも解任です。</p>
+        ${boardLvCtl()}
       </section>
       <section class="card" style="display:grid;gap:8px">
         <div class="row"><div class="eyebrow">クラブの格</div><span class="spacer"></span>${presBadge(c)}<b>${E.presLabel(c.pres)}</b></div>
@@ -1266,7 +1278,7 @@ function go() {
   render();
   if (st.stop === 'match') sheetPrematch(st.fid);
   else if (st.stop === 'inbox') { const it = S.inbox.find(x => x.type !== 'youth'); UI.tab = 'home'; render(); window.scrollTo(0, 0); toast(it && it.type === 'scout' ? 'スカウトが戻りました' : '移籍オファーが届きました'); }
-  else if (st.stop === 'note') toast(st.text);
+  else if (st.stop === 'note') { if (/フロント/.test(st.text)) { UI.tab = 'home'; render(); window.scrollTo(0, 0); } toast(st.text); }
   else if (st.stop === 'seasonEnd') { persist(true); render(); sheetSeasonEnd(); }
   else if (st.stop === 'fired') { persist(true); render(); sheetFired(); }
 }
@@ -1301,6 +1313,7 @@ const ACT = {
   ctr() { const t = S.clubs[S.my].tac; t.ctr = !t.ctr; persist(false); render(); },
   press(d) { S.clubs[S.my].tac.press = d.k; persist(false); render(); },
   autoSubs() { S.settings.autoSubs = !S.settings.autoSubs; persist(false); if (sheetState && sheetState.type === 'msub') refreshSheet(); else render(); },
+  boardLv(d) { S.settings.boardLv = d.k; persist(false); render(); },
   subRate(d) { S.settings.subRate = d.k; persist(false); if (sheetState && sheetState.type === 'msub') refreshSheet(); else render(); },
   autoXI() { E.autoLineup(S, S.my); persist(false); render(); toast('ベストメンバーを組みました'); },
   benchPick(d) { sheetBench(Number(d.id)); },

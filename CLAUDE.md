@@ -20,6 +20,7 @@
 - 成長の見える化: 自クラブの選手（とレンタル中）は毎月1日に `p.trk`（[YYYY-MM, ovr, pot]、最大48）を記録し、選手シートの「成長の記録」にグラフ（総合力・伸びしろ・主力級＝自クラブ上位14人平均）と「主力級まで 今のペースで約X年・主力で使えば約Y年」（`yearsTo`）。月初に inbox `type:'youth'`（`seen:true` なので止まらない、最新1件だけ）→ ホームの「若手の成長レポート」。他クラブへ移ると `trk` は消える。旧セーブは `S.v` 7 で記録を始める。
 - ユースの逸材: 毎シーズンのユース昇格で、自クラブは `GEM.base + GEM.lv × ユースLv`（Lv2 16%・Lv5 31%）、他クラブは `GEM.ai` の確率で16〜17歳・伸びしろ80以上の選手（`p.gem`）が出る。
 - 実在の若手の補正: `build_data.js` の `YOUTH`（[総合力, 伸びしろ]、例: 三井寺眞 16歳 70/88）と `STYLE`（プレースタイル。`tech`/`phys`/`speed` で能力の配分を傾ける、`p.sty`）。23歳以下は Football LAB の先発数から下限を付ける。補正は `DATA_REV`（`data.rev`）と各選手の `fix = {r, d}` で旧セーブにも流れる（`migrate` が上げ幅 d を能力に足し、それまでの成長は残す。`pot0` も同じだけずらすので開花扱いにならない）。補正を足すときは `DATA_REV` を上げる。
+- フロントの信頼（2026-10-12〜）: `S.settings.boardLv`（`BOARD_LV` の easy/mid/hard＝やさしい・ふつう・きびしい、無ければ mid）。試合ごとに（勝点 − 戦力からの期待勝点）× `match`（カップ戦は半分）、シーズン終了時に目標との差（met +20、nearBand 以内 `near`、それ以上は1つ下回るごとに `perPos`、最大 `missMax`）。新シーズンは 55 + (信頼 − 55) × `keep` から。シーズン終了の解任は `fireEnd` 未満かつ就任 `grace` シーズン目より後（`tenure`）、途中解任は `fireMid` 以下・リーグ `fireAfter` 試合以降・下位 `zone` 位以内のときだけ。J2降格はどの段階でも解任。`warn` の値まで下がると news と停止メモ（`S._stopNote`）、ホームのカードにも警告。hard が以前のルール（横浜FMを自動采配で4季回すと 16回中14回解任、平均1.4季）。mid は 16回中7回（うち降格3）・平均3.3季、easy は降格のときだけ。UI はクラブ → 経営の「フロントの厳しさ」。
 - 交代はおまかせ: `S.settings.autoSubs` がオンのとき、自クラブは `S.settings.subRate`（`SUB_RATE` の low/mid/high＝少なめ・ふつう・多め、無ければ mid）の頻度で `aiSubs` が交代する。1試合あたり 少なめ 約1.5人（70分〜）・ふつう 約3.4人（60分〜）・多め ほぼ5人（55分〜）。AIクラブは以前の交代のまま（`SUB_RATE.ai`）なのでリーグのバランスは変わらない。試合中の体力は90分で92→84程度しか落ちないので、交代の時間は主に `late`（その分以降は体力に関係なく交代候補）で決まる。UIは戦術画面と試合中の采配シート（おまかせがオンのときだけ表示）。
 - ショートリスト: 入札した選手は `bid` の中で `noteBid` が `S.shortlist`（`{pid, since, last, n, fee, res, guide, club}`、res は club/player/thin/funds/full）に入れる。獲得は `moveP` で自クラブに来たとき `unshort`、引退（club が RET）は `shortlist()` が外す。他クラブへ移った選手は残る（入札時のクラブを `club` に保持）。本人に断られた期間は `bidBlock` で入札ボタンを出さない。UI はクラブ → 移籍市場 の「ショートリスト」。`S.v` 6 で旧セーブの `S._bids` から作る。
 - デザイン: 「作戦ボード」。既定は緑の黒板、クラブ → ボードの見た目 でホワイトボード（`<html data-board="white">`、端末ごとの localStorage `kuratsuku.board`、セーブとは別）。色は `template.html` の `:root` と `:root[data-board="white"]` のトークンで、OSのダークモードには追従しない。クラブ・選手は丸いマグネット、ボタンはマグネットプレート。フォントは見出し Dela Gothic One、ラベル（`.eyebrow`）Yusei Magic（チョーク）、本文 Zen Kaku Gothic New、試合のスコアボードだけ DotGothic16。
@@ -48,6 +49,8 @@ git add -A && git commit && git push             # Pages が1分ほどで反映
 - `node dev/test/shortlist.js` / `python3 dev/test/shortlist.py` — ショートリスト（入札で入る・獲得と引退で外れる・移籍しても残る・旧セーブ移行／画面・保存・外す）
 - `node dev/test/youth.js` / `node dev/test/loan.js` / `python3 dev/test/youth.py` — 育成（出場時間の効果・大物の伸び方・開花・若手育成・月次レポート・逸材の確率・データ補正の旧セーブ反映／期限付き移籍の出し入れ・J2成績・復帰／成長グラフ・レンタル画面・レポート・旧セーブ v6）
 - 育成のバランスの目安: 6シーズン回してリーグ上位14人平均が 71〜72 で横ばい、ベンチの若手（出場15%未満）が1季 +3前後、主力の若手 +7〜8
+- `node dev/test/board.js` / `python3 dev/test/board.py` — フロントの厳しさ（1年目の猶予・2年続けて目標を大きく下回ると解任・降格・途中解任は下位のときだけ・警告／クラブ画面の切り替え・旧セーブはふつう・ホームの警告）
+- `node dev/test/tenure.js <club> <回数> <シーズン数> <easy|mid|hard>` — 自動采配で何シーズン続けられるか（解任の理由別）。1シーズン約5秒
 - `node dev/test/subrate.js` / `python3 dev/test/subrate.py` — 交代の頻度（段階ごとの交代人数・タイミング、AIは変わらない／戦術画面と采配シートの切り替え・保存・旧セーブ）
 - `python3 dev/test/presets.py` — 戦術の保存・読み込み（出場停止の選手が入ったまま読み込まれ、試合に進めないこと）
 - `python3 dev/test/cups.py` — カップ戦の表示・PK・大一番（燃えている選手）・カウンター・スカウト
