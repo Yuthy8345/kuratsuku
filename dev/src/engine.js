@@ -662,6 +662,40 @@ function validateLineup(S, cid, opts) {
   if (cid !== S.my) autoBench(S, cid);
   return changed;
 }
+// saved tactics (formation, game plan, XI and bench), up to PRESET_MAX per club
+const PRESET_MAX = 5;
+function savePreset(S, idx, name) {
+  const c = S.clubs[S.my]; c.presets = c.presets || [];
+  const ment = MENTALITY[c.tac.ment] ? c.tac.ment : 'bal';
+  const pr = { name: (name || '').trim().slice(0, 16) || `${c.tac.form}・${MENTALITY[ment].jp}`, form: c.tac.form, ment, press: c.tac.press, xi: c.tac.xi.slice(), bench: c.tac.bench.slice(), d: S.date };
+  if (idx != null && c.presets[idx]) { if (!(name || '').trim()) pr.name = c.presets[idx].name; c.presets[idx] = pr; return idx; }
+  if (c.presets.length >= PRESET_MAX) return -1;
+  c.presets.push(pr); return c.presets.length - 1;
+}
+// load exactly what was saved: injured / suspended players stay in the team (the manager swaps them himself);
+// only players who have left the club leave an empty place
+function loadPreset(S, idx) {
+  const c = S.clubs[S.my]; const pr = c.presets && c.presets[idx]; if (!pr) return null;
+  const inClub = id => id && S.players[id] && S.players[id].club === S.my;
+  c.tac.form = FORMATIONS[pr.form] ? pr.form : c.tac.form;
+  c.tac.ment = MENTALITY[pr.ment] ? pr.ment : 'bal';
+  c.tac.press = PRESS[pr.press] ? pr.press : 'mid';
+  c.tac.xi = FORMATIONS[c.tac.form].map((s0, i) => inClub(pr.xi[i]) ? pr.xi[i] : null);
+  c.tac.bench = pr.bench.filter((id, k, a) => inClub(id) && !c.tac.xi.includes(id) && a.indexOf(id) === k);
+  c.tac.benchManual = true;
+  validateLineup(S, S.my);
+  return presetStatus(S, pr);
+}
+function presetStatus(S, pr) {
+  const out = [], gone = [];
+  for (const id of pr.xi.concat(pr.bench)) {
+    if (!id) continue; const p = S.players[id];
+    if (!p || p.club !== S.my) gone.push(id); else if (!available(p)) out.push(id);
+  }
+  return { out, gone };
+}
+function renamePreset(S, idx, name) { const c = S.clubs[S.my]; if (c.presets && c.presets[idx] && (name || '').trim()) c.presets[idx].name = name.trim().slice(0, 16); }
+function deletePreset(S, idx) { const c = S.clubs[S.my]; if (c.presets) c.presets.splice(idx, 1); }
 // manager takes a player off the bench without a replacement
 function benchRemove(S, pid) {
   const c = S.clubs[S.my]; if (!c.tac.bench.includes(pid)) return false;
@@ -1679,7 +1713,7 @@ const API = {
   D, jdate, FORMATIONS, ROLE, DPOS, DP_CAT, DP_JP, LEARN_MAX, PLAY_MAX, ppOf, apt, roleApt, posValues, learnRate, learnWeeks, MENTALITY, PRESS, TRAINING, FACILITY, ATTR, ATTR_SHOW, FOCUS, INTENS,
   calcOvr, roleScore, bestRoles, devPreview, migrate, weekly, power, presStars, presLabel,
   newGame, seasonForDate, seasonLabel, squad, strength, table, position, age, ovr, value, wage, money, attrs,
-  autoLineup, autoBench, benchSwap, benchRemove, lineupIssues, BENCH_SIZE, clubRating, validateLineup, effective, posPenalty, available, teamRating,
+  autoLineup, autoBench, benchSwap, benchRemove, lineupIssues, BENCH_SIZE, PRESET_MAX, savePreset, loadPreset, presetStatus, renamePreset, deletePreset, clubRating, validateLineup, effective, posPenalty, available, teamRating,
   createMatch, stepMatch, simulateFull, finishMatch, doSub, benchOptions, onPitch, setMentality, bestSubFor,
   advance, nextDay, simAIToday, myFixtureToday, nextMyFixture, todaysFixtures, inWindow, windowEnd, nextWindowStart,
   acceptOffer, rejectOffer, bid, decideRetirements,

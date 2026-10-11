@@ -454,6 +454,7 @@ function viewTactics() {
   return `${banner}<div class="trate"><div><small>攻撃</small><b>${Math.round(r.att)}</b></div><div><small>中盤</small><b>${Math.round(r.mid)}</b></div><div><small>守備</small><b>${Math.round(r.def)}</b></div></div>
     <div class="formrow" role="group" aria-label="フォーメーション">${Object.keys(E.FORMATIONS).map(f => `<button data-act="form" data-k="${f}" aria-pressed="${c.tac.form === f}">${f}</button>`).join('')}</div>
     <div class="pitch">${PITCH_SVG}${toks}</div>
+    <button class="btn ghost block" data-act="presets">戦術の保存・読み込み<span class="small muted">　${(c.presets || []).length}/${E.PRESET_MAX}</span></button>
     <p class="fine">選手をタップすると入れ替えられます。「!」は適性が低いポジションか疲れている選手、「×」はケガや出場停止で出られない選手です。</p>
     <div class="ctlrow"><label>試合の進め方</label>${seg('ment', c.tac.ment, MENT_OPTS)}<span class="fine">${MENT_DESC[c.tac.ment]}</span></div>
     <div class="ctlrow"><label>プレスの強度（高いほど中盤で優位、ただし消耗）</label>${seg('press', c.tac.press, [['low', '低'], ['mid', '中'], ['high', '高']])}</div>
@@ -737,6 +738,36 @@ const MENT_DESC = {
   bal: '攻守のバランスを取る標準の戦い方。',
   att: '前に出て押し込む。得点も失点も増えやすい。格下相手に。',
 };
+// saved tactics: load / overwrite / rename / delete, and save the current one
+function sheetPresets() {
+  const c = S.clubs[S.my]; const list = c.presets || [];
+  sheetState = { type: 'presets' };
+  const ui = UI.preset || (UI.preset = {});
+  const row = (pr, i) => {
+    const st = E.presetStatus(S, pr);
+    const sus = st.out.filter(id => S.players[id].inj <= 0).length, inj = st.out.length - sus;
+    const names = pr.xi.map(id => S.players[id] && S.players[id].club === S.my ? S.players[id].short : '—').join('・');
+    const chips = [sus ? `<span class="chip warn">出場停止 ${sus}</span>` : '', inj ? `<span class="chip warn">負傷 ${inj}</span>` : '', st.gone.length ? `<span class="chip">移籍・退団 ${st.gone.length}</span>` : ''].join('');
+    const head = ui.edit === i
+      ? `<div class="row" style="gap:8px"><input class="input" id="pr-name" maxlength="16" value="${esc(pr.name)}" autocomplete="off" style="flex:1"><button class="btn" data-act="presetRename" data-i="${i}">決定</button></div>`
+      : `<div class="row"><b>${esc(pr.name)}</b><span class="spacer"></span><span class="small muted">${jd(pr.d)}保存</span></div>`;
+    return `<li><div class="preset">${head}
+      <div class="small muted">${pr.form}・${esc((E.MENTALITY[pr.ment] || E.MENTALITY.bal).jp)}・プレス${esc(E.PRESS[pr.press].jp)}</div>
+      <div class="small preset-xi">${esc(names)}</div>
+      ${chips ? `<div class="row wrap">${chips}</div>` : ''}
+      <div class="preset-act"><button class="btn primary" data-act="presetLoad" data-i="${i}">読み込む</button><button class="btn ghost" data-act="presetSave" data-i="${i}">上書き</button><button class="btn ghost" data-act="presetEdit" data-i="${i}">名前</button><button class="btn ghost ${ui.del === i ? 'danger' : ''}" data-act="presetDel" data-i="${i}">${ui.del === i ? '本当に削除' : '削除'}</button></div>
+    </div></li>`;
+  };
+  const full = list.length >= E.PRESET_MAX;
+  openSheet(`<div class="eyebrow">戦術の保存・読み込み</div><h2>保存した戦術<small class="muted" style="font-size:14px">　${list.length}/${E.PRESET_MAX}</small></h2>
+    ${list.length ? `<ul class="list">${list.map(row).join('')}</ul>` : '<p class="fine">まだ保存した戦術はありません。</p>'}
+    <section class="card" style="display:grid;gap:8px"><div class="eyebrow">今の戦術を保存</div>
+      <div class="small muted">${c.tac.form}・${esc(E.MENTALITY[c.tac.ment].jp)}・プレス${esc(E.PRESS[c.tac.press].jp)}・先発とベンチ ${c.tac.xi.filter(Boolean).length + c.tac.bench.length}人</div>
+      ${full ? '<p class="fine" style="margin:0">保存枠がいっぱいです。上の「上書き」で入れ替えてください。</p>' : `<div class="row" style="gap:8px"><input class="input" id="pr-new" maxlength="16" placeholder="名前（例：格上用カウンター）" autocomplete="off" style="flex:1"><button class="btn primary" data-act="presetSave">保存</button></div>`}
+    </section>
+    <p class="fine">読み込むと、保存したときのフォーメーション・進め方・プレス・先発・ベンチをそのまま反映します。ケガや出場停止の選手もそのまま入るので、試合の前に自分で入れ替えてください。移籍した選手の枠は空きになります。</p>`,
+    '<button class="btn ghost block" data-act="closeSheet">閉じる</button>');
+}
 function sheetFired() {
   const F = S.fired; if (!F) return;
   sheetState = { type: 'fired' };
@@ -820,6 +851,7 @@ function closeSheet() {
 function refreshSheet() {
   if (!sheetState) return;
   const s = sheetState;
+  if (s.type === 'presets') return sheetPresets();
   if (s.type === 'player') sheetPlayer(s.id); else if (s.type === 'train') sheetTrain(s.id); else if (s.type === 'bench') sheetBench(s.id); else if (s.type === 'slot') sheetSlot(s.i); else if (s.type === 'pre') sheetPrematch(s.id); else if (s.type === 'msub') sheetMatchTactics();
 }
 let toastT = null;
@@ -1082,6 +1114,29 @@ const ACT = {
   },
   lgView(d) { UI.lg.view = d.k; render(); },
   cupPick(d) { UI.lg.cup = d.k; render(); },
+  presets() { UI.preset = {}; sheetPresets(); },
+  presetSave(d) {
+    const i = d.i != null ? Number(d.i) : null;
+    const name = i == null ? ((document.getElementById('pr-new') || {}).value || '') : '';
+    const r = E.savePreset(S, i, name);
+    if (r < 0) return toast('保存枠がいっぱいです');
+    UI.preset = {}; persist(false); refreshSheet(); render();
+    toast(i == null ? `「${S.clubs[S.my].presets[r].name}」を保存しました` : `「${S.clubs[S.my].presets[r].name}」を今の戦術で上書きしました`);
+  },
+  presetLoad(d) {
+    const i = Number(d.i); const pr = S.clubs[S.my].presets[i];
+    const st = E.loadPreset(S, i); if (!st) return;
+    persist(false); closeSheet(); UI.tab = 'tactics'; render(); window.scrollTo(0, 0);
+    const notes = [st.out.length ? `出場できない選手が${st.out.length}人います` : '', st.gone.length ? `移籍した${st.gone.length}人の枠は空きです` : ''].filter(Boolean);
+    toast(`「${pr.name}」を読み込みました` + (notes.length ? `。${notes.join('、')}` : ''));
+  },
+  presetEdit(d) { UI.preset = { edit: Number(d.i) }; refreshSheet(); const el = document.getElementById('pr-name'); if (el) el.focus(); },
+  presetRename(d) { E.renamePreset(S, Number(d.i), (document.getElementById('pr-name') || {}).value || ''); UI.preset = {}; persist(false); refreshSheet(); },
+  presetDel(d) {
+    const i = Number(d.i);
+    if (!UI.preset || UI.preset.del !== i) { UI.preset = { del: i }; return refreshSheet(); }
+    const nm = S.clubs[S.my].presets[i].name; E.deletePreset(S, i); UI.preset = {}; persist(false); refreshSheet(); render(); toast(`「${nm}」を削除しました`);
+  },
   scout(d) { const r = E.sendScout(S, d.k); toast(r.msg); if (r.ok) { persist(false); render(); } },
   round(d) { UI.lg.round = Math.max(1, Math.min(38, (UI.lg.round || curRound()) + Number(d.d))); render(); },
   fxDetail(d) { sheetFixture(Number(d.id)); },
