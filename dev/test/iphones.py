@@ -1,10 +1,11 @@
 # Title screen on every current iPhone: home-screen app (standalone, notch / home-bar safe areas) and Safari.
 # The board must fill exactly one screen (no scrolling), the buttons must be inside it and clear of the logo.
 # Serves the repo root (the real PWA index.html). Chromium has no safe areas, so they are injected as px.
-# 'launch' = the iOS 26/27 home-screen bug (WebKit 301994): at launch the viewport is short by the status bar until the
-# first swipe. Reproduced with a viewport that short and navigator.standalone / screen size of the real phone;
-# iOS clips fixed layers to the short viewport but draws page content below it, so the title must then be laid out in the
-# page (absolute) at the real screen height, and fixed parts (dock) must stay inside the short viewport.
+# Home-screen app ('app', 'launch'): navigator.standalone and the phone's screen size are faked. 'launch' = the iOS 26/27
+# bug (WebKit 301994): the viewport starts short by the status bar and nothing is drawn below it. On the device iOS uses
+# the right height while the page is taller than the viewport and goes short again when it is not; that rule is emulated
+# here, and the title (laid out in the page at screen height + 1px) must settle at the right height without flipping
+# back and forth (an earlier fix flickered ~12 times a second on an iPhone 16).
 import asyncio, pathlib, os, re, threading, http.server, functools
 from playwright.async_api import async_playwright
 REPO = pathlib.Path('/home/claude/kuratsuku'); OUT = REPO/'dev/test/shots'
@@ -64,12 +65,13 @@ async def main():
                     board: [board.top, board.bottom, board.width], logoBottom: r('.tb-logo svg').bottom, logoW: logo.width, menuTop: menu.top, linksBottom: links.bottom,
                     plates: document.querySelectorAll('.tb-menu .plate').length }; }''')
                 problems = []
-                want = 'absolute' if mode == 'launch' else 'fixed'
-                if m['pos'] != want: problems.append(f"title is {m['pos']}, want {want} (fixed: vh/dvh are wrong at launch; launch: fixed layers are clipped)")
-                if abs(m['board'][1] - (h - bot - 10)) > 1: problems.append(f"board bottom {m['board'][1]:.0f} not 10px above the home bar ({h - bot - 10})")
-                if m['sh'] > max(m['ih'], h if mode == 'launch' else 0) + 1: problems.append(f"scrolls {m['sh']}>{m['ih']}")
+                want = 'fixed' if mode == 'safari' else 'absolute'
+                if m['pos'] != want: problems.append(f"title is {m['pos']}, want {want}")
+                exp = h - bot - 10 + (0 if mode == 'safari' else 1)  # home-screen app: screen height + 1px
+                if abs(m['board'][1] - exp) > 1: problems.append(f"board bottom {m['board'][1]:.0f}, want {exp}")
+                if m['sh'] > (m['ih'] if mode == 'safari' else h + 1) + 1: problems.append(f"scrolls {m['sh']}>{m['ih']}")
                 if m['sw'] > m['iw'] + 1: problems.append('horizontal scroll')
-                if m['board'][1] > h - bot + 0.5: problems.append(f"board bottom {m['board'][1]:.0f} under home bar ({h - bot})")
+                if m['board'][1] > h - bot + 1.5: problems.append(f"board bottom {m['board'][1]:.0f} under home bar ({h - bot})")
                 if m['board'][0] < top - 0.5: problems.append(f"board top {m['board'][0]:.0f} under notch ({top})")
                 if m['logoBottom'] > m['menuTop'] - 8: problems.append(f"logo {m['logoBottom']:.0f} touches buttons {m['menuTop']:.0f}")
                 if m['linksBottom'] > m['board'][1]: problems.append('links outside the board')
@@ -78,13 +80,18 @@ async def main():
                 print(f"{tag:41s} board {m['board'][0]:.0f}-{m['board'][1]:.0f} logo-bottom {m['logoBottom']:.0f} buttons {m['menuTop']:.0f} | {'OK' if not problems else ' / '.join(problems)}")
                 if problems: bad.append(tag)
                 await page.screenshot(path=str(OUT/f"ip-{'save' if save else 'new'}-{mode}-{w}x{h}.png"))
-                if mode == 'launch':  # the first swipe fixes the viewport: back to fixed, still exactly one screen
-                    await page.set_viewport_size({'width': w, 'height': h}); await page.wait_for_timeout(150)
-                    f = await page.evaluate('''() => ({ pos: getComputedStyle(document.querySelector('.tb-wrap')).position, bottom: document.querySelector('.tboard').getBoundingClientRect().bottom,
-                      sh: document.scrollingElement.scrollHeight, cls: document.documentElement.classList.contains('vgap') })''')
-                    if f['pos'] != 'fixed' or f['cls'] or abs(f['bottom'] - (h - bot - 10)) > 1 or f['sh'] > h + 1:
-                        print(f"   {name} after swipe: {f}"); bad.append(f'{tag} after swipe')
-                    vh = h
+                if mode == 'launch':  # emulate iOS: right height while the page is taller than the viewport, short again when not
+                    cur, flips = vh, 0
+                    for _ in range(8):
+                        sh_ = await page.evaluate('document.scrollingElement.scrollHeight')
+                        nxt = h if sh_ > cur else h - top
+                        if nxt != cur:
+                            flips += 1; cur = nxt; await page.set_viewport_size({'width': w, 'height': cur}); await page.wait_for_timeout(120)
+                    f = await page.evaluate('''() => ({ pos: getComputedStyle(document.querySelector('.tb-wrap')).position,
+                      bottom: document.querySelector('.tboard').getBoundingClientRect().bottom, sh: document.scrollingElement.scrollHeight })''')
+                    if cur != h or flips > 1 or f['pos'] != 'absolute' or abs(f['bottom'] - exp) > 1 or f['sh'] > h + 1:
+                        print(f"   {name} settle: viewport {cur} flips {flips} {f}"); bad.append(f'{tag} settle')
+                    vh = cur
                 if save:  # the club screens too: header below the notch, dock on the home bar, no sideways scroll
                     await page.click('[data-act="continue"]'); await page.wait_for_timeout(400)
                     for tab in ('home', 'squad', 'tactics', 'league', 'club'):

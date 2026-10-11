@@ -340,10 +340,10 @@ button.apc:not(:disabled):active { transform: scale(.97); }
    short by the notch at launch and only correct themselves after a scroll (WebKit bug 254868). The frame runs on under the
    status bar and the home bar; the board stays clear of both. */
 .tb-wrap { position: fixed; inset: 0; overflow-y: auto; overscroll-behavior: contain; padding: calc(var(--sat) + 10px) max(10px, env(safe-area-inset-right, 0px)) calc(var(--sab) + 10px) max(10px, env(safe-area-inset-left, 0px)); background: linear-gradient(135deg, #D7DBDF 0%, #9EA4AA 45%, #C9CDD1 70%, #8C9298 100%); display: flex; }
-/* iOS 26/27 home-screen launch bug (WebKit 301994): the viewport comes out short by the status bar until the first swipe and
-   fixed layers are clipped to it, while page content below is still drawn. fixViewportGap (app.js) sets html.vgap and
-   --apph (the real screen height); the title then sits in the page at full height instead of being fixed. */
-html.vgap .tb-wrap { position: absolute; inset: 0 0 auto 0; height: var(--apph); overflow: hidden; }
+/* iOS home-screen app (html.ios-app, set in app.js): at launch iOS can report a viewport short by the status bar (WebKit
+   bug 301994) and draws nothing below it, but uses the right height whenever the page is taller than the screen. So
+   there the title always sits in the page at the real screen height + 1px (--apph) instead of being fixed. */
+html.ios-app .tb-wrap { position: absolute; inset: 0 0 auto 0; height: calc(var(--apph) + 1px); overflow: hidden; }
 .tboard { position: relative; flex: 1; width: 100%; max-width: 520px; min-height: 440px; margin: 0 auto; border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; color: #F4F1E6;
   background-color: #1E4A39; background-image: radial-gradient(ellipse at 30% 20%, rgba(255,255,255,.07) 0%, rgba(255,255,255,0) 40%), radial-gradient(ellipse at 75% 70%, rgba(255,255,255,.05) 0%, rgba(255,255,255,0) 45%), radial-gradient(circle, rgba(255,255,255,.035) 0 1px, rgba(0,0,0,0) 1.4px); background-size: auto, auto, 4px 4px;
   box-shadow: inset 0 0 0 2px #163A2C, inset 0 0 60px rgba(0,0,0,.45); }
