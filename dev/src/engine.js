@@ -317,7 +317,15 @@ function migrate(S, DATA) {
     if (c.tac && c.tac.ment === 'ctr') { c.tac.ment = 'def'; c.tac.ctr = true; }
     for (const pr of c.presets || []) if (pr.ment === 'ctr') { pr.ment = 'def'; pr.ctr = true; }
   }
-  S.v = Math.max(S.v || 1, 5);
+  // v6: shortlist of players I bid on (seeded from the bids already made)
+  if ((S.v || 1) < 6 && !S.shortlist) {
+    S.shortlist = [];
+    for (const [pid, b] of Object.entries(S._bids || {})) {
+      const p = S.players[pid]; if (!p || p.club === S.my) continue;
+      S.shortlist.push({ pid: p.id, since: b.date, last: b.date, n: 1, club: p.club, res: b.refused ? 'player' : 'club' });
+    }
+  }
+  S.v = Math.max(S.v || 1, 6);
   return S;
 }
 // how good the player is in each detailed position (rested, form left out)
@@ -416,7 +424,7 @@ function newGame(DATA, clubId, managerName, todayISO) {
     S.players[p.id] = { ...p, cond: 100, form: 6.5, inj: 0, sus: 0, ycAcc: 0, listed: false, st: blankStats(), hist: [], joined: DATA.start };
     initAttrs(S.players[p.id]);
   }
-  S.v = 5; S.presV = 4;
+  S.v = 6; S.presV = 4;
   for (const id of S.order) autoLineup(S, id);
   S.fixtures = genFixtures(S.order, DATA.round1, sy);
   setupCups(S);
@@ -1168,6 +1176,7 @@ function moveP(S, p, toCid, fee) {
   const oldClub = p.club;
   if (S.clubs[oldClub]) p.prev = oldClub; // for 古巣対決
   p.club = toCid; p.listed = false; p.joined = S.date; p.cond = Math.min(p.cond, 90);
+  if (toCid === S.my) unshort(S, p.id);  // signed: off the shortlist
   // shirt number
   const used = new Set(squad(S, toCid).filter(x => x.id !== p.id).map(x => x.num));
   if (used.has(p.num)) { let n = 13; while (used.has(n)) n++; p.num = n; }
@@ -1203,38 +1212,59 @@ function bid(S, pid, mult) {
   if (p.retire) return { ok: false, msg: `${p.name}は今季限りでの引退が決まっています` };
   const my = S.clubs[S.my];
   if (p.club === 'FA') {
-    if (squad(S, S.my).length >= 40) return { ok: false, msg: '登録上限（40人）に達しています' };
+    if (squad(S, S.my).length >= 40) { noteBid(S, p, 0, 'full'); return { ok: false, msg: '登録上限（40人）に達しています' }; }
     const sign = Math.round(wage(p) * 0.5 / 10) * 10;
-    if (my.funds < sign) return { ok: false, msg: '契約金を払う資金が足りません' };
+    if (my.funds < sign) { noteBid(S, p, sign, 'funds'); return { ok: false, msg: '契約金を払う資金が足りません' }; }
     my.funds -= sign; my.fin.trans -= sign;
     moveP(S, p, S.my, 0);
     news(S, `フリーの${p.name}と契約（契約金 ${money(sign)}）。`, 'transfer');
     return { ok: true, msg: `${p.name}と契約しました` };
   }
   if (!inWindow(S.date)) return { ok: false, msg: `移籍期間外です（次は${jdate(nextWindowStart(S.date))}から）` };
-  if (squad(S, S.my).length >= 40) return { ok: false, msg: '登録上限（40人）に達しています' };
   const v = value(p, S.date); const fee = Math.round(v * mult / 100) * 100;
-  if (my.funds < fee) return { ok: false, msg: `資金が足りません（必要 ${money(fee)}）` };
+  if (squad(S, S.my).length >= 40) { noteBid(S, p, fee, 'full'); return { ok: false, msg: '登録上限（40人）に達しています' }; }
+  if (my.funds < fee) { noteBid(S, p, fee, 'funds'); return { ok: false, msg: `資金が足りません（必要 ${money(fee)}）` }; }
   const seller = S.clubs[p.club];
   const rank = squad(S, p.club).sort((a, b) => b.ovr - a.ovr).findIndex(x => x.id === p.id);
   const demand = rank < 6 ? 1.35 : rank < 14 ? 1.12 : 0.92;
-  if (squad(S, p.club).length <= 22) return { ok: false, msg: `${seller.short}は選手層が薄く、放出を拒否しました` };
+  if (squad(S, p.club).length <= 22) { noteBid(S, p, fee, 'thin'); return { ok: false, msg: `${seller.short}は選手層が薄く、放出を拒否しました` }; }
   S._bids = S._bids || {};
   const we = windowEnd(S.date);
   const prev = S._bids[pid];
   if (prev && prev.until >= S.date && prev.refused) return { ok: false, msg: `${p.name}は今回の移籍期間中は移籍しない意向です` };
   if (prev && prev.date === S.date) return { ok: false, msg: '同じ日に同じ選手へ再オファーはできません' };
   S._bids[pid] = { date: S.date, until: we };
-  if (mult < demand * (0.94 + R() * 0.08)) return { ok: false, msg: `${seller.short}がオファーを拒否（目安：${money(Math.round(v * demand / 100) * 100)}前後）` };
+  if (mult < demand * (0.94 + R() * 0.08)) { const guide = Math.round(v * demand / 100) * 100; noteBid(S, p, fee, 'club', guide); return { ok: false, msg: `${seller.short}がオファーを拒否（目安：${money(guide)}前後）` }; }
   // player willingness
   const myLvl = strength(S, S.my), theirLvl = strength(S, p.club);
   // players are drawn to bigger, more storied clubs
   const reluct = (theirLvl - myLvl) * 0.06 + (p.ovr - myLvl - 4) * 0.04 + ((S.clubs[p.club].pres || 2) - (my.pres || 2)) * 0.1;
-  if (R() < clamp(reluct, 0, 0.75)) { S._bids[pid].refused = true; return { ok: false, msg: `クラブ間で合意したが、${p.name}本人が移籍を断った（今期間中は交渉不可）` }; }
+  if (R() < clamp(reluct, 0, 0.75)) { S._bids[pid].refused = true; noteBid(S, p, fee, 'player'); return { ok: false, msg: `クラブ間で合意したが、${p.name}本人が移籍を断った（今期間中は交渉不可）` }; }
   const fromName = seller.short;
   moveP(S, p, S.my, fee);
   news(S, `${p.name}（${fromName}）を獲得！ 移籍金 ${money(fee)}。`, 'transfer');
   return { ok: true, msg: `${p.name}を獲得しました` };
+}
+/* shortlist: the players I bid on, newest bid first. Signing a player (moveP) takes him off; so does retiring. */
+function noteBid(S, p, fee, res, guide) {
+  S.shortlist = S.shortlist || [];
+  let e = S.shortlist.find(x => x.pid === p.id);
+  if (!e) { e = { pid: p.id, since: S.date, n: 0 }; S.shortlist.push(e); }
+  e.last = S.date; e.n++; e.fee = fee; e.res = res; e.club = p.club;
+  if (guide) e.guide = guide; else delete e.guide;
+}
+function unshort(S, pid) { if (S.shortlist) S.shortlist = S.shortlist.filter(x => x.pid !== pid); }
+function shortlist(S) {
+  S.shortlist = (S.shortlist || []).filter(x => { const p = S.players[x.pid]; return p && p.club !== S.my && (S.clubs[p.club] || p.club === 'FA'); });
+  return S.shortlist.slice().sort((a, b) => (a.last < b.last ? 1 : a.last > b.last ? -1 : b.n - a.n));
+}
+function shortEntry(S, pid) { return (S.shortlist || []).find(x => x.pid === pid) || null; }
+// can I bid on him again right now? (player refusals last until the end of that window)
+function bidBlock(S, pid) {
+  const b = (S._bids || {})[pid];
+  if (b && b.refused && b.until >= S.date) return { why: 'player', until: b.until };
+  if (b && b.date === S.date) return { why: 'today' };
+  return null;
 }
 function genPlayer(S, cid, opts) {
   const o = opts || {};
@@ -1727,7 +1757,7 @@ const API = {
   autoLineup, autoBench, benchSwap, benchRemove, lineupIssues, BENCH_SIZE, PRESET_MAX, savePreset, loadPreset, presetStatus, renamePreset, deletePreset, clubRating, validateLineup, effective, posPenalty, available, teamRating,
   createMatch, stepMatch, simulateFull, finishMatch, doSub, benchOptions, onPitch, setMentality, bestSubFor, setCounter, mentLabel,
   advance, nextDay, simAIToday, myFixtureToday, nextMyFixture, todaysFixtures, inWindow, windowEnd, nextWindowStart,
-  acceptOffer, rejectOffer, bid, decideRetirements,
+  acceptOffer, rejectOffer, bid, decideRetirements, shortlist, shortEntry, unshort, bidBlock,
   CUPS, CUP_PRIZE, NATIONAL, fxLabel, cupResult, cupWinner, hypeMatch, bigGame, rivalry, SCOUT, sendScout, playShare, HOT_BOOST, marketList, ensureFreeAgents, upgrade, facCost, takeJob, rollover, endSeason, news, fire,
 };
 if (typeof module !== 'undefined' && module.exports) module.exports = API; else root.Engine = API;

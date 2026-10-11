@@ -49,7 +49,7 @@ function measureViewportGap() {
   if (vgapNow && !vgapSeen) vgapSeen = vgapNow;
 }
 measureViewportGap();
-let UI = { screen: 'title', tab: 'home', sq: { pos: 'ALL', sort: 'pos' }, lg: { view: 'table', round: null, cup: 'ec' }, cl: { view: 'main' }, mk: { pos: '', q: '', fa: false } };
+let UI = { screen: 'title', tab: 'home', sq: { pos: 'ALL', sort: 'pos' }, lg: { view: 'table', round: null, cup: 'ec' }, cl: { view: 'main' }, mk: { pos: '', q: '', fa: false, view: 'find' } };
 let sheetState = null;
 let MATCH = null;
 let PREVIEW = null;
@@ -318,6 +318,7 @@ function prow(p, ctx) {
   if (p.inj > 0) chips.push(`<span class="chip warn">負傷 ${p.inj}日</span>`);
   if (p.sus > 0) chips.push('<span class="chip warn">出場停止</span>');
   if (p.hot) chips.push('<span class="chip fire">燃えている</span>');
+  if (ctx === 'market' && E.shortEntry(S, p.id)) chips.push('<span class="chip acc">入札済み</span>');
   const lead = ctx === 'market' ? (S.clubs[p.club] ? kit(p.club) : '<span class="chip">FA</span>') : `<span class="no">${p.num}</span>`;
   const sub = ctx === 'market' ? `${S.clubs[p.club] ? esc(S.clubs[p.club].short) : 'フリー'}・${a}歳・${E.money(E.value(p, S.date))}` : `${a}歳`;
   return `<li><button class="prow" data-act="player" data-id="${p.id}">${lead}${posTag(p)}<span class="nm"><b>${esc(p.name)}</b><span>${sub} ${natChip(p)}${chips.join('')}</span></span><span class="rt"><span class="ovr ${oc(p.ovr)}">${E.ovr(p)}</span>${ctx === 'market' ? '' : condBar(p.cond)}</span></button></li>`;
@@ -425,18 +426,23 @@ function sheetPlayer(id) {
   if (p.hot) status.push(`<span class="chip fire">燃えている（${esc(p.hot.why)}）</span>`);
   if (E.bigGame(p)) status.push('<span class="chip">大舞台に強い</span>');
   if (p.found && p.club === 'FA') status.push('<span class="chip acc">スカウト推薦</span>');
+  const se = !mine && E.shortEntry(S, p.id);
+  if (se) status.push('<span class="chip acc">ショートリスト</span>');
   const hist = p.hist && p.hist.length ? `<div><div class="eyebrow" style="margin-bottom:6px">過去の成績</div><ul class="list">${p.hist.map(h => `<li><div class="row" style="padding:9px 12px;font-size:13px"><b>${h.s}</b><span class="muted">${esc(S.clubs[h.c] ? S.clubs[h.c].short : '')}</span><span class="spacer"></span><span class="tnum">${h.apps}試合 ${h.g}得点 ${h.a}A</span></div></li>`).join('')}</ul></div>` : '';
   let foot;
   if (mine) {
     foot = `<button class="btn primary block" data-act="train" data-id="${p.id}">トレーニングを設定</button><div class="grid2">${p.retire ? '<button class="btn ghost" disabled>引退が決まっています</button>' : `<button class="btn ghost" data-act="toggleList" data-id="${p.id}">${p.listed ? '放出リストから外す' : '放出リストに載せる'}</button>`}<button class="btn ghost" data-act="closeSheet">閉じる</button></div>`;
   } else if (p.club === 'FA') {
     const sign = Math.round(E.wage(p) * 0.5 / 10) * 10;
-    foot = `<button class="btn primary block" data-act="sign" data-id="${p.id}">契約する（契約金 ${E.money(sign)}）</button><button class="btn ghost block" data-act="closeSheet">閉じる</button>`;
+    foot = `${se ? `<div class="small muted">${shortStatus(se, p)}</div>` : ''}<button class="btn primary block" data-act="sign" data-id="${p.id}">契約する（契約金 ${E.money(sign)}）</button>${shortFoot(se, p)}`;
   } else {
     const open = E.inWindow(S.date);
     const mults = [0.9, 1.0, 1.2, 1.5];
-    foot = open ? `<div class="small muted">移籍金を提示（${club ? esc(club.short) : ''}・〜${jd(E.windowEnd(S.date))}）</div><div class="grid2">${mults.map(m => `<button class="btn ${m === 1.2 ? 'primary' : ''}" data-act="bid" data-id="${p.id}" data-m="${m}">${E.money(Math.round(v * m / 100) * 100)}</button>`).join('')}</div><button class="btn ghost block" data-act="closeSheet">閉じる</button>`
-      : `<div class="small muted">移籍期間外です。次の移籍期間は ${jd(E.nextWindowStart(S.date))} から。</div><button class="btn ghost block" data-act="closeSheet">閉じる</button>`;
+    const blk = E.bidBlock(S, p.id);
+    const last = se ? `<div class="small muted">${shortStatus(se, p)}</div>` : '';
+    foot = !open ? `${last}<div class="small muted">移籍期間外です。次の移籍期間は ${jd(E.nextWindowStart(S.date))} から。</div>${shortFoot(se, p)}`
+      : blk && blk.why === 'player' ? `${last}${shortFoot(se, p)}`
+      : `${last}<div class="small muted">移籍金を提示（${club ? esc(club.short) : ''}・〜${jd(E.windowEnd(S.date))}）${blk ? '・同じ日の再入札はできません' : ''}</div><div class="grid2">${mults.map(m => `<button class="btn ${m === 1.2 ? 'primary' : ''}" data-act="bid" data-id="${p.id}" data-m="${m}" ${blk ? 'disabled' : ''}>${E.money(Math.round(v * m / 100) * 100)}</button>`).join('')}</div>${shortFoot(se, p)}`;
   }
   openSheet(`<div class="row">${posTag(p)}<span class="small muted">#${p.num}・${club ? esc(club.name) : 'フリー'}・${a}歳 ${natChip(p)}</span></div>
     <h2>${esc(p.name)}</h2>
@@ -672,7 +678,14 @@ function viewClub() {
       <button class="btn danger block" data-act="askReset">はじめからやり直す</button></section>`;
   } else if (v === 'market') {
     const open = E.inWindow(S.date);
+    const sl = E.shortlist(S);
+    const mv = UI.mk.view === 'short' ? 'short' : 'find';
     body = `<section class="card" style="display:grid;gap:6px"><div class="row"><div class="eyebrow">移籍期間</div><span class="spacer"></span>${open ? `<span class="chip ok">オープン〜${jd(E.windowEnd(S.date))}</span>` : `<span class="chip">クローズ（次は${jd(E.nextWindowStart(S.date))}〜）</span>`}</div><div class="small muted">資金 ${E.money(c.funds)}・登録 ${E.squad(S, S.my).length}/40人。フリーの選手はいつでも契約できます。</div></section>
+      <div class="seg" role="group" aria-label="移籍市場">${[['find', '選手を探す'], ['short', `ショートリスト${sl.length ? ` ${sl.length}` : ''}`]].map(([k, l]) => `<button data-act="mkView" data-k="${k}" aria-pressed="${mv === k}">${l}</button>`).join('')}</div>`;
+    if (mv === 'short') body += sl.length
+      ? `<ul class="list">${sl.map(shortRow).join('')}</ul><p class="fine">入札した選手が自動で入ります。獲得するとリストから外れます。選手をタップすると、もう一度入札したりリストから外したりできます。</p>`
+      : '<p class="empty">まだ入札した選手はいません。「選手を探す」から選手を選んで移籍金を提示すると、ここにまとまります。</p>';
+    else body += `
       <input class="input" id="mk-q" type="search" placeholder="選手名・クラブで検索" value="${esc(UI.mk.q)}" autocomplete="off">
       <div class="seg">${[['', '全員'], ['GK', 'GK'], ['DF', 'DF'], ['MF', 'MF'], ['FW', 'FW']].map(([k, l]) => `<button data-act="mkPos" data-k="${k}" aria-pressed="${UI.mk.pos === k}">${l}</button>`).join('')}</div>
       <button class="toggle" role="switch" aria-checked="${UI.mk.fa}" data-act="mkFA"><span><b>フリーの選手だけ</b><br><span class="small muted">移籍金なし・契約金のみ（架空の選手です）</span></span><span class="sw"></span></button>
@@ -684,6 +697,32 @@ function viewClub() {
       <h3 class="sec-h">今季のクラブ記録</h3>${clubRecords()}`;
   }
   return `${body}<div class="subnav"><div class="seg">${[['main', '経営'], ['market', '移籍市場'], ['records', '記録']].map(([k, l]) => `<button data-act="clView" data-k="${k}" aria-pressed="${v === k}">${l}</button>`).join('')}</div></div>`;
+}
+/* shortlist (players I bid on) */
+function shortStatus(e, p, row) {  // row: the list shows the guide fee as a chip, so leave it out of the line
+  const blk = E.bidBlock(S, p.id);
+  const cl = S.clubs[e.club] ? S.clubs[e.club].short : 'クラブ';
+  const res = e.res === 'club' ? (row ? `${esc(cl)}が拒否` : `${esc(cl)}が拒否（目安 ${E.money(e.guide)}前後）`)
+    : e.res === 'player' ? (blk && blk.why === 'player' ? `本人が移籍を断った（${jd(blk.until)}まで交渉不可）` : '本人が移籍を断った（今は再交渉できます）')
+    : e.res === 'thin' ? `${esc(cl)}が放出を拒否（選手層が薄い）`
+    : e.res === 'funds' ? '資金が足りず提示できなかった'
+    : e.res === 'full' ? '登録上限（40人）で提示できなかった' : '';
+  return `前回 ${jd(e.last)}${e.fee ? `・${E.money(e.fee)}` : ''}${e.n > 1 ? `・${e.n}回目` : ''}：${res}`;
+}
+function shortFoot(e, p) {
+  return e ? `<div class="grid2"><button class="btn ghost" data-act="unshort" data-id="${p.id}">リストから外す</button><button class="btn ghost" data-act="closeSheet">閉じる</button></div>`
+    : '<button class="btn ghost block" data-act="closeSheet">閉じる</button>';
+}
+function shortRow(e) {
+  const p = S.players[e.pid]; const a = E.age(p, S.date);
+  const club = S.clubs[p.club];
+  const blk = E.bidBlock(S, p.id);
+  const moved = e.club && e.club !== p.club ? `<span class="chip">${club ? esc(club.short) + 'へ移籍' : 'フリーに'}</span>` : '';
+  const state = p.retire ? '<span class="chip">今季限りで引退</span>'
+    : blk && blk.why === 'player' ? `<span class="chip warn">交渉不可〜${jd(blk.until)}</span>`
+    : e.res === 'club' ? `<span class="chip acc">目安 ${E.money(e.guide)}</span>` : '';
+  const lead = club ? kit(p.club) : '<span class="chip">FA</span>';
+  return `<li><button class="prow" data-act="player" data-id="${p.id}">${lead}${posTag(p)}<span class="nm"><b>${esc(p.name)}</b><span>${club ? esc(club.short) : 'フリー'}・${a}歳・${E.money(E.value(p, S.date))} ${state}${moved}</span><span class="sl-last">${shortStatus(e, p, true)}</span></span><span class="rt"><span class="ovr ${oc(p.ovr)}">${E.ovr(p)}</span></span></button></li>`;
 }
 function marketRows() {
   let list = E.marketList(S, { pos: UI.mk.pos, q: UI.mk.q.trim() });
@@ -1194,11 +1233,13 @@ const ACT = {
   clView(d) { UI.cl.view = d.k; render(); window.scrollTo(0, 0); },
   mkPos(d) { UI.mk.pos = d.k; render(); },
   mkFA() { UI.mk.fa = !UI.mk.fa; render(); },
+  mkView(d) { UI.mk.view = d.k; render(); },
+  unshort(d) { const p = S.players[d.id]; E.unshort(S, Number(d.id)); persist(false); toast(`${p ? p.name : '選手'}をショートリストから外しました`); refreshSheet(); render(); },
   upgrade(d) { const r = E.upgrade(S, d.k); toast(r.msg); if (r.ok) { persist(true); render(); } },
   training(d) { S.training = d.k; persist(false); render(); },
   toggleList(d) { const p = S.players[d.id]; p.listed = !p.listed; persist(false); toast(p.listed ? (E.inWindow(S.date) ? '放出リストに載せました。オファーを待ちます' : '放出リストに載せました。移籍期間に入るとオファーが届きます') : '放出リストから外しました'); refreshSheet(); render(); },
-  bid(d) { const r = E.bid(S, Number(d.id), Number(d.m)); toast(r.msg); if (r.ok) { persist(true); closeSheet(); render(); } },
-  sign(d) { const r = E.bid(S, Number(d.id), 1); toast(r.msg); if (r.ok) { persist(true); closeSheet(); render(); } },
+  bid(d) { const r = E.bid(S, Number(d.id), Number(d.m)); toast(r.msg); if (r.ok) { persist(true); closeSheet(); render(); } else { persist(false); refreshSheet(); render(); } },
+  sign(d) { const r = E.bid(S, Number(d.id), 1); toast(r.msg); if (r.ok) { persist(true); closeSheet(); render(); } else { persist(false); refreshSheet(); render(); } },
   offerYes(d) { const r = E.acceptOffer(S, Number(d.id)); toast(r.ok ? '移籍が成立しました' : r.msg); persist(true); render(); },
   offerNo(d) { E.rejectOffer(S, Number(d.id)); toast('オファーを断りました'); persist(false); render(); },
   toTactics() { closeSheet(); UI.tab = 'tactics'; render(); window.scrollTo(0, 0); },
