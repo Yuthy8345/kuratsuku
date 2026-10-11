@@ -20,6 +20,29 @@ function applyBoard() {
 }
 function setBoard(k) { try { localStorage.setItem(BOARD_KEY, k === 'white' ? 'white' : 'chalk'); } catch (e) { /* storage blocked: only this session */ } applyBoard(); }
 applyBoard();
+/* iOS home-screen apps (iOS 26/27): at launch the layout viewport can come out short by the status-bar height (59-62px)
+   until the first swipe (WebKit bug 301994), so fixed elements stop above the home bar. The area below is still drawn:
+   measure the gap with a fixed probe and let bottom-anchored fixed elements reach the real screen bottom (--vgap). */
+const vgapProbe = document.createElement('div');
+vgapProbe.setAttribute('aria-hidden', 'true');
+vgapProbe.style.cssText = 'position:fixed;top:0;bottom:0;left:0;width:0;visibility:hidden;pointer-events:none';
+let vgapNow = -1, vgapSeen = 0;  // vgapSeen: the gap found at launch (shown in このゲームについて)
+function fixViewportGap() {
+  let gap = 0;
+  if (navigator.standalone === true) {  // iOS home-screen app only (Android and Safari report their real viewport)
+    if (!vgapProbe.isConnected) document.body.appendChild(vgapProbe);
+    const h = vgapProbe.getBoundingClientRect().height, portrait = innerHeight >= innerWidth;
+    const full = portrait ? Math.max(screen.width, screen.height) : Math.min(screen.width, screen.height);
+    const d = Math.round(full - h);
+    if (d > 0 && d <= 100) gap = d;  // bigger = keyboard or something else: leave it alone
+  }
+  if (gap !== vgapNow) { vgapNow = gap; document.documentElement.style.setProperty('--vgap', gap + 'px'); }
+  if (gap && !vgapSeen) vgapSeen = gap;
+}
+fixViewportGap();
+['resize', 'orientationchange', 'pageshow', 'scroll', 'touchend'].forEach(ev => addEventListener(ev, fixViewportGap, { passive: true }));
+if (window.visualViewport) visualViewport.addEventListener('resize', fixViewportGap);
+[50, 300, 1000, 2500].forEach(t => setTimeout(fixViewportGap, t));
 let UI = { screen: 'title', tab: 'home', sq: { pos: 'ALL', sort: 'pos' }, lg: { view: 'table', round: null, cup: 'ec' }, cl: { view: 'main' }, mk: { pos: '', q: '', fa: false } };
 let sheetState = null;
 let MATCH = null;
@@ -145,6 +168,7 @@ function sheetAbout() {
     <p class="small" style="margin:0">Jリーグのクラブを率いる、片手で遊べるクラブ経営シミュレーションです。</p>
     <dl class="kv"><dt>開始日</dt><dd>${fmtLong(TODAY)}</dd><dt>対象シーズン</dt><dd>2026/27（開幕 2026年8月7日）</dd></dl>
     <p class="fine">${se.note ? `今日の日付からは${E.seasonLabel(se.computed)}シーズンにあたりますが、収録データは2026/27シーズン版のため、2026/27の開幕から始まります。` : '開始日が含まれる2026/27シーズンの開幕（8月7日）からスタートします。'}</p>
+    <p class="fine">画面 ${screen.width}×${screen.height}・表示 ${innerWidth}×${innerHeight}${navigator.standalone ? '・ホーム画面アプリ' : ''}・起動時の補正 ${vgapSeen}px（いま ${Math.max(0, vgapNow)}px）</p>
     <p class="fine">選手と在籍クラブはJリーグ公式サイトの2026/27シーズン登録選手（2026年9月時点）をもとにしています。能力値は独自の推定です。クラブのエンブレムは使用していません。非商用のファンメイドゲームです。</p>`,
     '<button class="btn ghost block" data-act="closeSheet">閉じる</button>');
 }

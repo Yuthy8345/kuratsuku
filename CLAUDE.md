@@ -25,7 +25,7 @@ cd dev && node build_data.js && node build.js   # data.json → index.html / sw.
 git add -A && git commit && git push             # Pages が1分ほどで反映
 ```
 - `sw.js` のキャッシュ名はビルドごとに変わる。index.html はネットワーク優先なので、修正はオンラインなら次回起動で反映。
-- 安全領域: PWA の index.html は `:root` をノッチ・ホームバー分（`env(safe-area-inset-*)`）だけ上下に詰めている。画面側で同じ値を足すと二重になって1画面からはみ出す。また iOS のホーム画面アプリでは起動直後の `vh`/`dvh` がノッチ分だけ短く、スクロールすると直る（WebKit bug 254868）ので、1画面ぴったりの画面（タイトル `.tb-wrap`、試合、シート）は `position: fixed` で画面に貼り、余白は `--sat`/`--sab` で付ける。`vh`/`dvh` は使わない。
+- 安全領域: PWA の index.html は `:root` をノッチ・ホームバー分（`env(safe-area-inset-*)`）だけ上下に詰めている。画面側で同じ値を足すと二重になって1画面からはみ出す。また iOS のホーム画面アプリでは起動直後の `vh`/`dvh` がノッチ分だけ短く、スクロールすると直る（WebKit bug 254868）ので、1画面ぴったりの画面（タイトル `.tb-wrap`、試合、シート）は `position: fixed` で画面に貼り、余白は `--sat`/`--sab` で付ける。`vh`/`dvh` は使わない。さらに iOS 26/27 では起動直後に表示域そのもの（fixed の基準）がステータスバー分だけ短く、指でスワイプすると直る（WebKit bug 301994）。`fixViewportGap`（app.js）がホーム画面アプリのときだけ固定のプローブで差を測り `--vgap` に入れ、画面下に付く fixed 要素（タイトル・ドック・シート・試合など）を `calc(-1 * var(--vgap))` で本当の画面下まで伸ばす。差は「このゲームについて」に表示。テストは iphones.py の launch モード。
 - セーブは localStorage キー `touchline.j1.save`（変えない）。端末間の移動は「引き継ぎコード」（`KTK1.` + lz圧縮JSON）。
 - 既存セーブの互換: `Engine.migrate(S, DATA)` で能力値・格・生年月日・本職の更新を流し込む（`S.v` 3 で細分化ポジション。旧 `pos2`/`learn` のカテゴリ習得は適性に変換）。格の計算式を変えたら `PRES_BASE` に旧値を残して `presV` を上げる。
 
