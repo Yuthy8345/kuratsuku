@@ -1644,18 +1644,22 @@ function takeJob(S, cid) {
 /* ---------- special matches: derbies, six-pointers, revenge, cup ties ---------- */
 // In a big game one player may catch fire for that match only (more often for the underdog).
 const HOT_BOOST = 12, HOT_TEAM = 1.5;
+// named fixtures (as the clubs / J.League / media bill them), then same prefecture, then same region, then two Original 10 clubs
 const RIVALRY = [
-  ['kawasakif', 'fctokyo', '多摩川クラシコ'], ['gosaka', 'cosaka', '大阪ダービー'], ['yokohamafm', 'yokohamafc', '横浜ダービー'],
+  ['kawasakif', 'fctokyo', '多摩川クラシコ'], ['tokyov', 'machida', '東京クラシック'], ['yokohamafm', 'tokyov', 'Jリーグ開幕カード', 0.8],
+  ['gosaka', 'cosaka', '大阪ダービー'], ['yokohamafm', 'yokohamafc', '横浜ダービー'], ['urawa', 'omiya', 'さいたまダービー'],
   ['chiba', 'kashiwa', '千葉ダービー'], ['kashima', 'mito', '茨城ダービー'], ['shimizu', 'iwata', '静岡ダービー'], ['sendai', 'yamagata', 'みちのくダービー'],
 ];
-const REGION = { fukuoka: '九州', nagasaki: '九州', tosu: '九州', oita: '九州' };
-function rivalry(S, a, b) {
-  for (const [x, y, n] of RIVALRY) if ((a === x && b === y) || (a === y && b === x)) return n;
-  if (REGION[a] && REGION[a] === REGION[b]) return REGION[a] + 'ダービー';
+const REGION = { fukuoka: '九州', nagasaki: '九州', tosu: '九州', oita: '九州', gosaka: '関西', cosaka: '関西', kobe: '関西', kyoto: '関西', nagoya: '東海', shimizu: '東海', iwata: '東海' };
+function rivalryInfo(S, a, b) {
+  for (const [x, y, n, w] of RIVALRY) if ((a === x && b === y) || (a === y && b === x)) return { name: n, w: w || 1 };
   const A = S.clubs[a], B = S.clubs[b];
-  if (A && B && A.area && A.area === B.area) return A.area + 'ダービー';
+  if (A && B && A.area && A.area === B.area) return { name: A.area + 'ダービー', w: 1 };
+  if (REGION[a] && REGION[a] === REGION[b]) return { name: REGION[a] + 'ダービー', w: 0.8 };
+  if (A && B && A.o10 && B.o10) return { name: 'オリジナル10対決', w: 0.5 };
   return null;
 }
+function rivalry(S, a, b) { const r = rivalryInfo(S, a, b); return r ? r.name : null; }
 function bigGame(p) { return hash(p.name + '|' + p.birth) % 9 === 0; } // 大舞台に強い（1割ほど）
 function formerClubs(p) {
   const s = new Set((p.hist || []).map(h => h.c).filter(c => c && c !== p.club));
@@ -1667,7 +1671,7 @@ function lastMeeting(S, a, b) {
 }
 function matchStory(S, f) {
   const tags = [];
-  const riv = rivalry(S, f.h, f.a); if (riv) tags.push({ k: 'derby', jp: riv, w: 1 });
+  const riv = rivalryInfo(S, f.h, f.a); if (riv) tags.push({ k: 'derby', jp: riv.name, w: riv.w });
   if (f.cup) {
     const last = CUPS[f.cup].rounds.length - 1;
     tags.push({ k: 'cup', jp: fxLabel(f), w: f.cr === last ? 1.2 : f.cr === last - 1 ? 0.8 : 0.4 });
