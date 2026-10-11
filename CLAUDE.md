@@ -42,4 +42,5 @@ git add -A && git commit && git push             # Pages が1分ほどで反映
 - `node dev/test/shortlist.js` / `python3 dev/test/shortlist.py` — ショートリスト（入札で入る・獲得と引退で外れる・移籍しても残る・旧セーブ移行／画面・保存・外す）
 - `python3 dev/test/presets.py` — 戦術の保存・読み込み（出場停止の選手が入ったまま読み込まれ、試合に進めないこと）
 - `python3 dev/test/cups.py` — カップ戦の表示・PK・大一番（燃えている選手）・カウンター・スカウト
+- `node dev/test/hype.js <now|A|B|C|D> <シーズン数>` — ビッグプレーヤー（燃える選手）の発動の比較。確率と人数は `Engine.HYPE`（k・cap・maxN・more・decay・upTag・floor・former）で決まり、パターンはその上書き
 - 番狂わせの目安（4〜6シーズン回す）: 下位5クラブの上位5クラブ相手の勝率 18〜22%、1試合2.4〜2.6点、優勝勝点 74〜88

@@ -1327,6 +1327,10 @@ function takeJob(S, cid) {
 /* ---------- special matches: derbies, six-pointers, revenge, cup ties ---------- */
 // In a big game one player may catch fire for that match only (more often for the underdog).
 const HOT_BOOST = 12, HOT_TEAM = 1.5;
+// how often players catch fire. k: chance per unit of big-game weight (times the underdog factor), cap: its ceiling;
+// maxN/more/decay: after the first, each extra player catches fire with more*under*decay^(i-1); upTag: weight added when
+// the opponent is 4+ stronger (格上挑戦); floor: weight every match has at least; former: chance per former-club player
+const HYPE = { k: 0.25, cap: 0.75, maxN: 1, more: 0, decay: 0.5, upTag: 0, floor: 0, former: 0.3 };
 // named fixtures (as the clubs / J.League / media bill them), then same prefecture, then same region, then two Original 10 clubs
 const RIVALRY = [
   ['kawasakif', 'fctokyo', '多摩川クラシコ'], ['tokyov', 'machida', '東京クラシック'], ['yokohamafm', 'tokyov', 'Jリーグ開幕カード', 0.8],
@@ -1381,17 +1385,23 @@ function hypeMatch(S, f) {
     const lm = lastMeeting(S, cid, opp);
     const lost = !!lm && (lm.h === cid ? lm.ag - lm.hg : lm.hg - lm.ag) >= 3;
     if (lost) hy.rev = (hy.rev || []).concat(cid);
-    const W = W0 + (lost ? 0.8 : 0) + (f.cup && gap >= 3 ? 0.6 : 0);
+    const up = HYPE.upTag && gap >= 4;
+    const W = Math.max(HYPE.floor, W0 + (lost ? 0.8 : 0) + (f.cup && gap >= 3 ? 0.6 : 0) + (up ? HYPE.upTag : 0));
     const pool = squad(S, cid).filter(p => available(p) && !p.retire);
     const picked = new Set();
-    for (const p of pool) if (formerClubs(p).has(opp) && R() < 0.3 * under) picked.add(p);
-    if (W > 0 && R() < clamp(0.25 * W * under, 0, 0.75)) {
+    for (const p of pool) if (formerClubs(p).has(opp) && R() < HYPE.former * under) picked.add(p);
+    if (W > 0 && R() < clamp(HYPE.k * W * under, 0, HYPE.cap)) {
       const top = pool.slice().sort((a, b) => b.ovr - a.ovr).slice(0, 18);
-      const p = top.length ? wpick(top, q => (bigGame(q) ? 4 : 1) * (q.pos === 'FW' ? 1.6 : q.pos === 'MF' ? 1.3 : q.pos === 'GK' ? 0.5 : 1) * Math.pow(q.ovr / 70, 2)) : null;
-      if (p) picked.add(p);
+      const wt = q => (bigGame(q) ? 4 : 1) * (q.pos === 'FW' ? 1.6 : q.pos === 'MF' ? 1.3 : q.pos === 'GK' ? 0.5 : 1) * Math.pow(q.ovr / 70, 2);
+      for (let i = 0; i < HYPE.maxN; i++) {
+        if (i > 0 && !(R() < clamp(HYPE.more * under * Math.pow(HYPE.decay, i - 1), 0, 0.9))) break;
+        const left = top.filter(q => !picked.has(q));
+        const p = left.length ? wpick(left, wt) : null;
+        if (p) picked.add(p);
+      }
     }
     for (const p of picked) {
-      const why = formerClubs(p).has(opp) ? '古巣対決' : lost ? 'リベンジに燃える' : tags.length ? tags[0].jp : '大一番';
+      const why = formerClubs(p).has(opp) ? '古巣対決' : lost ? 'リベンジに燃える' : tags.length ? tags[0].jp : up ? '格上相手に燃える' : W0 > 0 ? '大一番' : '気合十分';
       p.hot = { d: f.date, b: HOT_BOOST, why };
       hy.hot.push({ pid: p.id, side: cid === f.h ? 'h' : 'a', why });
     }
@@ -1758,7 +1768,7 @@ const API = {
   createMatch, stepMatch, simulateFull, finishMatch, doSub, benchOptions, onPitch, setMentality, bestSubFor, setCounter, mentLabel,
   advance, nextDay, simAIToday, myFixtureToday, nextMyFixture, todaysFixtures, inWindow, windowEnd, nextWindowStart,
   acceptOffer, rejectOffer, bid, decideRetirements, shortlist, shortEntry, unshort, bidBlock,
-  CUPS, CUP_PRIZE, NATIONAL, fxLabel, cupResult, cupWinner, hypeMatch, bigGame, rivalry, SCOUT, sendScout, playShare, HOT_BOOST, marketList, ensureFreeAgents, upgrade, facCost, takeJob, rollover, endSeason, news, fire,
+  CUPS, CUP_PRIZE, NATIONAL, fxLabel, cupResult, cupWinner, hypeMatch, HYPE, bigGame, rivalry, SCOUT, sendScout, playShare, HOT_BOOST, marketList, ensureFreeAgents, upgrade, facCost, takeJob, rollover, endSeason, news, fire,
 };
 if (typeof module !== 'undefined' && module.exports) module.exports = API; else root.Engine = API;
 })(typeof window !== 'undefined' ? window : globalThis);
