@@ -110,7 +110,7 @@ function openness(V, p) { const o = nearest(teamOf(V, other(p.side), true), p); 
 /* ---------- targets ---------- */
 function shapeTarget(V, p, inPoss) {
   const b = V.ball; const bxf = frameX(p.side, b.x); const byf = p.side === 'h' ? b.y : PH - b.y;
-  const ment = V.M[p.side].ment; const ms = ment === 'att' ? 5 : ment === 'def' ? -5 : ment === 'ctr' ? -7 : 0;
+  const ment = V.M[p.side].ment; const ms = (ment === 'att' ? 5 : ment === 'def' ? -5 : 0) + (V.M[p.side].ctr ? -3 : 0);
   let along, across;
   if (inPoss) {
     along = p.bA + 9 + (bxf - CX) * 0.42 + ms;

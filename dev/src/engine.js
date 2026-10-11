@@ -81,9 +81,9 @@ const LEARN_MAX = 95;    // training stops here (本職 = 100)
 const PLAY_MAX = 85;     // match experience alone takes a position this far
 // own: my chance rate, opp: the opponent's chance rate when I play this way,
 // sq: how much of a stronger opponent's attacking edge a deep block takes away, q: finishing of my chances
+// posture (守備的 / バランス / 攻撃的) and, separately, whether the side plays on the counter (tac.ctr)
 const MENTALITY = {
   def: { own: 0.88, opp: 0.86, sq: 0.5, jp: '守備的', sub: '引いて守る。格上ほど効く' },
-  ctr: { own: 0.84, opp: 0.9, sq: 0.4, q: 1.35, jp: 'カウンター', sub: '守って速攻。数は少ないが決まりやすい' },
   bal: { own: 1, opp: 1, jp: 'バランス', sub: '' },
   att: { own: 1.14, opp: 1.1, jp: '攻撃的', sub: '押し込む。打ち合いになりやすい' },
 };
@@ -312,7 +312,12 @@ function migrate(S, DATA) {
     if (!S.cups && !S.seasonEnd) { setupCups(S); news(S, '今季から天皇杯とLカップが開催される。組み合わせはリーグ画面の「カップ戦」から。', 'big'); }
     for (const f of todaysFixtures(S)) hypeMatch(S, f);
   }
-  S.v = Math.max(S.v || 1, 4);
+  // v5: カウンター is a separate switch (old 'ctr' posture = 守備的 + カウンター)
+  if ((S.v || 1) < 5) for (const c of Object.values(S.clubs)) {
+    if (c.tac && c.tac.ment === 'ctr') { c.tac.ment = 'def'; c.tac.ctr = true; }
+    for (const pr of c.presets || []) if (pr.ment === 'ctr') { pr.ment = 'def'; pr.ctr = true; }
+  }
+  S.v = Math.max(S.v || 1, 5);
   return S;
 }
 // how good the player is in each detailed position (rested, form left out)
@@ -411,7 +416,7 @@ function newGame(DATA, clubId, managerName, todayISO) {
     S.players[p.id] = { ...p, cond: 100, form: 6.5, inj: 0, sus: 0, ycAcc: 0, listed: false, st: blankStats(), hist: [], joined: DATA.start };
     initAttrs(S.players[p.id]);
   }
-  S.v = 4; S.presV = 4;
+  S.v = 5; S.presV = 4;
   for (const id of S.order) autoLineup(S, id);
   S.fixtures = genFixtures(S.order, DATA.round1, sy);
   setupCups(S);
@@ -667,7 +672,7 @@ const PRESET_MAX = 5;
 function savePreset(S, idx, name) {
   const c = S.clubs[S.my]; c.presets = c.presets || [];
   const ment = MENTALITY[c.tac.ment] ? c.tac.ment : 'bal';
-  const pr = { name: (name || '').trim().slice(0, 16) || `${c.tac.form}・${MENTALITY[ment].jp}`, form: c.tac.form, ment, press: c.tac.press, xi: c.tac.xi.slice(), bench: c.tac.bench.slice(), d: S.date };
+  const pr = { name: (name || '').trim().slice(0, 16) || `${c.tac.form}・${mentLabel({ ment, ctr: c.tac.ctr })}`, form: c.tac.form, ment, ctr: !!c.tac.ctr, press: c.tac.press, xi: c.tac.xi.slice(), bench: c.tac.bench.slice(), d: S.date };
   if (idx != null && c.presets[idx]) { if (!(name || '').trim()) pr.name = c.presets[idx].name; c.presets[idx] = pr; return idx; }
   if (c.presets.length >= PRESET_MAX) return -1;
   c.presets.push(pr); return c.presets.length - 1;
@@ -678,7 +683,8 @@ function loadPreset(S, idx) {
   const c = S.clubs[S.my]; const pr = c.presets && c.presets[idx]; if (!pr) return null;
   const inClub = id => id && S.players[id] && S.players[id].club === S.my;
   c.tac.form = FORMATIONS[pr.form] ? pr.form : c.tac.form;
-  c.tac.ment = MENTALITY[pr.ment] ? pr.ment : 'bal';
+  c.tac.ment = MENTALITY[pr.ment] ? pr.ment : pr.ment === 'ctr' ? 'def' : 'bal';
+  c.tac.ctr = !!pr.ctr || pr.ment === 'ctr';
   c.tac.press = PRESS[pr.press] ? pr.press : 'mid';
   c.tac.xi = FORMATIONS[c.tac.form].map((s0, i) => inClub(pr.xi[i]) ? pr.xi[i] : null);
   c.tac.bench = pr.bench.filter((id, k, a) => inClub(id) && !c.tac.xi.includes(id) && a.indexOf(id) === k);
@@ -743,7 +749,7 @@ function sideFor(S, cid) {
   const cond = {};
   for (const s of slots) if (s.pid) cond[s.pid] = S.players[s.pid].cond;
   const tactBonus = cid === S.my && S.training === 'tact' ? 1 : 0;
-  return { cid, form: c.tac.form, ment: c.tac.ment, press: c.tac.press, slots, bench: c.tac.bench.filter(id => S.players[id] && S.players[id].club === cid && available(S.players[id])), subs: 0, subLog: [], cond, tactBonus, sent: [], pres: c.pres || 2, fan: c.fan || 2 };
+  return { cid, form: c.tac.form, ment: MENTALITY[c.tac.ment] ? c.tac.ment : 'bal', ctr: !!c.tac.ctr, press: c.tac.press, slots, bench: c.tac.bench.filter(id => S.players[id] && S.players[id].club === cid && available(S.players[id])), subs: 0, subLog: [], cond, tactBonus, sent: [], pres: c.pres || 2, fan: c.fan || 2 };
 }
 function createMatch(S, fx) {
   const M = {
@@ -781,18 +787,19 @@ function stepMatch(S, M) {
   M.st.h.pos += pH; M.st.a.pos += 1 - pH; M.pH = pH;
   const ms = MENTALITY, lg = M.lg;
   const base = 0.109;
-  const rate = (r, o, p, ownM, oppM) => {
+  const rate = (r, o, p, own, opp) => {
+    const oM = ms[own.ment] || ms.bal, pM = ms[opp.ment] || ms.bal;
     let adv = (r.att - lg.att) - (o.def - lg.def);
-    if (adv > 0 && ms[oppM].sq) adv *= 1 - ms[oppM].sq; // a deep block blunts a stronger attack
-    let v = base * (1 + (p - 0.5) * 0.4) * Math.exp(adv / 44) * Math.pow(r.attV / 4.1, 0.35) * Math.pow(o.defV / 4.6, -0.35) * ms[ownM].own * ms[oppM].opp;
-    if (ownM === 'ctr' && oppM === 'att') v *= 1.2; // space behind an attacking side
+    if (adv > 0 && pM.sq) adv *= 1 - pM.sq; // a deep block blunts a stronger attack
+    let v = base * (1 + (p - 0.5) * 0.4) * Math.exp(adv / 44) * Math.pow(r.attV / 4.1, 0.35) * Math.pow(o.defV / 4.6, -0.35) * oM.own * pM.opp;
+    if (own.ctr) v *= opp.ment === 'att' ? 1.05 : 0.85; // fewer, quicker attacks (plenty when the other side pours forward)
     return v;
   };
   const lateBoost = (M.min > 80 ? 1.08 : 1);
   // 終盤、リードされている／追いつきたい名門は粘る
   const grit = (sd, own, opp) => M.min >= 75 && own <= opp ? 1 + ((sd.pres || 2) - 3) * 0.04 : 1;
-  const rH = rate(rh, ra, pH, H.ment, A.ment) * lateBoost * (M.neutral ? 1 : 1.05 + (H.fan || 2) * 0.01) * grit(H, M.hg, M.ag);
-  const rA = rate(ra, rh, 1 - pH, A.ment, H.ment) * lateBoost * (M.neutral ? 1 : 0.95) * grit(A, M.ag, M.hg);
+  const rH = rate(rh, ra, pH, H, A) * lateBoost * (M.neutral ? 1 : 1.05 + (H.fan || 2) * 0.01) * grit(H, M.hg, M.ag);
+  const rA = rate(ra, rh, 1 - pH, A, H) * lateBoost * (M.neutral ? 1 : 0.95) * grit(A, M.ag, M.hg);
   // condition drain
   for (const sd of [H, A]) {
     const drain = 0.19 + PRESS[sd.press].drain * 0.012;
@@ -863,7 +870,7 @@ function chance(S, M, k, r, o, push) {
   M.st[k].sh++;
   M.ball = { x: sh.x, y: 85, side: k };
   const shotSkill = (effective(P, sh.role, sd.cond[sh.pid]) * 0.5 + atk * 0.5);
-  const q = 0.112 * Math.exp((shotSkill - o.gk) / 40) * (MENTALITY[sd.ment].q || 1);
+  const q = 0.112 * Math.exp((shotSkill - o.gk) / 40) * (sd.ctr ? counterQ(k === 'h' ? 1 - (M.pH == null ? 0.5 : M.pH) : (M.pH == null ? 0.5 : M.pH)) : 1);
   const onT = R() < 0.36 + (shotSkill - 65) * 0.006;
   const gkPid = (onPitch(opp).find(s => s.role === 'GK') || {}).pid;
   if (onT) M.st[k].ot++;
@@ -934,6 +941,10 @@ function aiSubs(S, M, k, push) {
   }
 }
 function setMentality(M, k, ment) { M[k].ment = ment; }
+function setCounter(M, k, on) { M[k].ctr = !!on; }
+function mentLabel(t) { return ((MENTALITY[t.ment] || MENTALITY.bal).jp) + (t.ctr ? '＋カウンター' : ''); }
+// counters work when the other side has the ball and space behind; against a side that sits deep there is little to hit
+function counterQ(oppShare) { return clamp(1.15 + (oppShare - 0.5) * 1.5, 0.9, 1.6); }
 
 function simulateFull(S, M) { while (!M.done) stepMatch(S, M); return M; }
 
@@ -1089,7 +1100,7 @@ function matchdayPrep(S) {
   for (const f of today) for (const [cid, opp] of [[f.h, f.a], [f.a, f.h]]) {
     if (cid === S.my || !S.clubs[cid]) continue;
     autoLineup(S, cid, { rotate: true });
-    S.clubs[cid].tac.ment = aiMentality(S, cid, opp);
+    const plan = aiMentality(S, cid, opp); S.clubs[cid].tac.ment = plan.ment; S.clubs[cid].tac.ctr = plan.ctr;
   }
   if (today.some(f => f.h === S.my || f.a === S.my)) validateLineup(S, S.my);
 }
@@ -1361,9 +1372,9 @@ function hypeMatch(S, f) {
 // the side's mood for this match (AI clubs): sit deep against a much stronger side, go for it against a weak one
 function aiMentality(S, cid, opp) {
   const gap = power(S, opp) - power(S, cid);
-  if (gap >= 3) return R() < 0.6 ? 'ctr' : 'def';
-  if (gap <= -4) return R() < 0.2 ? 'att' : 'bal';
-  return 'bal';
+  if (gap >= 3) { const x = R(); return x < 0.5 ? { ment: 'def', ctr: true } : x < 0.75 ? { ment: 'def', ctr: false } : { ment: 'bal', ctr: true }; }
+  if (gap <= -4) return { ment: R() < 0.2 ? 'att' : 'bal', ctr: false };
+  return { ment: 'bal', ctr: gap >= 1.5 && R() < 0.3 };
 }
 
 /* ---------- cups: 天皇杯 and Lカップ (single matches, PK if level after 90 minutes) ---------- */
@@ -1714,7 +1725,7 @@ const API = {
   calcOvr, roleScore, bestRoles, devPreview, migrate, weekly, power, presStars, presLabel,
   newGame, seasonForDate, seasonLabel, squad, strength, table, position, age, ovr, value, wage, money, attrs,
   autoLineup, autoBench, benchSwap, benchRemove, lineupIssues, BENCH_SIZE, PRESET_MAX, savePreset, loadPreset, presetStatus, renamePreset, deletePreset, clubRating, validateLineup, effective, posPenalty, available, teamRating,
-  createMatch, stepMatch, simulateFull, finishMatch, doSub, benchOptions, onPitch, setMentality, bestSubFor,
+  createMatch, stepMatch, simulateFull, finishMatch, doSub, benchOptions, onPitch, setMentality, bestSubFor, setCounter, mentLabel,
   advance, nextDay, simAIToday, myFixtureToday, nextMyFixture, todaysFixtures, inWindow, windowEnd, nextWindowStart,
   acceptOffer, rejectOffer, bid, decideRetirements,
   CUPS, CUP_PRIZE, NATIONAL, fxLabel, cupResult, cupWinner, hypeMatch, bigGame, rivalry, SCOUT, sendScout, playShare, HOT_BOOST, marketList, ensureFreeAgents, upgrade, facCost, takeJob, rollover, endSeason, news, fire,

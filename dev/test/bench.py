@@ -41,7 +41,7 @@ async def main():
         print('bench options in match include picked player:', inId in ins, len(ins))
         await pg.click(f'#sheet [data-act="mIn"][data-id="{inId}"]'); await pg.wait_for_timeout(300)
         await pg.screenshot(path=str(OUT/'b-match-sub.png'))
-        left = await pg.evaluate("document.querySelector('#sheet .toggle .small').textContent")
+        left = await pg.evaluate("document.querySelector('#sheet [data-act=autoSubs] .small').textContent")
         await pg.click('#sheet [data-act="closeSheet"]'); await pg.wait_for_timeout(300)
         feed = await pg.evaluate("[...document.querySelectorAll('#feed li')].map(l => l.textContent).filter(t => t.includes('交代'))")
         print('subs left:', left, '| feed:', feed[:2])

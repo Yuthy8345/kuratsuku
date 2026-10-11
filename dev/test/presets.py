@@ -23,11 +23,12 @@ async def main():
         await page.click('[data-act="startClub"]'); await page.wait_for_timeout(400)
         await page.click('[data-tab="tactics"]'); await page.wait_for_timeout(200)
         # preset A: the opening XI, counter
-        await page.click('[data-act="ment"][data-k="ctr"]'); await page.wait_for_timeout(150)
+        await page.click('[data-act="ment"][data-k="def"]'); await page.wait_for_timeout(150)
+        await page.click('[data-act="ctr"]'); await page.wait_for_timeout(150)
         await page.click('[data-act="presets"]'); await page.wait_for_timeout(350)
         await page.fill('#pr-new', '格上用カウンター'); await page.click('#sheet [data-act="presetSave"]'); await page.wait_for_timeout(250)
         st = await page.evaluate(LOAD); A = st['clubs']['urawa']['presets'][0]
-        print('saved A', A['name'], A['form'], A['ment'], len([x for x in A['xi'] if x]), 'bench', len(A['bench']))
+        print('saved A', A['name'], A['form'], A['ment'], 'ctr', A.get('ctr'), len([x for x in A['xi'] if x]), 'bench', len(A['bench']))
         await page.click('#sheet [data-act="closeSheet"]'); await page.wait_for_timeout(300)
         # preset B: another shape and best XI, attacking
         await page.click('.formrow [data-k="3-4-2-1"]'); await page.wait_for_timeout(200)
@@ -53,7 +54,7 @@ async def main():
         await page.screenshot(path=str(OUT/'t-presets2.png'))
         await page.click('#sheet [data-act="presetLoad"][data-i="0"]'); await page.wait_for_timeout(400)
         st = await page.evaluate(LOAD); c = st['clubs']['urawa']
-        print('loaded A: same XI', c['tac']['xi'] == A['xi'], '| form', c['tac']['form'], '| ment', c['tac']['ment'], '| suspended kept', SUS in c['tac']['xi'], '| injured kept', INJ in c['tac']['xi'])
+        print('loaded A: same XI', c['tac']['xi'] == A['xi'], '| form', c['tac']['form'], '| ment', c['tac']['ment'], 'ctr', c['tac'].get('ctr'), '| suspended kept', SUS in c['tac']['xi'], '| injured kept', INJ in c['tac']['xi'])
         print('banner', await page.locator('.card.alert').count(), '| out tokens', await page.locator('.tok.out').count(), '| toast', await page.locator('#toast, .toast').first.inner_text() if await page.locator('#toast, .toast').count() else '')
         await page.screenshot(path=str(OUT/'t-loaded.png'))
         await page.click('[data-act="go"]'); await page.wait_for_timeout(400)

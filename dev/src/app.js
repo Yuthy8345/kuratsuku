@@ -456,7 +456,8 @@ function viewTactics() {
     <div class="pitch">${PITCH_SVG}${toks}</div>
     <button class="btn ghost block" data-act="presets">戦術の保存・読み込み<span class="small muted">　${(c.presets || []).length}/${E.PRESET_MAX}</span></button>
     <p class="fine">選手をタップすると入れ替えられます。「!」は適性が低いポジションか疲れている選手、「×」はケガや出場停止で出られない選手です。</p>
-    <div class="ctlrow"><label>試合の進め方</label>${seg('ment', c.tac.ment, MENT_OPTS)}<span class="fine">${MENT_DESC[c.tac.ment]}</span></div>
+    <div class="ctlrow"><label>攻撃の姿勢</label>${seg('ment', c.tac.ment, MENT_OPTS)}<span class="fine">${MENT_DESC[c.tac.ment] || ''}</span></div>
+    <button class="toggle" role="switch" aria-checked="${!!c.tac.ctr}" data-act="ctr"><span><b>カウンターを狙う</b><br><span class="small muted">${CTR_DESC}</span></span><span class="sw"></span></button>
     <div class="ctlrow"><label>プレスの強度（高いほど中盤で優位、ただし消耗）</label>${seg('press', c.tac.press, [['low', '低'], ['mid', '中'], ['high', '高']])}</div>
     <button class="toggle" role="switch" aria-checked="${!!S.settings.autoSubs}" data-act="autoSubs"><span><b>交代はおまかせ</b><br><span class="small muted">オフにすると試合中に自分で交代を選びます</span></span><span class="sw"></span></button>
     <h3 class="sec-h">ベンチ（${c.tac.bench.length}/${E.BENCH_SIZE}人）<small>自動では入れ替わりません</small></h3>
@@ -680,9 +681,9 @@ function sheetPrematch(fid) {
   openSheet(`<div class="eyebrow">${E.fxLabel(f)}・${jdw(f.date)}・${f.neutral ? '国立競技場' : f.h === S.my ? 'ホーム' : 'アウェイ'}</div>
     <h2>vs ${esc(o.name)}</h2>
     ${story ? `<div class="row wrap">${story}</div>` : ''}
-    <div class="row small muted"><span>${esc(c.short)} ${c.tac.form}・${E.MENTALITY[c.tac.ment].jp}</span><span class="spacer"></span><span>${esc(o.short)} ${o.tac.form}${o.tac.ment !== 'bal' ? '・' + E.MENTALITY[o.tac.ment].jp : ''}</span></div>
+    <div class="row small muted"><span>${esc(c.short)} ${c.tac.form}・${esc(E.mentLabel(c.tac))}</span><span class="spacer"></span><span>${esc(o.short)} ${o.tac.form}${o.tac.ment !== 'bal' || o.tac.ctr ? '・' + esc(E.mentLabel(o.tac)) : ''}</span></div>
     <div style="display:grid;gap:8px">${row('攻撃', me.att, op.att)}${row('中盤', me.mid, op.mid)}${row('守備', me.def, op.def)}</div>
-    ${gap >= 3 && !['def', 'ctr'].includes(c.tac.ment) ? '<p class="fine" style="margin:0">格上が相手です。「守備的」や「カウンター」で戦うと勝機が増えます（戦術画面）。</p>' : ''}
+    ${gap >= 3 && c.tac.ment !== 'def' && !c.tac.ctr ? '<p class="fine" style="margin:0">格上が相手です。「守備的」や「カウンターを狙う」で戦うと勝機が増えます（戦術画面）。</p>' : ''}
     ${fire}
     <div><div class="eyebrow" style="margin-bottom:6px">警戒する選手</div><div class="row wrap">${keys.map(p => `<span class="chip">${posTag(p, 'width:26px;height:16px;font-size:9px')}${esc(p.name)} ${E.ovr(p)}</span>`).join('')}</div></div>
     ${iss.block ? `<div class="card alert"><div class="eyebrow">このままでは試合に進めません</div><ul>${issueLines(iss).map(t => `<li>${esc(t)}</li>`).join('')}</ul><p class="fine" style="margin:6px 0 0">戦術画面で、出られない選手を自分で入れ替えてください。</p></div>` : ''}
@@ -731,13 +732,13 @@ function sheetRetire(i) {
     `<button class="btn primary block" data-act="retNext" data-i="${i + 1}" style="min-height:54px">${left ? `次へ（あと${left}人）` : '次のシーズンへ'}</button>`);
   const b = sheetEl.querySelector('.sheet-body'); if (b) b.scrollTop = 0;
 }
-const MENT_OPTS = [['def', '守備的'], ['ctr', 'カウンター'], ['bal', 'バランス'], ['att', '攻撃的']];
+const MENT_OPTS = [['def', '守備的'], ['bal', 'バランス'], ['att', '攻撃的']];
 const MENT_DESC = {
   def: '引いて守る。失点は減るが得点も減る。格上が相手ほど効果が大きい。',
-  ctr: '守ってから速攻。チャンスは少ないが決まりやすい。格上や攻めてくる相手に効く。',
   bal: '攻守のバランスを取る標準の戦い方。',
   att: '前に出て押し込む。得点も失点も増えやすい。格下相手に。',
 };
+const CTR_DESC = 'ボールを奪ったら素早く攻める。チャンスは減るが決まりやすい。相手がボールを持つほど、攻めてくるほど効く。「守備的」と組み合わせるのが定番。';
 // saved tactics: load / overwrite / rename / delete, and save the current one
 function sheetPresets() {
   const c = S.clubs[S.my]; const list = c.presets || [];
@@ -752,7 +753,7 @@ function sheetPresets() {
       ? `<div class="row" style="gap:8px"><input class="input" id="pr-name" maxlength="16" value="${esc(pr.name)}" autocomplete="off" style="flex:1"><button class="btn" data-act="presetRename" data-i="${i}">決定</button></div>`
       : `<div class="row"><b>${esc(pr.name)}</b><span class="spacer"></span><span class="small muted">${jd(pr.d)}保存</span></div>`;
     return `<li><div class="preset">${head}
-      <div class="small muted">${pr.form}・${esc((E.MENTALITY[pr.ment] || E.MENTALITY.bal).jp)}・プレス${esc(E.PRESS[pr.press].jp)}</div>
+      <div class="small muted">${pr.form}・${esc(E.mentLabel(pr))}・プレス${esc(E.PRESS[pr.press].jp)}</div>
       <div class="small preset-xi">${esc(names)}</div>
       ${chips ? `<div class="row wrap">${chips}</div>` : ''}
       <div class="preset-act"><button class="btn primary" data-act="presetLoad" data-i="${i}">読み込む</button><button class="btn ghost" data-act="presetSave" data-i="${i}">上書き</button><button class="btn ghost" data-act="presetEdit" data-i="${i}">名前</button><button class="btn ghost ${ui.del === i ? 'danger' : ''}" data-act="presetDel" data-i="${i}">${ui.del === i ? '本当に削除' : '削除'}</button></div>
@@ -762,7 +763,7 @@ function sheetPresets() {
   openSheet(`<div class="eyebrow">戦術の保存・読み込み</div><h2>保存した戦術<small class="muted" style="font-size:14px">　${list.length}/${E.PRESET_MAX}</small></h2>
     ${list.length ? `<ul class="list">${list.map(row).join('')}</ul>` : '<p class="fine">まだ保存した戦術はありません。</p>'}
     <section class="card" style="display:grid;gap:8px"><div class="eyebrow">今の戦術を保存</div>
-      <div class="small muted">${c.tac.form}・${esc(E.MENTALITY[c.tac.ment].jp)}・プレス${esc(E.PRESS[c.tac.press].jp)}・先発とベンチ ${c.tac.xi.filter(Boolean).length + c.tac.bench.length}人</div>
+      <div class="small muted">${c.tac.form}・${esc(E.mentLabel(c.tac))}・プレス${esc(E.PRESS[c.tac.press].jp)}・先発とベンチ ${c.tac.xi.filter(Boolean).length + c.tac.bench.length}人</div>
       ${full ? '<p class="fine" style="margin:0">保存枠がいっぱいです。上の「上書き」で入れ替えてください。</p>' : `<div class="row" style="gap:8px"><input class="input" id="pr-new" maxlength="16" placeholder="名前（例：格上用カウンター）" autocomplete="off" style="flex:1"><button class="btn primary" data-act="presetSave">保存</button></div>`}
     </section>
     <p class="fine">読み込むと、保存したときのフォーメーション・進め方・プレス・先発・ベンチをそのまま反映します。ケガや出場停止の選手もそのまま入るので、試合の前に自分で入れ替えてください。移籍した選手の枠は空きになります。</p>`,
@@ -1042,7 +1043,8 @@ function sheetMatchTactics() {
   const left = 5 - sd.subs;
   const sel = MATCH.sel;
   openSheet(`<div class="eyebrow">${M.min}分・${M.hg}-${M.ag}</div><h2>采配</h2>
-    <div class="ctlrow"><label>試合の進め方</label><div class="seg">${MENT_OPTS.map(([x, l]) => `<button data-act="mMent" data-k="${x}" aria-pressed="${sd.ment === x}">${l}</button>`).join('')}</div><span class="fine">${MENT_DESC[sd.ment]}</span></div>
+    <div class="ctlrow"><label>攻撃の姿勢</label><div class="seg">${MENT_OPTS.map(([x, l]) => `<button data-act="mMent" data-k="${x}" aria-pressed="${sd.ment === x}">${l}</button>`).join('')}</div><span class="fine">${MENT_DESC[sd.ment] || ''}</span></div>
+    <button class="toggle" role="switch" aria-checked="${!!sd.ctr}" data-act="mCtr"><span><b>カウンターを狙う</b><br><span class="small muted">${CTR_DESC}</span></span><span class="sw"></span></button>
     <button class="toggle" role="switch" aria-checked="${!!S.settings.autoSubs}" data-act="autoSubs"><span><b>交代はおまかせ</b><br><span class="small muted">残り交代 ${left}回</span></span><span class="sw"></span></button>
     <div class="eyebrow">${sel ? 'OUT：' + esc(S.players[sel].name) + ' → 入れる選手を選ぶ' : '下げる選手を選ぶ'}</div>
     ${sel ? `<ul class="list">${bench.map(id => { const p = S.players[id]; return `<li><button class="prow" data-act="mIn" data-id="${id}"><span class="no">${p.num}</span>${posTag(p)}<span class="nm"><b>${esc(p.name)}</b><span>${Math.round(p.cond)}%</span></span><span class="rt"><span class="ovr ${oc(p.ovr)}">${E.ovr(p)}</span></span></button></li>`; }).join('') || '<li class="empty">控えがいません</li>'}</ul><button class="btn ghost block" data-act="mOut" data-id="">選び直す</button>`
@@ -1090,6 +1092,7 @@ const ACT = {
   setLearn(d) { const p = S.players[d.id]; if (!d.k) p.learn = null; else if (!p.learn || p.learn.pos !== d.k) p.learn = { pos: d.k }; persist(false); refreshSheet(); render(); },
   form(d) { reslot(d.k); persist(false); render(); },
   ment(d) { S.clubs[S.my].tac.ment = d.k; persist(false); render(); },
+  ctr() { const t = S.clubs[S.my].tac; t.ctr = !t.ctr; persist(false); render(); },
   press(d) { S.clubs[S.my].tac.press = d.k; persist(false); render(); },
   autoSubs() { S.settings.autoSubs = !S.settings.autoSubs; persist(false); if (sheetState && sheetState.type === 'msub') refreshSheet(); else render(); },
   autoXI() { E.autoLineup(S, S.my); persist(false); render(); toast('ベストメンバーを組みました'); },
@@ -1190,6 +1193,7 @@ const ACT = {
   mClose() { closeMatch(); },
   mTac() { if (!MATCH.paused && !MATCH.ht) { MATCH.paused = true; MATCH.resumeOnClose = true; clearTimeout(MATCH.timer); } MATCH.sel = null; sheetMatchTactics(); },
   mMent(d) { E.setMentality(MATCH.M, MATCH.k, d.k); refreshSheet(); },
+  mCtr() { const sd = MATCH.M[MATCH.k]; E.setCounter(MATCH.M, MATCH.k, !sd.ctr); refreshSheet(); },
   mOut(d) { MATCH.sel = d.id ? Number(d.id) : null; refreshSheet(); },
   mIn(d) { const ok = E.doSub(S, MATCH.M, MATCH.k, MATCH.sel, Number(d.id)); if (ok) { const ev = MATCH.M.ev[MATCH.M.ev.length - 1]; feedAdd(ev); if (MATCH.viz) MATCH.viz.sync(); toast('交代しました'); } MATCH.sel = null; refreshSheet(); renderMatchCtl(); },
 };
