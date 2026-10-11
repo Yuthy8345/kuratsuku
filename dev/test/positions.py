@@ -40,6 +40,9 @@ async def main():
         await page.click('#sheet [data-act="closeSheet"]'); await page.wait_for_timeout(300)
         for i in range(4):
             await page.click('[data-act="go"]'); await page.wait_for_timeout(200)
+            if await page.locator('#sheet .card.alert').count():
+                await page.click('#sheet [data-act="toTactics"]'); await page.wait_for_timeout(250); await page.click('[data-act="autoXI"]'); await page.wait_for_timeout(200)
+                await page.click('[data-act="go"]'); await page.wait_for_timeout(300)
             if await page.locator('#sheet [data-act="quick"]').count():
                 await page.click('#sheet [data-act="quick"]'); await page.wait_for_timeout(200); await page.click('[data-act="mClose"]'); await page.wait_for_timeout(150)
         st1 = await page.evaluate(READ, UEDA); print('4 steps later', st1)
@@ -79,6 +82,9 @@ async def main():
         await page.screenshot(path=str(OUT/'p-migrated.png'))
         await page.click('#sheet [data-act="closeSheet"]'); await page.wait_for_timeout(300)
         await page.click('[data-act="go"]'); await page.wait_for_timeout(300)  # forces a save
+        if await page.locator('#sheet .card.alert').count():
+            await page.click('#sheet [data-act="toTactics"]'); await page.wait_for_timeout(250); await page.click('[data-act="autoXI"]'); await page.wait_for_timeout(200)
+            await page.click('[data-act="go"]'); await page.wait_for_timeout(300)
         if await page.locator('#sheet [data-act="quick"]').count():
             await page.click('#sheet [data-act="quick"]'); await page.wait_for_timeout(200); await page.click('[data-act="mClose"]'); await page.wait_for_timeout(150)
         print('migrated CB with old MF', await page.evaluate(READ, UEDA))

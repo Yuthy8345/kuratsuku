@@ -17,6 +17,9 @@ async def main():
         await pg.click('[data-act="startClub"]'); await pg.wait_for_timeout(300)
         for i in range(3):
             await pg.click('[data-act="go"]'); await pg.wait_for_timeout(150)
+            if await pg.locator('#sheet .card.alert').count():
+                await pg.click('#sheet [data-act="toTactics"]'); await pg.wait_for_timeout(250); await pg.click('[data-act="autoXI"]'); await pg.wait_for_timeout(200)
+                await pg.click('[data-act="go"]'); await pg.wait_for_timeout(300)
             if await pg.locator('#sheet [data-act="quick"]').count():
                 await pg.click('#sheet [data-act="quick"]'); await pg.wait_for_timeout(150); await pg.click('[data-act="mClose"]'); await pg.wait_for_timeout(120)
         await pg.click('[data-tab="club"]'); await pg.wait_for_timeout(150)

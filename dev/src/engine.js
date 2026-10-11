@@ -1036,7 +1036,7 @@ function transferDay(S) {
   }
   // occasional unsolicited bids for my best players
   if (R() < 0.012) {
-    const top = squad(S, S.my).filter(p => !p.listed && available(p)).sort((a, b) => b.ovr - a.ovr).slice(0, 6);
+    const top = squad(S, S.my).filter(p => !p.listed && !p.retire && available(p)).sort((a, b) => b.ovr - a.ovr).slice(0, 6);
     const p = pick(top); if (p && !S.inbox.some(x => x.type === 'offer' && x.pid === p.id && !x.done)) makeOffer(S, p, 1.05 + R() * 0.35);
   }
   // AI <-> AI moves
@@ -1091,7 +1091,7 @@ function aiTransfer(S) {
 }
 function marketList(S, filter) {
   const f = filter || {};
-  return Object.values(S.players).filter(p => p.club !== S.my && (S.clubs[p.club] || p.club === 'FA'))
+  return Object.values(S.players).filter(p => p.club !== S.my && !p.retire && (S.clubs[p.club] || p.club === 'FA'))
     .filter(p => !f.pos || p.pos === f.pos)
     .filter(p => !f.q || p.name.replace(/\s/g, '').includes(f.q.replace(/\s/g, '')) || (S.clubs[p.club] && S.clubs[p.club].short.includes(f.q)))
     .sort((a, b) => b.ovr - a.ovr);
@@ -1099,6 +1099,7 @@ function marketList(S, filter) {
 // Try to buy. mult: offer as multiple of value. Returns {ok, msg}
 function bid(S, pid, mult) {
   const p = S.players[pid]; if (!p) return { ok: false, msg: '選手が見つかりません' };
+  if (p.retire) return { ok: false, msg: `${p.name}は今季限りでの引退が決まっています` };
   const my = S.clubs[S.my];
   if (p.club === 'FA') {
     if (squad(S, S.my).length >= 40) return { ok: false, msg: '登録上限（40人）に達しています' };
@@ -1224,22 +1225,47 @@ function endSeason(S) {
   else if (verdict === 'missed') S.board = clamp(S.board - 25, 0, 100);
   S.seasonEnd = { label: seasonLabel(S.season), champ, myPos, rel, scorers, verdict, prize: PRIZE[myPos - 1] || 0, pts: t[myPos - 1].pts, target: target.jp };
   S.history.unshift({ season: seasonLabel(S.season), club: S.my, pos: myPos, pts: t[myPos - 1].pts, champ, verdict });
+  decideRetirements(S);
   news(S, `${seasonLabel(S.season)}シーズン終了。優勝は${S.clubs[champ].name}。${S.clubs[S.my].short}は${myPos}位。`, 'big');
 }
-function rollover(S) {
-  const se = S.seasonEnd; if (!se) return;
-  const myRelegated = se.rel.includes(S.my);
-  const fireMe = myRelegated || S.board < 15;
-  // retirements
+// Retirements are settled when the season ends, so the manager can see his own players off before the next season.
+// Each of my retiring players gets a card (what he did for the club) for the farewell pop-up.
+function retireCard(S, p) {
+  const rows = (p.hist || []).filter(h => h.c === p.club).concat([{ s: seasonLabel(S.season), ovr: Math.round(p.ovr), ...p.st }]);
+  const sum = k => rows.reduce((t, r) => t + (r[k] || 0), 0);
+  return {
+    id: p.id, name: p.name, short: p.short, num: p.num, pp: ppOf(p), pos: p.pos, nat: p.nat, club: p.club,
+    age: age(p, (S.season + 1) + '-06-08'), seasons: rows.length, apps: sum('apps'), g: sum('g'), a: sum('a'),
+    peak: Math.max(...rows.map(r => r.ovr || 0), Math.round(p.ovr), Math.round(p.ovr0 || 0)),
+    best: rows.reduce((b, r) => (r.apps || 0) && (!b || (r.g || 0) > b.g || ((r.g || 0) === b.g && (r.apps || 0) > b.apps)) ? { s: r.s, apps: r.apps || 0, g: r.g || 0 } : b, null),
+    rows: rows.map(r => ({ s: r.s, apps: r.apps || 0, g: r.g || 0, a: r.a || 0 })),
+  };
+}
+function decideRetirements(S) {
+  const se = S.seasonEnd; if (!se || se.retDone) return se ? se.ret || [] : [];
   const newDate = (S.season + 1) + '-06-08';
+  const mine = [];
   for (const p of Object.values(S.players)) {
     if (!S.clubs[p.club] && p.club !== 'FA') continue;
     const a = age(p, newDate);
     if (a >= 35) {
       const pr = 0.3 + (a - 35) * 0.17 + (p.ovr < 64 ? 0.2 : 0);
-      if (R() < pr) { if (p.club === S.my) news(S, `${p.name}が現役引退を発表。`, 'info'); p.club = 'RET'; }
+      if (R() < pr) { p.retire = true; p.listed = false; if (p.club === S.my) mine.push(p); }
     }
   }
+  se.ret = mine.sort((a, b) => b.ovr - a.ovr).map(p => retireCard(S, p));
+  se.retDone = true;
+  S.inbox = S.inbox.filter(x => !(x.type === 'offer' && !x.done && S.players[x.pid] && S.players[x.pid].retire));
+  return se.ret;
+}
+function rollover(S) {
+  const se = S.seasonEnd; if (!se) return;
+  const myRelegated = se.rel.includes(S.my);
+  const fireMe = myRelegated || S.board < 15;
+  const newDate = (S.season + 1) + '-06-08';
+  // retirements (decided at the end of the season)
+  decideRetirements(S);
+  for (const p of Object.values(S.players)) if (p.retire) { if (p.club === S.my) news(S, `${p.name}が現役引退。お疲れさまでした。`, 'info'); p.club = 'RET'; }
   // season stats archive
   for (const p of Object.values(S.players)) {
     if (p.st.apps || p.club === S.my) p.hist.unshift({ s: seasonLabel(S.season), c: p.club, ovr: Math.round(p.ovr), ...p.st });
@@ -1317,7 +1343,7 @@ const API = {
   autoLineup, autoBench, benchSwap, benchRemove, lineupIssues, BENCH_SIZE, clubRating, validateLineup, effective, posPenalty, available, teamRating,
   createMatch, stepMatch, simulateFull, finishMatch, doSub, benchOptions, onPitch, setMentality, bestSubFor,
   advance, nextDay, simAIToday, myFixtureToday, nextMyFixture, todaysFixtures, inWindow, windowEnd, nextWindowStart,
-  acceptOffer, rejectOffer, bid, marketList, ensureFreeAgents, upgrade, facCost, takeJob, rollover, endSeason, news, fire,
+  acceptOffer, rejectOffer, bid, decideRetirements, marketList, ensureFreeAgents, upgrade, facCost, takeJob, rollover, endSeason, news, fire,
 };
 if (typeof module !== 'undefined' && module.exports) module.exports = API; else root.Engine = API;
 })(typeof window !== 'undefined' ? window : globalThis);

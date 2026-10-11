@@ -23,6 +23,9 @@ async def main():
         n = 0; offers = 0
         for i in range(140):
             await page.click('[data-act="go"]'); await page.wait_for_timeout(120)
+            if await page.locator('#sheet .card.alert').count():
+                await page.click('#sheet [data-act="toTactics"]'); await page.wait_for_timeout(250); await page.click('[data-act="autoXI"]'); await page.wait_for_timeout(200)
+                await page.click('[data-act="go"]'); await page.wait_for_timeout(300)
             if await page.locator('#sheet [data-act="quick"]').count():
                 await page.click('#sheet [data-act="quick"]'); await page.wait_for_timeout(150)
                 await page.click('[data-act="mClose"]'); await page.wait_for_timeout(100); n += 1

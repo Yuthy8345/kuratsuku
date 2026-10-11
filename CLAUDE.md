@@ -10,6 +10,7 @@
 - `dev/raw/*.txt` — 2026/27 J1 登録選手（Jリーグ公式/クラブ公式から取得）。`dev/build_data.js` が能力値・格・本職を付けて `dev/data.json` を作る。`dev/raw/` には選手ファイル以外の .txt を置かない（全部クラブとして読まれる）。
 - ポジション: 登録は GK/DF/MF/FW（能力の重み用、`p.pos`）。細分化した本職 `p.pp`（CB SB / DMF CMF OMF SH / CF ST WG、STはセカンドトップ・シャドー）と、他ポジションの適性 `p.ap`（0〜100、無ければ `DP_SIM` の初期値）。本職は `dev/positions_footballlab.txt`（Football LAB の2026/27先発位置）＋ `build_data.js` の `PP_KNOWN`、どちらも無い選手はクラブの不足ポジションで補完。各クラブの基本フォーメーションは `FORM`。
 - メンバー: 自クラブの先発・ベンチは自動で入れ替えない（`validateLineup` はクラブを離れた選手を外すだけ）。負傷・出場停止の選手はそのまま残し、`lineupIssues` が block のあいだは試合に進めない。AIクラブは従来どおり自動。
+- 引退: シーズン終了時（`endSeason` → `decideRetirements`）に決まり、自クラブの引退選手は `S.seasonEnd.ret` のカードで、「次のシーズンへ」を押したときに1人ずつポップアップ表示（セレモニーの代わり）。そのあと `rollover` でクラブから外れる。
 - `dev/icons/real.py` — アプリアイコン（SVG生成）。PNGはリポジトリ直下。
 
 ## Build & deploy
@@ -28,3 +29,4 @@ git add -A && git commit && git push             # Pages が1分ほどで反映
 - `python3 dev/test/bench.py` / `python3 dev/test/match2d.py` — ベンチ入れ替え／試合画面の通し再生
 - `python3 dev/test/positions.py` — 適性グリッド・ポジション習得・旧セーブ（v2）からの移行
 - `python3 dev/test/suspend.py` — 出場停止・負傷の選手がいると試合に進めず、復帰しても勝手にメンバーに戻らないこと
+- `python3 dev/test/retire.py` — 引退選手のポップアップ（ライト/ダーク）とシーズン移行

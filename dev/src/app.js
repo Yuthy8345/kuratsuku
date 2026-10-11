@@ -355,10 +355,11 @@ function sheetPlayer(id) {
   if (p.inj > 0) status.push(`<span class="chip warn">負傷中（あと${p.inj}日）</span>`);
   if (p.sus > 0) status.push('<span class="chip warn">出場停止</span>');
   if (p.listed) status.push('<span class="chip acc">放出リスト登録中</span>');
+  if (p.retire) status.push('<span class="chip">今季限りで引退</span>');
   const hist = p.hist && p.hist.length ? `<div><div class="eyebrow" style="margin-bottom:6px">過去の成績</div><ul class="list">${p.hist.map(h => `<li><div class="row" style="padding:9px 12px;font-size:13px"><b>${h.s}</b><span class="muted">${esc(S.clubs[h.c] ? S.clubs[h.c].short : '')}</span><span class="spacer"></span><span class="tnum">${h.apps}試合 ${h.g}得点 ${h.a}A</span></div></li>`).join('')}</ul></div>` : '';
   let foot;
   if (mine) {
-    foot = `<button class="btn primary block" data-act="train" data-id="${p.id}">トレーニングを設定</button><div class="grid2"><button class="btn ghost" data-act="toggleList" data-id="${p.id}">${p.listed ? '放出リストから外す' : '放出リストに載せる'}</button><button class="btn ghost" data-act="closeSheet">閉じる</button></div>`;
+    foot = `<button class="btn primary block" data-act="train" data-id="${p.id}">トレーニングを設定</button><div class="grid2">${p.retire ? '<button class="btn ghost" disabled>引退が決まっています</button>' : `<button class="btn ghost" data-act="toggleList" data-id="${p.id}">${p.listed ? '放出リストから外す' : '放出リストに載せる'}</button>`}<button class="btn ghost" data-act="closeSheet">閉じる</button></div>`;
   } else if (p.club === 'FA') {
     const sign = Math.round(E.wage(p) * 0.5 / 10) * 10;
     foot = `<button class="btn primary block" data-act="sign" data-id="${p.id}">契約する（契約金 ${E.money(sign)}）</button><button class="btn ghost block" data-act="closeSheet">閉じる</button>`;
@@ -634,6 +635,36 @@ function sheetSeasonEnd() {
     <div><div class="eyebrow" style="margin-bottom:6px">得点王争い</div><ul class="list">${se.scorers.map((x, i) => `<li><div class="row" style="padding:9px 12px"><b class="tnum">${i + 1}</b>${kit(x.club, 'sm')}<span>${esc(x.name)}</span><span class="spacer"></span><b class="tnum">${x.g}点</b></div></li>`).join('')}</ul></div>
     <p class="fine">次のシーズンに進むと、ベテランの引退、ユースからの昇格、J2との入れ替えが行われます。オフシーズン（6〜8月）は移籍期間です。</p>`,
     '<button class="btn primary block" data-act="nextSeason" style="min-height:54px">次のシーズンへ</button><button class="btn ghost block" data-act="closeSheet">あとで</button>');
+}
+// farewell pop-up for a player of mine who retires (instead of a ceremony)
+const FAREWELL = {
+  GK: ['最後尾からチームを支え続けた守護神。', 'そのセーブに何度も救われた。'],
+  DF: ['体を張ってゴールを守り続けた。', '最終ラインに立つ背中が頼もしかった。'],
+  MF: ['中盤でチームの舵を取り続けた。', 'そのパスがいつも攻撃の始まりだった。'],
+  FW: ['ゴールでスタジアムを沸かせ続けた。', 'ここぞの場面で決めてくれるストライカーだった。'],
+};
+function sheetRetire(i) {
+  const se = S.seasonEnd; const ret = se.ret.filter(r => S.players[r.id]); const r = ret[i]; if (!r) return;
+  sheetState = { type: 'retire', i };
+  const c = S.clubs[r.club] || S.clubs[S.my];
+  const kt = lum(c.c1) > 0.6 ? '#141414' : '#ffffff';
+  const lines = FAREWELL[r.pos] || FAREWELL.MF;
+  const msg = r.g >= 20 ? `${S.clubs[S.my].short}で${r.g}ゴール。${lines[0]}` : r.apps >= 60 ? `${S.clubs[S.my].short}で${r.apps}試合に出場。${lines[0]}` : lines[r.id % 2];
+  const left = ret.length - i - 1;
+  openSheet(`<div class="farewell" style="--k1:${c.c1};--k2:${c.c2};--kt:${kt}">
+      <div class="fw-lights" aria-hidden="true">${'<i></i>'.repeat(14)}</div>
+      <div class="fw-head"><span>${esc(se.label)}</span><span>${ret.length > 1 ? `${i + 1} / ${ret.length}` : 'FAREWELL'}</span></div>
+      <div class="fw-shirt">${r.num}</div>
+      <div class="fw-tag">現役引退</div>
+      <h2 class="fw-name">${esc(r.name)}</h2>
+      <div class="fw-sub">${r.pp}・${r.age}歳・${esc(c.name)}</div>
+      <p class="fw-msg">${esc(msg)}<br>背番号${r.num}、${esc(r.short)}。ありがとう。</p>
+    </div>
+    <div class="statgrid"><div><small>シーズン</small><b>${r.seasons}</b></div><div><small>出場</small><b>${r.apps}</b></div><div><small>得点</small><b>${r.g}</b></div><div><small>アシスト</small><b>${r.a}</b></div><div><small>最高能力</small><b>${r.peak}</b></div></div>
+    ${r.rows.length > 1 ? `<div><div class="eyebrow" style="margin-bottom:6px">${esc(S.clubs[S.my].short)}での歩み</div><ul class="list">${r.rows.map(x => `<li><div class="row" style="padding:8px 12px;font-size:13px"><b>${esc(x.s)}</b><span class="spacer"></span><span class="tnum">${x.apps}試合 ${x.g}得点 ${x.a}A</span></div></li>`).join('')}</ul></div>` : ''}
+    <p class="fine">シーズン数と成績は、あなたが監督になってから共に戦った記録です。</p>`,
+    `<button class="btn primary block" data-act="retNext" data-i="${i + 1}" style="min-height:54px">${left ? `次へ（あと${left}人）` : '次のシーズンへ'}</button>`);
+  const b = sheetEl.querySelector('.sheet-body'); if (b) b.scrollTop = 0;
 }
 function sheetFired() {
   const F = S.fired; if (!F) return;
@@ -994,7 +1025,14 @@ const ACT = {
   toTactics() { closeSheet(); UI.tab = 'tactics'; render(); window.scrollTo(0, 0); },
   kickoff(d) { startMatch(Number(d.id), false); },
   quick(d) { startMatch(Number(d.id), true); },
-  nextSeason() { E.rollover(S); persist(true); closeSheet(); UI.tab = 'home'; UI.lg.round = null; render(); window.scrollTo(0, 0); if (S.fired) setTimeout(sheetFired, 260); else toast(`${E.seasonLabel(S.season)}シーズンへ`); },
+  nextSeason() {
+    // my retiring players get a farewell pop-up first (one per player), then the season rolls over
+    const ret = S.seasonEnd ? E.decideRetirements(S).filter(r => S.players[r.id]) : [];
+    if (ret.length && !S.seasonEnd.retSeen) { persist(false); return sheetRetire(0); }
+    ACT.rollNow();
+  },
+  retNext(d) { const i = Number(d.i); const ret = S.seasonEnd.ret.filter(r => S.players[r.id]); if (i < ret.length) return sheetRetire(i); S.seasonEnd.retSeen = true; ACT.rollNow(); },
+  rollNow() { E.rollover(S); persist(true); closeSheet(); UI.tab = 'home'; UI.lg.round = null; render(); window.scrollTo(0, 0); if (S.fired) setTimeout(sheetFired, 260); else toast(`${E.seasonLabel(S.season)}シーズンへ`); },
   job(d) { E.takeJob(S, d.id); persist(true); closeSheet(); UI.tab = 'home'; render(); toast(`${S.clubs[S.my].short}の監督に就任しました`); },
   askReset() { sheetReset(); },
   exportOpen() { sheetExport(); },
