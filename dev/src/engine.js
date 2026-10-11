@@ -593,13 +593,39 @@ function benchSwap(S, outId, inId) {
 }
 function clubRating(S, cid) {
   const c = S.clubs[cid];
-  const slots = FORMATIONS[c.tac.form].map((s0, i) => ({ role: s0[0], pid: c.tac.xi[i] && S.players[c.tac.xi[i]] ? c.tac.xi[i] : null }));
+  const can = id => id && S.players[id] && available(S.players[id]);
+  const slots = FORMATIONS[c.tac.form].map((s0, i) => ({ role: s0[0], pid: can(c.tac.xi[i]) ? c.tac.xi[i] : null }));
   const cond = {}; for (const s0 of slots) if (s0.pid) cond[s0.pid] = S.players[s0.pid].cond;
   return teamRating(S, { slots, cond, press: c.tac.press, tactBonus: cid === S.my && S.training === 'tact' ? 1 : 0, pres: c.pres || 2 });
 }
-function validateLineup(S, cid) {
+// what the manager has to sort out before kickoff: empty slots and players who can't play (injured / suspended)
+function lineupIssues(S, cid) {
+  const c = S.clubs[cid]; const xi = [], bench = [];
+  const why = p => p.inj > 0 ? 'inj' : 'sus';
+  FORMATIONS[c.tac.form].forEach((s0, i) => {
+    const id = c.tac.xi[i]; const p = id && S.players[id];
+    if (!p || p.club !== cid) xi.push({ i, role: s0[0], pid: null, why: 'empty' });
+    else if (!available(p)) xi.push({ i, role: s0[0], pid: id, why: why(p) });
+  });
+  for (const id of c.tac.bench) { const p = S.players[id]; if (p && p.club === cid && !available(p)) bench.push({ pid: id, why: why(p) }); }
+  // an empty slot only blocks kickoff while someone fit is left to put there
+  const spare = squad(S, cid).some(p => available(p) && !c.tac.xi.includes(p.id));
+  const block = xi.some(x => x.why !== 'empty' || spare) || bench.length > 0;
+  return { xi, bench, block };
+}
+// AI clubs: drop anyone who can't play and fill the gaps. The manager's own club is never changed behind his back:
+// only players who left the club are taken out; injured / suspended players stay where he put them until he swaps them.
+function validateLineup(S, cid, opts) {
   const c = S.clubs[cid];
-  const ok = id => id && S.players[id] && S.players[id].club === cid && available(S.players[id]);
+  const inClub = id => id && S.players[id] && S.players[id].club === cid;
+  const ok = id => inClub(id) && available(S.players[id]);
+  if (cid === S.my && !(opts && opts.fill)) {
+    const xi = FORMATIONS[c.tac.form].map((s0, i) => inClub(c.tac.xi[i]) ? c.tac.xi[i] : null);
+    const changed = xi.some((id, i) => id !== c.tac.xi[i]) || xi.length !== c.tac.xi.length;
+    c.tac.xi = xi;
+    c.tac.bench = c.tac.bench.filter((id, k, a) => inClub(id) && !xi.includes(id) && a.indexOf(id) === k);
+    return changed;
+  }
   let changed = false;
   c.tac.xi = c.tac.xi.map(id => { if (ok(id)) return id; changed = true; return null; });
   c.tac.bench = c.tac.bench.filter(id => ok(id) && !c.tac.xi.includes(id));
@@ -614,8 +640,14 @@ function validateLineup(S, cid) {
     });
     changed = true;
   }
-  autoBench(S, cid);
+  if (cid !== S.my) autoBench(S, cid);
   return changed;
+}
+// manager takes a player off the bench without a replacement
+function benchRemove(S, pid) {
+  const c = S.clubs[S.my]; if (!c.tac.bench.includes(pid)) return false;
+  c.tac.bench = c.tac.bench.filter(id => id !== pid); c.tac.benchManual = true;
+  return true;
 }
 
 /* ---------- team strength ---------- */
@@ -652,11 +684,13 @@ function leagueAvg(S) {
 function sideFor(S, cid) {
   const c = S.clubs[cid];
   validateLineup(S, cid);
+  // the UI doesn't let the manager kick off with a player who can't play; if it ever happens, patch the XI for this match
+  if (cid === S.my && c.tac.xi.some(id => !id || !available(S.players[id])) && lineupIssues(S, cid).block) validateLineup(S, cid, { fill: true });
   const slots = FORMATIONS[c.tac.form].map((s, i) => ({ role: s[0], x: s[1], y: s[2], pid: c.tac.xi[i] || null }));
   const cond = {};
   for (const s of slots) if (s.pid) cond[s.pid] = S.players[s.pid].cond;
   const tactBonus = cid === S.my && S.training === 'tact' ? 1 : 0;
-  return { cid, form: c.tac.form, ment: c.tac.ment, press: c.tac.press, slots, bench: [...c.tac.bench], subs: 0, subLog: [], cond, tactBonus, sent: [], pres: c.pres || 2, fan: c.fan || 2 };
+  return { cid, form: c.tac.form, ment: c.tac.ment, press: c.tac.press, slots, bench: c.tac.bench.filter(id => S.players[id] && S.players[id].club === cid && available(S.players[id])), subs: 0, subLog: [], cond, tactBonus, sent: [], pres: c.pres || 2, fan: c.fan || 2 };
 }
 function createMatch(S, fx) {
   const M = {
@@ -1265,7 +1299,8 @@ function rollover(S) {
   S.inbox = S.inbox.filter(x => !x.done).slice(0, 20);
   S.seasonEnd = null;
   ensureFreeAgents(S);
-  for (const cid of S.order) autoLineup(S, cid);
+  for (const cid of S.order) if (cid !== S.my) autoLineup(S, cid);
+  validateLineup(S, S.my); // the manager's XI stays as he left it (players who left are taken out)
   setSponsors(S);
   setExpectations(S);
   if (promoted.length) news(S, `J2から${promoted.map(c => S.clubs[c].short).join('・')}が昇格。`, 'info');
@@ -1279,7 +1314,7 @@ const API = {
   D, jdate, FORMATIONS, ROLE, DPOS, DP_CAT, DP_JP, LEARN_MAX, PLAY_MAX, ppOf, apt, roleApt, posValues, learnRate, learnWeeks, MENTALITY, PRESS, TRAINING, FACILITY, ATTR, ATTR_SHOW, FOCUS, INTENS,
   calcOvr, roleScore, bestRoles, devPreview, migrate, weekly, power, presStars, presLabel,
   newGame, seasonForDate, seasonLabel, squad, strength, table, position, age, ovr, value, wage, money, attrs,
-  autoLineup, autoBench, benchSwap, clubRating, validateLineup, effective, posPenalty, available, teamRating,
+  autoLineup, autoBench, benchSwap, benchRemove, lineupIssues, BENCH_SIZE, clubRating, validateLineup, effective, posPenalty, available, teamRating,
   createMatch, stepMatch, simulateFull, finishMatch, doSub, benchOptions, onPitch, setMentality, bestSubFor,
   advance, nextDay, simAIToday, myFixtureToday, nextMyFixture, todaysFixtures, inWindow, windowEnd, nextWindowStart,
   acceptOffer, rejectOffer, bid, marketList, ensureFreeAgents, upgrade, facCost, takeJob, rollover, endSeason, news, fire,

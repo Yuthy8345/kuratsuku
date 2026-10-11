@@ -189,10 +189,11 @@ function goState() {
 function dock() {
   const g = goState();
   const unseen = S.inbox.some(x => x.type === 'offer' && !x.done && !x.seen);
+  const fix = !S.fired && S.clubs[S.my] && E.lineupIssues(S, S.my).block;
   const tabs = [['home', 'ホーム'], ['squad', '選手'], ['tactics', '戦術'], ['league', 'リーグ'], ['club', 'クラブ']];
   return `<nav class="dock" aria-label="メイン操作"><div class="dock-in">
     <button class="go" data-act="go"><b>${g.label}</b><span class="row"><small>${g.sub}</small><span class="arrow" aria-hidden="true">▶</span></span></button>
-    <div class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab" data-act="tab" data-tab="${k}" ${UI.tab === k ? 'aria-current="page"' : ''}>${ICON[k]}<span>${l}</span>${k === 'home' && unseen ? '<i class="dot"></i>' : ''}</button>`).join('')}</div>
+    <div class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab" data-act="tab" data-tab="${k}" ${UI.tab === k ? 'aria-current="page"' : ''}>${ICON[k]}<span>${l}</span>${(k === 'home' && unseen) || (k === 'tactics' && fix) ? '<i class="dot"></i>' : ''}</button>`).join('')}</div>
   </div></nav>`;
 }
 
@@ -265,6 +266,14 @@ function prow(p, ctx) {
   return `<li><button class="prow" data-act="player" data-id="${p.id}">${lead}${posTag(p)}<span class="nm"><b>${esc(p.name)}</b><span>${sub} ${natChip(p)}${chips.join('')}</span></span><span class="rt"><span class="ovr ${oc(p.ovr)}">${E.ovr(p)}</span>${ctx === 'market' ? '' : condBar(p.cond)}</span></button></li>`;
 }
 const POS_ORD = { GK: 0, DF: 1, MF: 2, FW: 3 };
+// why a player can't play, e.g. 出場停止（あと1試合） / 負傷（あと5日）
+const outText = p => p.inj > 0 ? `負傷（あと${p.inj}日）` : `出場停止（あと${p.sus}試合）`;
+const outShort = p => p.inj > 0 ? '負傷' : '出場停止';
+function issueLines(iss) {
+  const c = S.clubs[S.my]; const F = E.FORMATIONS[c.tac.form];
+  return iss.xi.map(x => x.pid ? `${E.ROLE[F[x.i][0]].jp}：${S.players[x.pid].name}が${outText(S.players[x.pid])}` : `${E.ROLE[F[x.i][0]].jp}が空いています`)
+    .concat(iss.bench.map(x => `ベンチ：${S.players[x.pid].name}が${outText(S.players[x.pid])}`));
+}
 const dpOf = p => p.pp || (p.at ? E.ppOf(p) : p.pos);
 const DP_ORD = p => { const i = E.DPOS.indexOf(dpOf(p)); return i < 0 ? 0 : i; };
 function posTag(p, st) { const dp = dpOf(p); return `<span class="pos pos-${E.DP_CAT[dp] || p.pos}"${st ? ` style="${st}"` : ''}>${dp}</span>`; }
@@ -410,21 +419,24 @@ function viewTactics() {
     const k1 = c.c1, k2 = c.c2, kt = lum(c.c1) > 0.6 ? '#141414' : '#ffffff';
     const style = `left:${s[1]}%;top:${88 - (s[2] - 7) * 1.04}%;--k1:${k1};--k2:${k2};--kt:${kt}`;
     if (!p) return `<button class="tok empty" style="${style}" data-act="slot" data-i="${i}"><span class="shirt">+</span><span class="lbl">${E.ROLE[s[0]].jp}</span></button>`;
+    if (!E.available(p)) return `<button class="tok out" style="${style}" data-act="slot" data-i="${i}" aria-label="${E.ROLE[s[0]].jp} ${esc(p.name)} ${outShort(p)}"><span class="shirt">${p.num}</span><span class="lbl">${esc(p.short)}</span><span class="ov">${outShort(p)}</span></button>`;
     const warn = E.posPenalty(p, s[0]) <= -1.5 || p.cond < 70;
     return `<button class="tok" style="${style}" data-act="slot" data-i="${i}" aria-label="${E.ROLE[s[0]].jp} ${esc(p.name)}"><span class="shirt ${warn ? 'warn' : ''}">${p.num}</span><span class="lbl">${esc(p.short)}</span><span class="ov">${E.ROLE[s[0]].jp}・${E.ovr(p)}</span></button>`;
   }).join('');
   const seg = (act, cur, opts) => `<div class="seg">${opts.map(([k, l]) => `<button data-act="${act}" data-k="${k}" aria-pressed="${cur === k}">${l}</button>`).join('')}</div>`;
-  return `<div class="trate"><div><small>攻撃</small><b>${Math.round(r.att)}</b></div><div><small>中盤</small><b>${Math.round(r.mid)}</b></div><div><small>守備</small><b>${Math.round(r.def)}</b></div></div>
+  const iss = E.lineupIssues(S, S.my);
+  const banner = iss.block ? `<div class="card alert"><div class="eyebrow">試合の前に入れ替えが必要です</div><ul>${issueLines(iss).map(t => `<li>${esc(t)}</li>`).join('')}</ul><p class="fine" style="margin:6px 0 0">選手やベンチの行をタップして入れ替えてください。自動では入れ替わりません。</p></div>` : '';
+  return `${banner}<div class="trate"><div><small>攻撃</small><b>${Math.round(r.att)}</b></div><div><small>中盤</small><b>${Math.round(r.mid)}</b></div><div><small>守備</small><b>${Math.round(r.def)}</b></div></div>
     <div class="formrow" role="group" aria-label="フォーメーション">${Object.keys(E.FORMATIONS).map(f => `<button data-act="form" data-k="${f}" aria-pressed="${c.tac.form === f}">${f}</button>`).join('')}</div>
     <div class="pitch">${PITCH_SVG}${toks}</div>
-    <p class="fine">選手をタップすると入れ替えられます。「!」は適性が低いポジションか、疲れている選手です。</p>
+    <p class="fine">選手をタップすると入れ替えられます。「!」は適性が低いポジションか疲れている選手、「×」はケガや出場停止で出られない選手です。</p>
     <div class="ctlrow"><label>攻撃の姿勢</label>${seg('ment', c.tac.ment, [['def', '守備的'], ['bal', 'バランス'], ['att', '攻撃的']])}</div>
     <div class="ctlrow"><label>プレスの強度（高いほど中盤で優位、ただし消耗）</label>${seg('press', c.tac.press, [['low', '低'], ['mid', '中'], ['high', '高']])}</div>
     <button class="toggle" role="switch" aria-checked="${!!S.settings.autoSubs}" data-act="autoSubs"><span><b>交代はおまかせ</b><br><span class="small muted">オフにすると試合中に自分で交代を選びます</span></span><span class="sw"></span></button>
-    <h3 class="sec-h">ベンチ（${c.tac.bench.length}人）<small>${c.tac.benchManual ? '自分で選んだメンバー' : 'おまかせ（能力とコンディション順）'}</small></h3>
+    <h3 class="sec-h">ベンチ（${c.tac.bench.length}/${E.BENCH_SIZE}人）<small>自動では入れ替わりません</small></h3>
     <p class="fine" style="margin:-6px 0 0">選手をタップすると、ベンチ外の選手と入れ替えられます。</p>
-    <ul class="list">${c.tac.bench.map(id => benchRow(S.players[id])).join('') || '<li class="empty">控え選手がいません</li>'}</ul>
-    ${c.tac.benchManual ? '<button class="btn ghost block" data-act="benchAuto">ベンチをおまかせに戻す</button>' : ''}
+    <ul class="list">${c.tac.bench.map(id => benchRow(S.players[id])).join('')}${c.tac.bench.length < E.BENCH_SIZE ? `<li><button class="prow addrow" data-act="benchPick" data-id="0"><span class="no">+</span><span class="nm"><b>ベンチに加える</b><span>空き ${E.BENCH_SIZE - c.tac.bench.length}枠</span></span></button></li>` : ''}</ul>
+    <button class="btn ghost block" data-act="benchAuto">ベンチをおまかせで組み直す</button>
     <div class="subnav"><button class="btn primary block" data-act="autoXI">おまかせでベストメンバーを組む</button></div>`;
 }
 function benchRow(p) {
@@ -432,7 +444,7 @@ function benchRow(p) {
 }
 function sheetBench(outId) {
   const c = S.clubs[S.my]; const o = S.players[outId];
-  sheetState = { type: 'bench', id: outId };
+  sheetState = { type: 'bench', id: outId || 0 };
   const reserves = E.squad(S, S.my).filter(p => !c.tac.xi.includes(p.id) && !c.tac.bench.includes(p.id))
     .sort((a, b) => (E.available(b) - E.available(a)) || (POS_ORD[a.pos] - POS_ORD[b.pos]) || b.ovr - a.ovr);
   const row = p => {
@@ -440,10 +452,13 @@ function sheetBench(outId) {
     const st = !av ? (p.inj > 0 ? `<span class="chip warn">負傷 ${p.inj}日</span>` : '<span class="chip warn">出場停止</span>') : '';
     return `<li><button class="prow" data-act="benchIn" data-id="${p.id}" ${av ? '' : 'disabled style="opacity:.5"'}><span class="no">${p.num}</span>${posTag(p)}<span class="nm"><b>${esc(p.name)}</b><span>${E.age(p, S.date)}歳・${Math.round(p.cond)}% ${st}</span></span><span class="rt"><span class="ovr ${oc(p.ovr)}">${E.ovr(p)}</span>${condBar(p.cond)}</span></button></li>`;
   };
-  openSheet(`<div class="eyebrow">ベンチの入れ替え</div><h2>${esc(o.name)}（${dpOf(o)}・${E.ovr(o)}）と入れ替える選手</h2>
-    <p class="fine">ベンチ外の選手です。GKがベンチにいなくなる場合は、自動でGKを1人残します。</p>
+  const head = o ? `<div class="eyebrow">ベンチの入れ替え</div><h2>${esc(o.name)}（${dpOf(o)}・${E.ovr(o)}）と入れ替える選手</h2>${E.available(o) ? '' : `<p class="small" style="color:var(--loss);margin:0">${esc(o.short)}は${outText(o)}のため、この試合には出られません。</p>`}`
+    : `<div class="eyebrow">ベンチの空き枠</div><h2>ベンチに加える選手</h2>`;
+  openSheet(`${head}
+    <p class="fine">ベンチ外の選手です。</p>
     <ul class="list">${reserves.map(row).join('') || '<li class="empty">ベンチ外の選手がいません</li>'}</ul>`,
-    `<button class="btn ghost block" data-act="player" data-id="${o.id}">${esc(o.short)}の詳細を見る</button><button class="btn ghost block" data-act="closeSheet">閉じる</button>`);
+    o ? `<div class="grid2"><button class="btn ghost" data-act="benchOut" data-id="${o.id}">ベンチから外す</button><button class="btn ghost" data-act="player" data-id="${o.id}">詳細を見る</button></div><button class="btn ghost block" data-act="closeSheet">閉じる</button>`
+      : '<button class="btn ghost block" data-act="closeSheet">閉じる</button>');
 }
 function reslot(newForm) {
   const c = S.clubs[S.my]; const keep = c.tac.xi.filter(Boolean);
@@ -597,15 +612,18 @@ function sheetPrematch(fid) {
   const row = (lab, a, b) => { const mx = Math.max(a, b, 1); return `<div class="cmp"><b class="l">${a.toFixed(0)}</b><span class="bar bl"><i style="width:${Math.max(8, 100 - (mx - a) * 9)}%;background:var(--accent-bg)"></i></span><span class="lab">${lab}</span><span class="bar"><i style="width:${Math.max(8, 100 - (mx - b) * 9)}%;background:var(--muted)"></i></span><b>${b.toFixed(0)}</b></div>`; };
   const warn = [];
   const F = E.FORMATIONS[c.tac.form];
-  c.tac.xi.forEach((id, i) => { const p = S.players[id]; if (!p) { warn.push(`${E.ROLE[F[i][0]].jp}が空いています`); return; } if (p.cond < 70) warn.push(`${p.name}が疲れています（${Math.round(p.cond)}%）`); if (E.posPenalty(p, F[i][0]) <= -1.5) warn.push(`${p.name}は${E.ROLE[F[i][0]].jp}の適性が低め（${Math.round(E.roleApt(p, F[i][0]))}）`); });
+  const iss = E.lineupIssues(S, S.my);
+  c.tac.xi.forEach((id, i) => { const p = S.players[id]; if (!p || !E.available(p)) return; if (p.cond < 70) warn.push(`${p.name}が疲れています（${Math.round(p.cond)}%）`); if (E.posPenalty(p, F[i][0]) <= -1.5) warn.push(`${p.name}は${E.ROLE[F[i][0]].jp}の適性が低め（${Math.round(E.roleApt(p, F[i][0]))}）`); });
   const keys = o.tac.xi.map(id => S.players[id]).filter(Boolean).sort((a, b) => b.ovr - a.ovr).slice(0, 3);
   openSheet(`<div class="eyebrow">第${f.r}節・${jdw(f.date)}・${f.h === S.my ? 'ホーム' : 'アウェイ'}</div>
     <h2>vs ${esc(o.name)}</h2>
     <div class="row small muted"><span>${esc(c.short)} ${c.tac.form}・${E.MENTALITY[c.tac.ment].jp}</span><span class="spacer"></span><span>${esc(o.short)} ${o.tac.form}</span></div>
     <div style="display:grid;gap:8px">${row('攻撃', me.att, op.att)}${row('中盤', me.mid, op.mid)}${row('守備', me.def, op.def)}</div>
     <div><div class="eyebrow" style="margin-bottom:6px">警戒する選手</div><div class="row wrap">${keys.map(p => `<span class="chip">${posTag(p, 'width:26px;height:16px;font-size:9px')}${esc(p.name)} ${E.ovr(p)}</span>`).join('')}</div></div>
-    ${warn.length ? `<div class="card" style="padding:10px 12px"><div class="eyebrow" style="color:var(--loss)">メンバーの注意点</div><ul style="margin:6px 0 0;padding-left:18px;font-size:13px">${warn.slice(0, 5).map(w => `<li>${esc(w)}</li>`).join('')}</ul></div>` : '<p class="fine">メンバーに問題はありません。</p>'}`,
-    `<button class="btn primary block" data-act="kickoff" data-id="${fid}" style="min-height:54px;font-size:16px">キックオフ</button><div class="grid2"><button class="btn ghost" data-act="toTactics">戦術を調整</button><button class="btn ghost" data-act="quick" data-id="${fid}">結果だけ見る</button></div>`);
+    ${iss.block ? `<div class="card alert"><div class="eyebrow">このままでは試合に進めません</div><ul>${issueLines(iss).map(t => `<li>${esc(t)}</li>`).join('')}</ul><p class="fine" style="margin:6px 0 0">戦術画面で、出られない選手を自分で入れ替えてください。</p></div>` : ''}
+    ${warn.length ? `<div class="card" style="padding:10px 12px"><div class="eyebrow" style="color:var(--loss)">メンバーの注意点</div><ul style="margin:6px 0 0;padding-left:18px;font-size:13px">${warn.slice(0, 5).map(w => `<li>${esc(w)}</li>`).join('')}</ul></div>` : iss.block ? '' : '<p class="fine">メンバーに問題はありません。</p>'}`,
+    iss.block ? `<button class="btn primary block" data-act="toTactics" style="min-height:54px;font-size:16px">メンバーを入れ替える</button><button class="btn ghost block" data-act="closeSheet">閉じる</button>`
+      : `<button class="btn primary block" data-act="kickoff" data-id="${fid}" style="min-height:54px;font-size:16px">キックオフ</button><div class="grid2"><button class="btn ghost" data-act="toTactics">戦術を調整</button><button class="btn ghost" data-act="quick" data-id="${fid}">結果だけ見る</button></div>`);
 }
 const VERDICT = { champion: 'リーグ優勝！', met: '目標達成', near: 'あと一歩', missed: '目標未達', relegated: 'J2降格' };
 function sheetSeasonEnd() {
@@ -713,6 +731,7 @@ function startMatch(fid, quick) {
   closeSheet();
   const fx = S.fixtures.find(f => f.id === fid); if (!fx || fx.played) return;
   E.validateLineup(S, S.my);
+  if (E.lineupIssues(S, S.my).block) return sheetPrematch(fid);
   const M = E.createMatch(S, fx);
   const k = M.userSide;
   MATCH = { M, fx, k, speed: S.settings.speed || 1, paused: false, timer: null, raf: null, sel: null, evq: [], hold: false, shown: { h: 0, a: 0 }, ftShown: false };
@@ -943,9 +962,10 @@ const ACT = {
   benchPick(d) { sheetBench(Number(d.id)); },
   benchIn(d) {
     const outId = sheetState && sheetState.id; const o = S.players[outId], p = S.players[d.id];
-    if (E.benchSwap(S, outId, Number(d.id))) { persist(false); closeSheet(); render(); toast(`${p.short}をベンチに入れました（${o.short}はベンチ外）`); }
+    if (E.benchSwap(S, outId, Number(d.id))) { persist(false); closeSheet(); render(); toast(o ? `${p.short}をベンチに入れました（${o.short}はベンチ外）` : `${p.short}をベンチに入れました`); }
   },
-  benchAuto() { const c = S.clubs[S.my]; c.tac.benchManual = false; E.autoBench(S, S.my, true); persist(false); render(); toast('ベンチをおまかせに戻しました'); },
+  benchOut(d) { const p = S.players[d.id]; if (E.benchRemove(S, Number(d.id))) { persist(false); closeSheet(); render(); toast(`${p.short}をベンチから外しました`); } },
+  benchAuto() { const c = S.clubs[S.my]; c.tac.benchManual = false; E.autoBench(S, S.my, true); persist(false); render(); toast('ベンチをおまかせで組み直しました'); },
   slot(d) { sheetSlot(Number(d.i)); },
   assign(d) {
     const c = S.clubs[S.my]; const i = Number(d.i), pid = Number(d.id); const xi = c.tac.xi; const j = xi.indexOf(pid);
@@ -954,7 +974,7 @@ const ACT = {
     else {
       const old = xi[i]; const bi = c.tac.bench.indexOf(pid);
       xi[i] = pid;
-      if (bi >= 0) { if (old) c.tac.bench[bi] = old; else c.tac.bench.splice(bi, 1); }
+      if (bi >= 0) { if (old && E.available(S.players[old])) c.tac.bench[bi] = old; else c.tac.bench.splice(bi, 1); }
     }
     E.validateLineup(S, S.my); persist(false); closeSheet(); render();
   },
