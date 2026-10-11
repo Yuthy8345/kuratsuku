@@ -33,28 +33,52 @@ function jdate(s, withDow) { return D.m(s) + '/' + D.d(s) + (withDow ? '(' + WD[
 
 /* ---------- static tables ---------- */
 const FORMATIONS = {
-  '4-4-2':   [['GK',50,7],['LB',13,27],['CB',37,22],['CB',63,22],['RB',87,27],['LM',13,54],['CM',37,49],['CM',63,49],['RM',87,54],['ST',37,80],['ST',63,80]],
+  '4-4-2':   [['GK',50,7],['LB',13,27],['CB',37,22],['CB',63,22],['RB',87,27],['LM',13,54],['CM',37,49],['CM',63,49],['RM',87,54],['ST',37,80],['SS',63,80]],
   '4-3-3':   [['GK',50,7],['LB',13,27],['CB',37,22],['CB',63,22],['RB',87,27],['DM',50,41],['CM',28,55],['CM',72,55],['LW',15,76],['ST',50,82],['RW',85,76]],
-  '4-2-3-1': [['GK',50,7],['LB',13,27],['CB',37,22],['CB',63,22],['RB',87,27],['DM',35,42],['DM',65,42],['WAM',15,66],['AM',50,63],['WAM',85,66],['ST',50,84]],
+  '4-2-3-1': [['GK',50,7],['LB',13,27],['CB',37,22],['CB',63,22],['RB',87,27],['DM',35,42],['DM',65,42],['LAM',15,66],['AM',50,63],['RAM',85,66],['ST',50,84]],
   '3-4-2-1': [['GK',50,7],['CB',25,24],['CB',50,20],['CB',75,24],['WB',10,50],['CM',37,46],['CM',63,46],['WB',90,50],['AM',32,68],['AM',68,68],['ST',50,84]],
-  '3-5-2':   [['GK',50,7],['CB',25,24],['CB',50,20],['CB',75,24],['WB',10,52],['CM',30,52],['DM',50,41],['CM',70,52],['WB',90,52],['ST',37,80],['ST',63,80]],
+  '3-5-2':   [['GK',50,7],['CB',25,24],['CB',50,20],['CB',75,24],['WB',10,52],['CM',30,52],['DM',50,41],['CM',70,52],['WB',90,52],['ST',37,80],['SS',63,80]],
 };
-const ROLE = { // cat, weights attack / midfield / defence, label
-  GK:  { cat: 'GK', a: 0,    m: 0,    d: 0,    jp: 'GK' },
-  CB:  { cat: 'DF', a: 0.05, m: 0.1,  d: 1.0,  jp: 'CB' },
-  LB:  { cat: 'DF', a: 0.2,  m: 0.25, d: 0.8,  jp: 'LSB' },
-  RB:  { cat: 'DF', a: 0.2,  m: 0.25, d: 0.8,  jp: 'RSB' },
-  WB:  { cat: 'MF', a: 0.35, m: 0.35, d: 0.55, jp: 'WB', alt: 'DF' },
-  DM:  { cat: 'MF', a: 0.15, m: 0.8,  d: 0.5,  jp: 'DMF' },
-  CM:  { cat: 'MF', a: 0.35, m: 1.0,  d: 0.3,  jp: 'CMF' },
-  LM:  { cat: 'MF', a: 0.55, m: 0.7,  d: 0.25, jp: 'LMF' },
-  RM:  { cat: 'MF', a: 0.55, m: 0.7,  d: 0.25, jp: 'RMF' },
-  AM:  { cat: 'MF', a: 0.8,  m: 0.7,  d: 0.1,  jp: 'OMF', alt: 'FW' },
-  WAM: { cat: 'MF', a: 0.75, m: 0.5,  d: 0.15, jp: 'WG', alt: 'FW' },
-  LW:  { cat: 'FW', a: 0.9,  m: 0.35, d: 0.1,  jp: 'LWG', alt: 'MF' },
-  RW:  { cat: 'FW', a: 0.9,  m: 0.35, d: 0.1,  jp: 'RWG', alt: 'MF' },
-  ST:  { cat: 'FW', a: 1.0,  m: 0.2,  d: 0.05, jp: 'CF' },
+// slot roles. a/m/d: weight in attack / midfield / defence. dp: the detailed position the slot asks for, dp2: a near one that also works
+const ROLE = {
+  GK:  { cat: 'GK', a: 0,    m: 0,    d: 0,    jp: 'GK',  dp: 'GK' },
+  CB:  { cat: 'DF', a: 0.05, m: 0.1,  d: 1.0,  jp: 'CB',  dp: 'CB' },
+  LB:  { cat: 'DF', a: 0.2,  m: 0.25, d: 0.8,  jp: 'LSB', dp: 'SB' },
+  RB:  { cat: 'DF', a: 0.2,  m: 0.25, d: 0.8,  jp: 'RSB', dp: 'SB' },
+  WB:  { cat: 'MF', a: 0.35, m: 0.35, d: 0.55, jp: 'WB',  dp: 'SB',  dp2: 'SH' },
+  DM:  { cat: 'MF', a: 0.15, m: 0.8,  d: 0.5,  jp: 'DMF', dp: 'DMF', dp2: 'CMF' },
+  CM:  { cat: 'MF', a: 0.35, m: 1.0,  d: 0.3,  jp: 'CMF', dp: 'CMF', dp2: 'DMF' },
+  LM:  { cat: 'MF', a: 0.55, m: 0.7,  d: 0.25, jp: 'LSH', dp: 'SH',  dp2: 'WG' },
+  RM:  { cat: 'MF', a: 0.55, m: 0.7,  d: 0.25, jp: 'RSH', dp: 'SH',  dp2: 'WG' },
+  AM:  { cat: 'MF', a: 0.8,  m: 0.7,  d: 0.1,  jp: 'OMF', dp: 'OMF', dp2: 'ST' },
+  LAM: { cat: 'MF', a: 0.75, m: 0.5,  d: 0.15, jp: 'LSH', dp: 'SH',  dp2: 'WG' },
+  RAM: { cat: 'MF', a: 0.75, m: 0.5,  d: 0.15, jp: 'RSH', dp: 'SH',  dp2: 'WG' },
+  WAM: { cat: 'MF', a: 0.75, m: 0.5,  d: 0.15, jp: 'SH',  dp: 'SH',  dp2: 'WG' }, // old 4-2-3-1 wide slot (kept for old saves)
+  LW:  { cat: 'FW', a: 0.9,  m: 0.35, d: 0.1,  jp: 'LWG', dp: 'WG',  dp2: 'SH' },
+  RW:  { cat: 'FW', a: 0.9,  m: 0.35, d: 0.1,  jp: 'RWG', dp: 'WG',  dp2: 'SH' },
+  ST:  { cat: 'FW', a: 1.0,  m: 0.2,  d: 0.05, jp: 'CF',  dp: 'CF',  dp2: 'ST' },
+  SS:  { cat: 'FW', a: 0.9,  m: 0.35, d: 0.05, jp: 'ST',  dp: 'ST',  dp2: 'CF' },
 };
+// detailed positions. A player has one 本職 (p.pp, aptitude 100); the others start from DP_SIM and grow by training (p.ap)
+const DPOS = ['GK', 'CB', 'SB', 'DMF', 'CMF', 'OMF', 'SH', 'CF', 'ST', 'WG'];
+const DP_CAT = { GK: 'GK', CB: 'DF', SB: 'DF', DMF: 'MF', CMF: 'MF', OMF: 'MF', SH: 'MF', CF: 'FW', ST: 'FW', WG: 'FW' };
+const DP_JP = { GK: 'ゴールキーパー', CB: 'センターバック', SB: 'サイドバック', DMF: '守備的MF', CMF: 'セントラルMF', OMF: '攻撃的MF', SH: 'サイドハーフ', CF: 'センターフォワード', ST: 'セカンドトップ', WG: 'ウイング' };
+const DP_SIM = {
+  CB:  { SB: 55, DMF: 60, CMF: 35, OMF: 15, SH: 25, CF: 20, ST: 10, WG: 10 },
+  SB:  { CB: 50, DMF: 45, CMF: 40, OMF: 30, SH: 70, CF: 15, ST: 20, WG: 50 },
+  DMF: { CB: 60, SB: 45, CMF: 80, OMF: 50, SH: 35, CF: 15, ST: 25, WG: 20 },
+  CMF: { CB: 35, SB: 40, DMF: 75, OMF: 75, SH: 55, CF: 25, ST: 45, WG: 35 },
+  OMF: { CB: 15, SB: 25, DMF: 45, CMF: 70, SH: 65, CF: 45, ST: 80, WG: 60 },
+  SH:  { CB: 15, SB: 60, DMF: 30, CMF: 50, OMF: 65, CF: 30, ST: 55, WG: 80 },
+  CF:  { CB: 20, SB: 15, DMF: 15, CMF: 25, OMF: 45, SH: 35, ST: 75, WG: 50 },
+  ST:  { CB: 10, SB: 20, DMF: 25, CMF: 45, OMF: 80, SH: 55, CF: 75, WG: 65 },
+  WG:  { CB: 10, SB: 45, DMF: 20, CMF: 35, OMF: 60, SH: 80, CF: 50, ST: 65 },
+};
+const DP_ROLE = { GK: 'GK', CB: 'CB', SB: 'LB', DMF: 'DM', CMF: 'CM', OMF: 'AM', SH: 'LM', CF: 'ST', ST: 'SS', WG: 'LW' }; // a typical slot per position
+const DP_GEN = { GK: { GK: 1 }, DF: { CB: 5, SB: 4 }, MF: { DMF: 3, CMF: 3, OMF: 2, SH: 3 }, FW: { CF: 3, ST: 1.5, WG: 2 } };
+const DP2_GAP = 15;      // a near position (dp2) counts as this much less aptitude
+const LEARN_MAX = 95;    // training stops here (本職 = 100)
+const PLAY_MAX = 85;     // match experience alone takes a position this far
 const MENTALITY = { def: { own: 0.86, opp: 0.88, jp: '守備的' }, bal: { own: 1, opp: 1, jp: 'バランス' }, att: { own: 1.14, opp: 1.1, jp: '攻撃的' } };
 const PRESS = { low: { mid: -1.5, drain: -3, jp: '低' }, mid: { mid: 0, drain: 0, jp: '中' }, high: { mid: 1.8, drain: 5, jp: '高' } };
 const TRAINING = {
@@ -138,14 +162,28 @@ const RW = {
   CM: [0.1, 0.3, 0.1, 0.1, 0, 0, 0.15, 0.25, 0],
   LM: [0.1, 0.2, 0.2, 0.05, 0.2, 0, 0.15, 0.1, 0], RM: [0.1, 0.2, 0.2, 0.05, 0.2, 0, 0.15, 0.1, 0],
   AM: [0.2, 0.25, 0.25, 0, 0.1, 0, 0, 0.2, 0],
-  WAM: [0.2, 0.15, 0.3, 0, 0.25, 0, 0, 0.1, 0], LW: [0.2, 0.15, 0.3, 0, 0.25, 0, 0, 0.1, 0], RW: [0.2, 0.15, 0.3, 0, 0.25, 0, 0, 0.1, 0],
+  WAM: [0.2, 0.15, 0.3, 0, 0.25, 0, 0, 0.1, 0], LAM: [0.2, 0.15, 0.3, 0, 0.25, 0, 0, 0.1, 0], RAM: [0.2, 0.15, 0.3, 0, 0.25, 0, 0, 0.1, 0],
+  LW: [0.2, 0.15, 0.3, 0, 0.25, 0, 0, 0.1, 0], RW: [0.2, 0.15, 0.3, 0, 0.25, 0, 0, 0.1, 0],
   ST: [0.4, 0, 0.1, 0, 0.15, 0.15, 0, 0.2, 0],
+  SS: [0.3, 0.15, 0.2, 0, 0.1, 0.05, 0, 0.2, 0],
 };
 const ATTR_BIAS = {
   FW: [7, -3, 3, -18, 3, 1, -2, 0, -45],
   MF: [-3, 5, 2, -4, -1, -3, 3, 3, -45],
   DF: [-15, -2, -8, 7, -1, 4, 0, 3, -45],
   GK: [-35, -10, -25, -30, -12, -2, -10, 2, 4],
+};
+// detailed position flavour on top of the category (new games only; existing attributes are kept)
+const DP_BIAS = {
+  CB:  [0, -2, -4, 3, -3, 5, 0, 1, 0],
+  SB:  [0, 1, 2, -2, 4, -4, 3, -1, 0],
+  DMF: [-3, 1, -3, 4, -2, 2, 1, 2, 0],
+  CMF: [0, 2, 0, 0, -1, -1, 2, 1, 0],
+  OMF: [2, 2, 3, -5, 0, -3, -2, 2, 0],
+  SH:  [0, 0, 3, -3, 4, -3, 2, -1, 0],
+  CF:  [3, -3, -2, 0, -1, 5, -1, 1, 0],
+  ST:  [1, 2, 3, 0, 1, -3, 0, 1, 0],
+  WG:  [-1, 0, 5, -2, 5, -4, 1, -2, 0],
 };
 // individual training menus: share of the focused part of the training load per attribute
 const FOCUS = {
@@ -167,7 +205,8 @@ function calcOvr(p) { const w = AW[p.pos]; let s0 = 0; for (let i = 0; i < 9; i+
 function roleScore(p, role) { const w = RW[role]; let s0 = 0; for (let i = 0; i < 9; i++) s0 += w[i] * p.at[i]; return s0; }
 function initAttrs(p) {
   let h = hash(p.name + p.birth + p.pos);
-  const bias = ATTR_BIAS[p.pos];
+  const db = DP_BIAS[p.pp] || null;
+  const bias = ATTR_BIAS[p.pos].map((b, i) => b + (db && DP_CAT[p.pp] === p.pos ? db[i] : 0));
   const v = bias.map(b => { h = Math.imul(h ^ (h >>> 15), 2246822507) >>> 0; return p.ovr + b + ((h % 13) - 6); });
   // a signature strength and a weakness, so players of the same level differ
   h = Math.imul(h ^ (h >>> 13), 3266489909) >>> 0; const up = h % 8; h = Math.imul(h ^ (h >>> 16), 2246822507) >>> 0; const dn = h % 8;
@@ -181,6 +220,35 @@ function initAttrs(p) {
   if (!p.ti) p.ti = 'norm';
 }
 function attrs(p) { if (!p.at) initAttrs(p); return p.at.map(x => Math.round(x)); }
+/* ---------- detailed positions ---------- */
+function ppOf(p) {
+  if (p.pp && DP_CAT[p.pp]) return p.pp;
+  if (p.pos === 'GK') return (p.pp = 'GK');
+  if (!p.at) initAttrs(p);
+  let best = null, bv = -1e9; // best fit inside the registered category
+  for (const dp of DPOS) if (DP_CAT[dp] === p.pos) { const v = roleScore(p, DP_ROLE[dp]); if (v > bv) { bv = v; best = dp; } }
+  return (p.pp = best);
+}
+// aptitude 0..100 for a detailed position (本職 = 100)
+function apt(p, dp) {
+  const pp = ppOf(p);
+  if (dp === pp) return 100;
+  if (dp === 'GK' || pp === 'GK') return 0;
+  return Math.max(DP_SIM[pp][dp] || 0, (p.ap && p.ap[dp]) || 0);
+}
+function roleApt(p, role) {
+  const R0 = ROLE[role]; let a = apt(p, R0.dp);
+  if (R0.dp2) a = Math.max(a, apt(p, R0.dp2) - DP2_GAP);
+  return a;
+}
+function aptPen(a) { return a >= 100 ? 0 : -14 * Math.pow((100 - a) / 100, 1.2); }
+function genPP(pos) { const w = DP_GEN[pos] || DP_GEN.MF; return wpick(Object.keys(w), k => w[k]); }
+// weekly aptitude gain while retraining
+function learnRate(S, p) {
+  const a = age(p, S.date); const it = INTENS[p.club === S.my ? (p.ti || 'norm') : 'norm'];
+  return (5 + p.at[7] / 30) * (a <= 24 ? 1.3 : a <= 29 ? 1 : 0.7) * it.g * 0.55;
+}
+function learnWeeks(S, p, dp) { const cur = apt(p, dp); return cur >= LEARN_MAX ? 0 : Math.ceil((LEARN_MAX - cur) / learnRate(S, p)); }
 function migrate(S, DATA) {
   for (const p of Object.values(S.players)) if (!p.at) initAttrs(p);
   // data corrections (e.g. verified birthdates) flow into existing saves
@@ -202,17 +270,45 @@ function migrate(S, DATA) {
   S.presV = 4;
   for (const c of Object.values(S.clubs)) if (c.pres == null && src[c.id]) { c.pres = src[c.id].pres || 2; c.titles = Object.assign({ j1: 0, lc: 0, ec: 0, acl: 0 }, src[c.id].titles || {}); c.o10 = !!src[c.id].o10; added = true; }
   if (added) setExpectations(S, { keepTargets: S.fixtures.some(f => f.played && (f.h === S.my || f.a === S.my)) });
-  S.v = Math.max(S.v || 1, 2);
+  // v3: detailed positions. 本職 from the data; old category retraining (pos2 / learn) becomes aptitude
+  if ((S.v || 1) < 3) {
+    // other clubs switch to the shape they really play (the manager's own club keeps its tactics)
+    for (const cid of S.order) { const c = S.clubs[cid]; if (cid !== S.my && src[cid] && FORMATIONS[src[cid].form] && c.tac.form === '4-4-2') c.tac.form = src[cid].form; }
+    const dm = {}; if (DATA && DATA.players) for (const d of DATA.players) dm[d.id] = d;
+    for (const p of Object.values(S.players)) {
+      const d = dm[p.id];
+      if (!p.pp && d && d.name === p.name && d.pp) { p.pp = d.pp; if (d.ap) p.ap = Object.assign({}, d.ap); }
+      if (!p.pp && p.gen && p.pos !== 'GK') p.pp = genPP(p.pos);
+      ppOf(p);
+      if (p.pos2 && p.pos2.length) {
+        p.ap = p.ap || {};
+        for (const cat of p.pos2) for (const dp of DPOS) if (DP_CAT[dp] === cat && dp !== p.pp) p.ap[dp] = Math.max(p.ap[dp] || 0, 92);
+      }
+      delete p.pos2;
+      if (p.learn && !DP_CAT[p.learn.pos]) {
+        const cat = p.learn.pos; let best = null, bv = -1;
+        for (const dp of DPOS) if (DP_CAT[dp] === cat && apt(p, dp) > bv) { bv = apt(p, dp); best = dp; }
+        if (best && best !== p.pp) {
+          p.ap = p.ap || {};
+          p.ap[best] = Math.round((bv + (LEARN_MAX - bv) * clamp((p.learn.prog || 0) / 100, 0, 1)) * 10) / 10;
+          p.learn = { pos: best };
+        } else p.learn = null;
+      }
+    }
+    for (const cid of S.order) if (cid !== S.my && S.clubs[cid]) autoLineup(S, cid);
+  }
+  S.v = Math.max(S.v || 1, 3);
   return S;
 }
-function bestRoles(p, n) {
-  const seen = new Set(); const out = [];
-  for (const r of Object.keys(RW)) {
-    const key = ROLE[r].jp; if (seen.has(key)) continue; seen.add(key);
-    out.push({ role: r, jp: key, v: effective(p, r, 100) - clamp((p.form - 6.5) * 1.2, -2, 2) });
-  }
-  return out.sort((a, b) => b.v - a.v).slice(0, n || 3);
+// how good the player is in each detailed position (rested, form left out)
+function posValues(p) {
+  return DPOS.filter(dp => (dp === 'GK') === (p.pos === 'GK')).map(dp => {
+    const role = DP_ROLE[dp], a = apt(p, dp);
+    const fit = p.at ? clamp((roleScore(p, role) - p.ovr) * 0.4, -2.5, 2.5) : 0;
+    return { dp, jp: dp, role, apt: a, v: p.ovr + aptPen(a) + fit };
+  });
 }
+function bestRoles(p, n) { return posValues(p).sort((a, b) => b.v - a.v).slice(0, n || 3); }
 // growth for one week; dry=true returns the expected change without touching the player
 function devWeek(S, p, dry) {
   const c = S.clubs[p.club]; if (!c) return null;
@@ -251,13 +347,17 @@ function devWeek(S, p, dry) {
   p.at = at.map(x => Math.round(x * 100) / 100);
   p.ovr = clamp(calcOvr(p), 30, 95);
   if (p.ovr > p.pot) p.pot = Math.ceil(p.ovr);
-  // position retraining
+  // position retraining: aptitude in the chosen position climbs toward LEARN_MAX
   if (p.learn) {
-    p.learn.prog += (5 + p.at[7] / 30) * (a <= 24 ? 1.3 : a <= 29 ? 1 : 0.7) * it.g;
-    if (p.learn.prog >= 100) {
-      p.pos2 = (p.pos2 || []).concat(p.learn.pos);
-      if (isMy) news(S, `${p.name}が${p.learn.pos}を習得。${p.learn.pos}でも違和感なくプレーできる。`, 'grow');
-      p.learn = null;
+    const dp = p.learn.pos;
+    if (!DP_CAT[dp] || dp === ppOf(p) || dp === 'GK' || p.pos === 'GK') p.learn = null;
+    else {
+      const nv = Math.min(LEARN_MAX, apt(p, dp) + learnRate(S, p));
+      p.ap = p.ap || {}; p.ap[dp] = Math.round(nv * 10) / 10;
+      if (nv >= LEARN_MAX) {
+        if (isMy) news(S, `${p.name}が${dp}（${DP_JP[dp]}）を習得。${dp}でも本職に近いプレーができる。`, 'grow');
+        p.learn = null;
+      }
     }
   }
   return null;
@@ -294,7 +394,7 @@ function newGame(DATA, clubId, managerName, todayISO) {
     S.players[p.id] = { ...p, cond: 100, form: 6.5, inj: 0, sus: 0, ycAcc: 0, listed: false, st: blankStats(), hist: [], joined: DATA.start };
     initAttrs(S.players[p.id]);
   }
-  S.v = 2; S.presV = 4;
+  S.v = 3; S.presV = 4;
   for (const id of S.order) autoLineup(S, id);
   S.fixtures = genFixtures(S.order, DATA.round1, sy);
   ensureFreeAgents(S);
@@ -312,7 +412,7 @@ function addClub(S, c) {
     coach: c.coach || '', tier: c.tier, fan: c.fan, area: c.area,
     pres: c.pres || 2, titles: Object.assign({ j1: 0, lc: 0, ec: 0, acl: 0 }, c.titles || {}), o10: !!c.o10,
     funds: startFunds, fac: { train: 2, youth: 2, stadium: 2, medical: 2 },
-    tac: { form: '4-4-2', ment: 'bal', press: 'mid', xi: [], bench: [] },
+    tac: { form: FORMATIONS[c.form] ? c.form : '4-4-2', ment: 'bal', press: 'mid', xi: [], bench: [] },
     fin: { gate: 0, spon: 0, wages: 0, trans: 0, prize: 0, fac: 0 },
   };
   if (!S.order.includes(c.id)) S.order.push(c.id);
@@ -411,17 +511,9 @@ function position(S, cid) { return table(S).findIndex(r => r.id === cid) + 1; }
 
 /* ---------- lineups ---------- */
 function posPenalty(p, role) {
-  const R0 = ROLE[role];
-  if (R0.cat === 'GK') return p.pos === 'GK' ? 0 : -35;
-  if (p.pos === 'GK') return -35;
-  if (p.pos === R0.cat) return 0;
-  let base;
-  if (R0.alt && p.pos === R0.alt) base = -3;
-  else if ((p.pos === 'DF' && R0.cat === 'FW') || (p.pos === 'FW' && R0.cat === 'DF')) base = -14;
-  else base = -7;
-  if (p.pos2 && p.pos2.includes(R0.cat)) return Math.max(base, -1);
-  if (p.learn && p.learn.pos === R0.cat) return base + (-1 - base) * Math.min(1, p.learn.prog / 100) * 0.6;
-  return base;
+  const gkSlot = ROLE[role].dp === 'GK';
+  if (gkSlot || p.pos === 'GK') return gkSlot === (p.pos === 'GK') ? 0 : -35;
+  return aptPen(roleApt(p, role));
 }
 function available(p) { return p.inj <= 0 && p.sus <= 0; }
 function effective(p, role, cond) {
@@ -438,7 +530,7 @@ function autoLineup(S, cid, opts) {
   const restCond = opts && opts.rotate ? 82 : 72;
   // order: GK, ST/W, CB/FB, MF
   const orderIdx = slots.map((s, i) => i).sort((a, b) => {
-    const pr = r => ({ GK: 0, ST: 1, LW: 2, RW: 2, CB: 3, LB: 4, RB: 4, DM: 5, AM: 6, WAM: 6, WB: 7, CM: 8, LM: 9, RM: 9 })[slots[r][0]];
+    const pr = r => ({ GK: 0, ST: 1, SS: 1, LW: 2, RW: 2, CB: 3, LB: 4, RB: 4, DM: 5, AM: 6, LAM: 6, RAM: 6, WAM: 6, WB: 7, CM: 8, LM: 9, RM: 9 })[slots[r][0]];
     return pr(a) - pr(b);
   });
   for (const i of orderIdx) {
@@ -451,6 +543,20 @@ function autoLineup(S, cid, opts) {
       if (v > bv) { bv = v; best = p; }
     }
     if (best) { xi[i] = best.id; used.add(best.id); }
+  }
+  // the greedy pass can put a star in the wrong slot; swap pairs / bring in reserves while the XI gets better
+  const val = (p, i) => { let v = effective(p, slots[i][0]); if (p.cond < restCond) v -= (restCond - p.cond) * 0.4; return v; };
+  for (let round = 0; round < 4; round++) {
+    let better = false;
+    for (let i = 0; i < 11; i++) for (let j = i + 1; j < 11; j++) {
+      const a = S.players[xi[i]], b = S.players[xi[j]]; if (!a || !b) continue;
+      if (val(a, j) + val(b, i) > val(a, i) + val(b, j) + 0.01) { xi[i] = b.id; xi[j] = a.id; better = true; }
+    }
+    for (let i = 0; i < 11; i++) {
+      const cur = S.players[xi[i]]; if (!cur) continue;
+      for (const p of pool) if (!used.has(p.id) && val(p, i) > val(S.players[xi[i]], i) + 0.01) { used.delete(xi[i]); xi[i] = p.id; used.add(p.id); better = true; }
+    }
+    if (!better) break;
   }
   c.tac.xi = xi;
   c.tac.benchManual = false;
@@ -559,7 +665,7 @@ function createMatch(S, fx) {
     pm: {}, mom: 0, ball: { x: 50, y: 50, side: 'h' }, userSide: fx.h === S.my ? 'h' : fx.a === S.my ? 'a' : null,
     lg: leagueAvg(S),
   };
-  for (const k of ['h', 'a']) for (const s of M[k].slots) if (s.pid) M.pm[s.pid] = { side: k, rt: 6.0, g: 0, a: 0, yc: 0, rc: 0, on: 0, off: null, inj: 0 };
+  for (const k of ['h', 'a']) for (const s of M[k].slots) if (s.pid) M.pm[s.pid] = { side: k, role: s.role, rt: 6.0, g: 0, a: 0, yc: 0, rc: 0, on: 0, off: null, inj: 0 };
   M.ev.push({ m: 0, t: 'ko', text: `キックオフ　${S.clubs[fx.h].short} vs ${S.clubs[fx.a].short}` });
   return M;
 }
@@ -690,7 +796,7 @@ function doSub(S, M, k, outPid, inPid, push) {
   slot.pid = inPid; sd.subs++;
   sd.cond[inPid] = S.players[inPid].cond;
   M.pm[outPid].off = M.min;
-  M.pm[inPid] = { side: k, rt: 6.0, g: 0, a: 0, yc: 0, rc: 0, on: M.min, off: null, inj: 0 };
+  M.pm[inPid] = { side: k, role: slot.role, rt: 6.0, g: 0, a: 0, yc: 0, rc: 0, on: M.min, off: null, inj: 0 };
   sd.bench = sd.bench.filter(b => b !== inPid);
   sd.subLog.push([outPid, inPid]);
   const ev = { t: 'sub', side: k, text: `交代　${S.players[outPid].short} → ${S.players[inPid].short}`, m: M.min };
@@ -748,6 +854,9 @@ function finishMatch(S, M) {
     rt = clamp(Math.round(rt * 10) / 10, 3.5, 10);
     pm.final = rt;
     p.st.apps++; p.st.g += pm.g; p.st.a += pm.a; p.st.mins += Math.max(1, mins); p.st.rt += rt;
+    // playing out of position slowly gets a player used to it
+    const dp = pm.role && ROLE[pm.role] ? ROLE[pm.role].dp : null;
+    if (dp && dp !== 'GK' && p.pos !== 'GK' && mins >= 45 && dp !== ppOf(p)) { const cur = apt(p, dp); if (cur < PLAY_MAX) { p.ap = p.ap || {}; p.ap[dp] = Math.round(Math.min(PLAY_MAX, cur + 0.6) * 10) / 10; } }
     p.form = p.form * 0.6 + rt * 0.4;
     p.cond = Math.round(sd.cond[pidS] != null ? sd.cond[pidS] : p.cond - 10);
     if (pm.yc && !pm.rc) { p.st.yc++; p.ycAcc++; if (p.ycAcc >= 4) { p.sus = 1; p.ycAcc = 0; if (p.club === S.my) news(S, `${p.name}は累積警告で次節出場停止。`, 'warn'); } }
@@ -1004,7 +1113,7 @@ function genPlayer(S, cid, opts) {
   const used = new Set(squad(S, cid).map(x => x.num));
   let num = o.num || ri(2, 49); while (used.has(num)) num++;
   const parts = name.split(' ');
-  const p = { id: S.nextPid++, club: cid, pos, num, name, short: foreign ? parts[1] : parts[0], birth, nat: foreign ? 'BRA' : 'JPN', ovr: ov, pot, cond: 100, form: 6.5, inj: 0, sus: 0, ycAcc: 0, listed: false, st: blankStats(), hist: [], joined: S.date, gen: true };
+  const p = { id: S.nextPid++, club: cid, pos, pp: o.pp || (pos === 'GK' ? 'GK' : genPP(pos)), num, name, short: foreign ? parts[1] : parts[0], birth, nat: foreign ? 'BRA' : 'JPN', ovr: ov, pot, cond: 100, form: 6.5, inj: 0, sus: 0, ycAcc: 0, listed: false, st: blankStats(), hist: [], joined: S.date, gen: true };
   initAttrs(p);
   S.players[p.id] = p;
   return p;
@@ -1167,7 +1276,7 @@ function rollover(S) {
 
 /* ---------- export ---------- */
 const API = {
-  D, jdate, FORMATIONS, ROLE, MENTALITY, PRESS, TRAINING, FACILITY, ATTR, ATTR_SHOW, FOCUS, INTENS,
+  D, jdate, FORMATIONS, ROLE, DPOS, DP_CAT, DP_JP, LEARN_MAX, PLAY_MAX, ppOf, apt, roleApt, posValues, learnRate, learnWeeks, MENTALITY, PRESS, TRAINING, FACILITY, ATTR, ATTR_SHOW, FOCUS, INTENS,
   calcOvr, roleScore, bestRoles, devPreview, migrate, weekly, power, presStars, presLabel,
   newGame, seasonForDate, seasonLabel, squad, strength, table, position, age, ovr, value, wage, money, attrs,
   autoLineup, autoBench, benchSwap, clubRating, validateLineup, effective, posPenalty, available, teamRating,

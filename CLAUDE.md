@@ -7,7 +7,8 @@
 - repo root = 公開サイト（`index.html`, `manifest.webmanifest`, `sw.js`, アイコン, `lz-string.min.js`）。**手で編集しない**。`dev/build.js` が生成する。
 - `dev/src/engine.js` — ゲームロジック（DOMなし）。`dev/src/app.js` — UI。`dev/src/template.html` — CSSとページ骨格。
 - `dev/src/match2d.js` — 試合の2D表示（見た目だけ。結果は engine の stepMatch が決め、シュート場面は演出が終わるまで時計を止める）。
-- `dev/raw/*.txt` — 2026/27 J1 登録選手（Jリーグ公式/クラブ公式から取得）。`dev/build_data.js` が能力値・格を付けて `dev/data.json` を作る。
+- `dev/raw/*.txt` — 2026/27 J1 登録選手（Jリーグ公式/クラブ公式から取得）。`dev/build_data.js` が能力値・格・本職を付けて `dev/data.json` を作る。`dev/raw/` には選手ファイル以外の .txt を置かない（全部クラブとして読まれる）。
+- ポジション: 登録は GK/DF/MF/FW（能力の重み用、`p.pos`）。細分化した本職 `p.pp`（CB SB / DMF CMF OMF SH / CF ST WG、STはセカンドトップ・シャドー）と、他ポジションの適性 `p.ap`（0〜100、無ければ `DP_SIM` の初期値）。本職は `dev/positions_footballlab.txt`（Football LAB の2026/27先発位置）＋ `build_data.js` の `PP_KNOWN`、どちらも無い選手はクラブの不足ポジションで補完。各クラブの基本フォーメーションは `FORM`。
 - `dev/icons/real.py` — アプリアイコン（SVG生成）。PNGはリポジトリ直下。
 
 ## Build & deploy
@@ -17,10 +18,11 @@ git add -A && git commit && git push             # Pages が1分ほどで反映
 ```
 - `sw.js` のキャッシュ名はビルドごとに変わる。index.html はネットワーク優先なので、修正はオンラインなら次回起動で反映。
 - セーブは localStorage キー `touchline.j1.save`（変えない）。端末間の移動は「引き継ぎコード」（`KTK1.` + lz圧縮JSON）。
-- 既存セーブの互換: `Engine.migrate(S, DATA)` で能力値・格・生年月日の更新を流し込む。格の計算式を変えたら `PRES_BASE` に旧値を残して `presV` を上げる。
+- 既存セーブの互換: `Engine.migrate(S, DATA)` で能力値・格・生年月日・本職の更新を流し込む（`S.v` 3 で細分化ポジション。旧 `pos2`/`learn` のカテゴリ習得は適性に変換）。格の計算式を変えたら `PRES_BASE` に旧値を残して `presV` を上げる。
 
 ## Checks
 - `node dev/test/sim.js 2 <clubId>` — シーズン自動シミュ（1試合平均2.4〜2.6点、優勝勝点70〜85程度が目安）
 - `python3 dev/test/dev_ui.py` — ブラウザ回帰テスト（スクロール固定、育成画面、旧セーブ移行）
 - `node dev/test/viz.js 5` — 2D表示を通しで回し、全チャンスが解決し表示スコアが結果と一致するか確認
 - `python3 dev/test/bench.py` / `python3 dev/test/match2d.py` — ベンチ入れ替え／試合画面の通し再生
+- `python3 dev/test/positions.py` — 適性グリッド・ポジション習得・旧セーブ（v2）からの移行

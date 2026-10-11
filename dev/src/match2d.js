@@ -154,7 +154,7 @@ function updateTargets(V, dt) {
     }
     p.run.t -= dt;
     if (p.run.t <= 0) {
-      const fwd = p.role === 'ST' || p.role === 'LW' || p.role === 'RW' || p.role === 'AM' || p.role === 'WAM';
+      const fwd = p.role === 'ST' || p.role === 'SS' || p.role === 'LW' || p.role === 'RW' || p.role === 'AM' || p.role === 'LAM' || p.role === 'RAM' || p.role === 'WAM';
       const mid = p.role === 'CM' || p.role === 'DM' || p.role === 'LM' || p.role === 'RM' || p.role === 'WB';
       p.run = { a: fwd ? rnd(-2, 12) : mid ? rnd(-4, 7) : rnd(-3, 3), y: fwd ? rnd(-7, 7) : rnd(-4, 4), t: rnd(1.2, 3.2) };
     }

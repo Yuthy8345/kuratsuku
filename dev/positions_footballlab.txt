@@ -1,0 +1,149 @@
+# Football LAB formation pages (2026/27 J1, starting appearances per slot, as of 2026-09-21). Labels as on the site.
+# club|slot|name count, name count, ...
+kashima|CF|レオ セアラ 7, 鈴木 優磨 4, 徳田 誉 2, 吉田 湊海 2
+kashima|LSH|鈴木 優磨 4, エウベル 2, 林 晴己 1, 吉田 湊海 1
+kashima|OH|マテウス ブエノ 1
+kashima|RSH|松村 優太 5, ヤン マテウス 2, チャヴリッチ 1
+kashima|CH|マテウス ブエノ 7, 三竿 健斗 4, 柴崎 岳 3, 津久井 佳祐 2
+kashima|LSB|小川 諒也 8
+kashima|CB|植田 直通 8, 関川 郁万 5, キム テヒョン 3
+kashima|RSB|広瀬 陸斗 6, 小池 龍太 1, 津久井 佳祐 1
+mito|CF|渡邉 新太 7, 内野 航太郎 7, 根本 凌 1
+mito|OH|鳥海 芳樹 1, 渡邉 新太 1
+mito|LSH|谷口 海斗 7
+mito|RSH|鳥海 芳樹 7
+mito|LWB|山本 隼大 1
+mito|CH|仙波 大志 8, 舩橋 佑 6, 大崎 航詩 2
+mito|RWB|真瀬 拓海 1
+mito|LSB|大森 渚生 6, 大崎 航詩 1
+mito|CB|木本 恭生 8, 板倉 健太 6, 河面 旺成 2, 大森 渚生 1
+mito|RSB|真瀬 拓海 7
+urawa|CF|小森 飛絢 5, オナイウ 阿道 2, 南野 遥海 1
+urawa|LSH|マテウス サヴィオ 5, 南野 遥海 1
+urawa|OH|マテウス サヴィオ 1, 渡邊 凌磨 1, 金子 拓郎 1, 南野 遥海 1
+urawa|RSH|金子 拓郎 6
+urawa|LWB|長沼 洋一 1, 林 幸多郎 1
+urawa|CH|安居 海渡 6, 植木 颯 5, 渡邊 凌磨 5, 瀬古 樹 4, 笹 修大 2
+urawa|RWB|稲垣 篤志 1, 水沼 宏太 1
+urawa|LSB|長沼 洋一 4, 林 幸多郎 2
+urawa|CB|宮本 優太 8, 根本 健太 5, ダニーロ ボザ 3, 工藤 孝太 2
+urawa|RSB|ダニーロ ボザ 4, 林 幸多郎 1, 山根 視来 1
+chiba|CF|エリソン 5, 石川 大地 5, 矢村 健 3
+chiba|LSH|津久井 匠海 5
+chiba|OH|石川 大地 2, 松村 拓実 2, 矢村 健 1, 姫野 誠 1
+chiba|RSH|杉山 直宏 3, 田中 和樹 2
+chiba|LWB|津久井 匠海 3
+chiba|CH|マテウス インディオ 7, 小林 祐介 4, 田口 泰士 3, 前 貴之 1, 喜田 陽 1
+chiba|RWB|田中 和樹 2, 飯田 貴敬 1
+chiba|LSB|日高 大 5
+chiba|CB|ダニエル ホール 8, 河野 貴志 6, 鳥海 晃司 3, 飯田 貴敬 2
+chiba|RSB|石尾 陸登 4, 飯田 貴敬 1
+kashiwa|CF|垣田 裕暉 5, 藤尾 翔太 3
+kashiwa|OH|小泉 佳穂 8, 山内 日向汰 6, 渡井 理己 2
+kashiwa|LWB|遠藤 渓太 8
+kashiwa|RWB|久保 藤次郎 7, 弓場 堅真 1
+kashiwa|CH|中川 敦瑛 8, 熊坂 光希 7, 小西 雄大 1
+kashiwa|CB|古賀 太陽 8, 杉岡 大暉 7, 原田 亘 6, 馬場 晴也 2, 三丸 拡 1
+fctokyo|CF|マルセロ ヒアン 7, 長倉 幹樹 7, 佐藤 恵允 2
+fctokyo|LSH|本間 至恩 6, 俵積田 晃太 2
+fctokyo|RSH|安斎 颯馬 4, 佐藤 恵允 4
+fctokyo|CH|高 宇洋 8, 常盤 亨太 4, 橋本 拳人 4
+fctokyo|LSB|橋本 健人 3, バングーナガンデ 佳史扶 3, 長友 佑都 1, 石原 広教 1
+fctokyo|CB|アレクサンダー ショルツ 8, 稲村 隼翔 6, 森重 真人 2
+fctokyo|RSB|室屋 成 7, 石原 広教 1
+tokyov|CF|染野 唯月 8
+tokyov|OH|福田 湧矢 7, 平尾 勇人 4, 松橋 優安 4, 熊取谷 一星 1
+tokyov|LWB|溝口 修平 7, 新井 悠太 1
+tokyov|CH|平川 怜 8, 食野 壮磨 3, 齋藤 功佑 3, 山本 丈偉 1, 森田 晃樹 1
+tokyov|RWB|内田 陽介 5, 新井 悠太 3
+tokyov|CB|林 尚輝 7, 鈴木 海音 7, 井上 竜太 6, 宮原 和也 3, 佐古 真礼 1
+machida|CF|テテ イェンギ 6, 小川 航基 2
+machida|OH|相馬 勇紀 8, ミッチェル デューク 4, 西村 拓真 3, 小川 航基 1
+machida|LWB|明本 考浩 7, 中村 帆高 1
+machida|CH|前 寛之 8, ネタ ラヴィ 4, 白崎 凌兵 3, 下田 北斗 1
+machida|RWB|中村 帆高 6, 望月 ヘンリー海輝 2
+machida|CB|昌子 源 8, 岡村 大八 7, 中山 雄太 3, 菊池 ダビド流帆 3, ドレシェヴィッチ 2
+kawasakif|CF|持山 匡佑 3, ラザル ロマニッチ 3, デリキ ラセルダ 2
+kawasakif|LSH|マルシーニョ 6, 伊藤 達哉 2
+kawasakif|OH|脇坂 泰斗 8
+kawasakif|RSH|伊藤 達哉 6, 紺野 和也 2
+kawasakif|CH|山本 悠樹 8, 橘田 健人 8
+kawasakif|LSB|三浦 颯太 5, 佐々木 旭 3
+kawasakif|CB|谷口 栄斗 7, ペドロ ホマーノ 7, フィリップ ウレモヴィッチ 1, 丸山 祐市 1
+kawasakif|RSB|山原 怜音 7, 佐々木 旭 1
+yokohamafm|CF|谷村 海那 8
+yokohamafm|LSH|三井寺 眞 5, 宮市 亮 3
+yokohamafm|OH|天野 純 5, 松村 晃助 2, 二田 理央 1
+yokohamafm|RSH|近藤 友喜 8
+yokohamafm|CH|知念 慶 7, 松村 晃助 6, 山根 陸 3
+yokohamafm|LSB|角田 涼太朗 7, 鈴木 冬一 1
+yokohamafm|CB|諏訪間 幸成 8, ジェイソン キニョーネス 8
+yokohamafm|RSB|井上 太聖 7, 木村 卓斗 1
+shimizu|CF|オ セフン 5, 木下 康介 3
+shimizu|LSH|藤井 智也 5, 井上 健太 2, 辻 友翔 1
+shimizu|RSH|北川 航也 3, ジャーメイン 良 2, 松崎 快 2, 辻 友翔 1
+shimizu|CH|嶋本 悠大 7, ジャーメイン 良 6, 弓場 将輝 6, ディエギーニョ 2, ウォン ドゥジェ 1
+shimizu|LSB|マテウス ブルネッティ 5, 吉田 豊 3
+shimizu|CB|本多 勇喜 6, パク スンウク 4, 住吉 ジェラニレショーン 3, 高橋 祐治 3
+shimizu|RSB|須貝 英大 8
+nagoya|CF|山岸 祐也 7, 木村 勇大 1, 永井 謙佑 1
+nagoya|OH|木村 勇大 7, 和泉 竜司 4, 内田 宅哉 3, 浅野 雄也 1
+nagoya|LWB|中山 克広 8
+nagoya|CH|高嶺 朋樹 8, 稲垣 祥 7, 森島 司 1
+nagoya|RWB|和泉 竜司 4, 浅野 雄也 2, マテウス カストロ 1, 甲田 英將 1
+nagoya|CB|藤井 陽也 7, 徳元 悠平 6, 原 輝綺 5, 野上 結貴 5, 稲垣 祥 1
+kyoto|CF|ラファエル エリアス 8, アレックス ソウザ 1
+kyoto|LSH|中野 瑠馬 3, 新井 晴樹 3, 松田 天馬 1
+kyoto|OH|平戸 太貴 3, エベルトン マセイオ 3, 中野 瑠馬 1, 新井 晴樹 1
+kyoto|RSH|新井 晴樹 3, 中野 瑠馬 2, 加藤 蓮 1, アレックス ソウザ 1
+kyoto|LWB|佐藤 響 1
+kyoto|CH|ジョアン ペドロ 8, 福岡 慎平 4, 尹 星俊 4
+kyoto|RWB|加藤 蓮 1
+kyoto|LSB|佐藤 響 7
+kyoto|CB|鈴木 義宜 7, ウェベルトン 6, 永田 倖大 2, アピアタウィア 久 1, エンリケ トレヴィザン 1
+kyoto|RSB|福田 心之助 4, 石田 侑資 2, 加藤 蓮 1
+gosaka|CF|デニス ヒュメット 5, 土信田 悠生 1, 中積 爲 1, 宇佐美 貴史 1
+gosaka|LSH|食野 亮太郎 7, 名和田 我空 1
+gosaka|OH|イッサム ジェバリ 5, 植中 朝日 2, 倉田 秋 1
+gosaka|RSH|山下 諒也 5, イーライ アダムス 2, 角 昂志郎 1
+gosaka|CH|安部 柊斗 7, 鈴木 徳真 4, 美藤 倫 4, 倉田 秋 1
+gosaka|LSB|初瀬 亮 7, 中野 伸哉 1
+gosaka|CB|中谷 進之介 8, 佐々木 翔悟 4, 福岡 将太 2, 池谷 銀姿郎 2
+gosaka|RSB|岸本 武流 6, 池谷 銀姿郎 1, 藤原 奏哉 1
+cosaka|CF|櫻川 ソロモン 7, チアゴ アンドラーデ 1
+cosaka|OH|横山 夢樹 5, 香川 真司 4, 小見 洋太 2, ルーカス フェルナンデス 2, チアゴ アンドラーデ 2
+cosaka|LWB|大畑 歩夢 6, 髙橋 仁胡 1, ハビ エルナンデス 1
+cosaka|CH|田中 駿汰 8, ジャクソン アーバイン 6, 岡澤 昂星 2
+cosaka|RWB|中村 拓海 5, 奥田 勇斗 3
+cosaka|CB|畠中 槙之輔 8, ディオン クールズ 8, 井上 黎生人 8
+kobe|CF|大迫 勇也 5, 小松 蓮 3
+kobe|LSH|永戸 勝也 7, ジェアン パトリッキ 1
+kobe|RSH|武藤 嘉紀 4, 飯野 七聖 3, 永戸 勝也 1
+kobe|CH|井手口 陽介 8, 郷家 友太 8, 酒井 高徳 4, 鍬先 祐弥 2, 日髙 光揮 1
+kobe|LSB|ジエゴ 8
+kobe|CB|マテウス トゥーレル 8, 山川 哲史 7, 岩波 拓也 1
+kobe|RSB|髙橋 壱晟 5, 酒井 高徳 3
+okayama|CF|ルカオ 7, レオ ガウショ 1
+okayama|OH|江坂 任 7, ナ サンホ 6, 河野 孝汰 3
+okayama|LWB|山根 永遠 4, 白井 康介 3, ブラウン ノア賢信 1
+okayama|CH|宮本 英治 6, オベルダン 6, 藤田 息吹 3, 松本 昌也 1
+okayama|RWB|白井 康介 4, 本山 遥 3, 山根 永遠 1
+okayama|CB|大森 博 8, 立田 悠悟 8, 鈴木 喜丈 7, 森 壮一朗 1
+hiroshima|CF|セバスティアン アレー 4, 鈴木 章斗 2, 鮎川 峻 2
+hiroshima|OH|加藤 陸次樹 8, 鈴木 章斗 6, 川村 拓夢 1, 前田 直輝 1
+hiroshima|LWB|東 俊希 8
+hiroshima|CH|川辺 駿 7, 中島 洋太朗 6, 松本 泰志 2, 新井 直人 1
+hiroshima|RWB|新井 直人 4, 中野 就斗 3, 越道 草太 1
+hiroshima|CB|佐々木 翔 8, 荒木 隼人 8, 中野 就斗 5, 塩谷 司 3
+fukuoka|CF|ウェリック ポポ 6, 碓井 聖生 1, 師岡 柊生 1
+fukuoka|OH|重見 柾斗 8, 師岡 柊生 6, 北島 祐二 1, 名古 新太郎 1
+fukuoka|LWB|藤本 一輝 4, 前嶋 洋太 3, 深澤 大輝 1
+fukuoka|CH|見木 友哉 8, 前田 快 4, 椎橋 慧也 4
+fukuoka|RWB|橋本 悠 6, 山脇 樺織 1, 前嶋 洋太 1
+fukuoka|CB|辻岡 佑真 7, 岡 哲平 6, 田代 雅也 4, 深澤 大輝 2, 三國 ケネディエブス 2
+nagasaki|CF|チアゴ サンタナ 7, 山﨑 凌吾 1
+nagasaki|OH|長谷川 元希 8, 岩崎 悠人 6, マテウス ジェズス 2
+nagasaki|LWB|翁長 聖 6, 高畑 奎汰 1, 米田 隼也 1
+nagasaki|CH|山口 蛍 8, 山田 陸 7, ディエゴ ピトゥカ 1
+nagasaki|RWB|関口 正大 4, 米田 隼也 3, 翁長 聖 1
+nagasaki|CB|進藤 亮佑 6, 江川 湧清 5, 新井 一耀 4, 大南 拓磨 3, 土肥 幹太 3

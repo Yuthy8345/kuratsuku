@@ -161,7 +161,7 @@ function sheetClub(id) {
   openSheet(`<div class="row"><span class="kit lg" style="--c1:${c.c1};--c2:${c.c2}"></span><div><div class="eyebrow">${esc(c.area)}</div><h2>${esc(c.name)}</h2></div></div>
     <dl class="kv"><dt>ホーム</dt><dd>${esc(c.stadium)}</dd><dt>収容</dt><dd>${c.cap.toLocaleString('ja-JP')}人</dd><dt>資金</dt><dd>${E.money(c.funds)}</dd><dt>スポンサー収入</dt><dd>月 ${E.money(c.spon)}</dd><dt>チーム力</dt><dd><span class="stars">${stars(c.pred)}</span>（${c.pred}番手）</dd><dt>クラブの格</dt><dd>${presBadge(c)} ${E.presLabel(c.pres)}</dd><dt>クラブの目標</dt><dd>${esc(c.target.jp)}</dd></dl>
     <p class="fine" style="margin:-6px 0 0">${titlesText(c)}${c.o10 ? '・Jリーグ創設メンバー' : ''}</p>
-    <div><div class="eyebrow" style="margin-bottom:6px">主力選手</div><ul class="list">${top.map(p => `<li><div class="prow" style="grid-template-columns:30px 1fr auto"><span class="pos pos-${p.pos}">${p.pos}</span><span class="nm"><b>${esc(p.name)}</b><span>${E.age(p, P.date)}歳 ${natChip(p)}</span></span><span class="ovr ${oc(p.ovr)}">${E.ovr(p)}</span></div></li>`).join('')}</ul></div>
+    <div><div class="eyebrow" style="margin-bottom:6px">主力選手</div><ul class="list">${top.map(p => `<li><div class="prow" style="grid-template-columns:30px 1fr auto">${posTag(p)}<span class="nm"><b>${esc(p.name)}</b><span>${E.age(p, P.date)}歳 ${natChip(p)}</span></span><span class="ovr ${oc(p.ovr)}">${E.ovr(p)}</span></div></li>`).join('')}</ul></div>
     <label class="ctlrow"><span class="small muted">監督名（任意）</span><input class="input" id="mgr-name" maxlength="12" placeholder="あなた" autocomplete="off"></label>`,
     `<button class="btn primary block" data-act="startClub" data-id="${id}">${esc(c.short)}で始める</button><button class="btn ghost block" data-act="closeSheet">ほかのクラブを見る</button>`);
 }
@@ -257,14 +257,33 @@ function prow(p, ctx) {
     if (c.tac.xi.includes(p.id)) chips.push('<span class="chip ok">先発</span>'); else if (c.tac.bench.includes(p.id)) chips.push('<span class="chip">ベンチ</span>');
     if (p.listed) chips.push('<span class="chip acc">放出リスト</span>');
   }
-  if (p.pos2 && p.pos2.length) chips.push(`<span class="chip">+${p.pos2.join('/')}</span>`);
+  const sp = subPos(p); if (sp.length) chips.push(`<span class="chip">+${sp.slice(0, 3).join('/')}</span>`);
   if (p.inj > 0) chips.push(`<span class="chip warn">負傷 ${p.inj}日</span>`);
   if (p.sus > 0) chips.push('<span class="chip warn">出場停止</span>');
   const lead = ctx === 'market' ? (S.clubs[p.club] ? kit(p.club) : '<span class="chip">FA</span>') : `<span class="no">${p.num}</span>`;
   const sub = ctx === 'market' ? `${S.clubs[p.club] ? esc(S.clubs[p.club].short) : 'フリー'}・${a}歳・${E.money(E.value(p, S.date))}` : `${a}歳`;
-  return `<li><button class="prow" data-act="player" data-id="${p.id}">${lead}<span class="pos pos-${p.pos}">${p.pos}</span><span class="nm"><b>${esc(p.name)}</b><span>${sub} ${natChip(p)}${chips.join('')}</span></span><span class="rt"><span class="ovr ${oc(p.ovr)}">${E.ovr(p)}</span>${ctx === 'market' ? '' : condBar(p.cond)}</span></button></li>`;
+  return `<li><button class="prow" data-act="player" data-id="${p.id}">${lead}${posTag(p)}<span class="nm"><b>${esc(p.name)}</b><span>${sub} ${natChip(p)}${chips.join('')}</span></span><span class="rt"><span class="ovr ${oc(p.ovr)}">${E.ovr(p)}</span>${ctx === 'market' ? '' : condBar(p.cond)}</span></button></li>`;
 }
 const POS_ORD = { GK: 0, DF: 1, MF: 2, FW: 3 };
+const dpOf = p => p.pp || (p.at ? E.ppOf(p) : p.pos);
+const DP_ORD = p => { const i = E.DPOS.indexOf(dpOf(p)); return i < 0 ? 0 : i; };
+function posTag(p, st) { const dp = dpOf(p); return `<span class="pos pos-${E.DP_CAT[dp] || p.pos}"${st ? ` style="${st}"` : ''}>${dp}</span>`; }
+// other positions the player handles well (適性85以上)
+function subPos(p) { if (p.pos === 'GK' || !p.at) return []; const pp = dpOf(p); return E.DPOS.filter(dp => dp !== 'GK' && dp !== pp && E.apt(p, dp) >= 85); }
+const aptCls = a => a >= 90 ? 'hi' : a >= 70 ? 'mid' : 'low';
+// aptitude for every position; interactive=true turns the cells into retraining buttons
+function aptGrid(p, interactive) {
+  const pp = dpOf(p); const rows = [['DF', ['CB', 'SB']], ['MF', ['DMF', 'CMF', 'OMF', 'SH']], ['FW', ['CF', 'ST', 'WG']]];
+  const cell = dp => {
+    const a = Math.round(E.apt(p, dp)); const own = dp === pp; const done = !own && a >= E.LEARN_MAX; const on = p.learn && p.learn.pos === dp;
+    const tag = own ? '本職' : on ? `習得中 ${a}` : done ? '習得済' : String(a);
+    const inner = `<b>${dp}</b><span class="apv">${tag}</span><span class="apbar"><i class="${aptCls(a)}" style="width:${a}%"></i></span>`;
+    const cls = `apc ${own ? 'own' : ''} ${on ? 'on' : ''}`;
+    if (!interactive) return `<div class="${cls}">${inner}</div>`;
+    return `<button class="${cls}" data-act="setLearn" data-id="${p.id}" data-k="${on ? '' : dp}" aria-pressed="${!!on}" ${own || done ? 'disabled' : ''} aria-label="${dp} ${E.DP_JP[dp]} 適性${a}">${inner}</button>`;
+  };
+  return `<div class="aptgrid">${rows.map(([cat, dps]) => `<div class="aprow"><span class="apcat pos-${cat}">${cat}</span><div class="apcells" style="grid-template-columns:repeat(${dps.length},1fr)">${dps.map(cell).join('')}</div></div>`).join('')}</div>`;
+}
 const TEAM_TRAIN_DESC = { bal: '成長と回復のバランス型。', hard: '全員がよく伸びる代わりに疲れが抜けにくい。', tact: '連携が深まり試合で中盤がやや有利に。成長は控えめ。', rest: '疲労回復を最優先。成長はゆっくり。' };
 // whole-number change; with soft=true a small move that doesn't change the shown number reads as 微増/微減
 function dlt(x, soft) {
@@ -282,10 +301,10 @@ function devRow(p) {
   const a = E.age(p, S.date); const F = E.FOCUS[p.tf || 'auto']; const I = E.INTENS[p.ti || 'norm'];
   const chips = [`${a}歳`, `<span class="chip ${p.tf && p.tf !== 'auto' ? 'acc' : ''}">${F.jp}</span>`];
   if (p.ti && p.ti !== 'norm') chips.push(`<span class="chip ${p.ti === 'hard' ? 'warn' : ''}">${I.jp}</span>`);
-  if (p.learn) chips.push(`<span class="chip ok">${p.learn.pos}習得 ${Math.floor(p.learn.prog)}%</span>`);
+  if (p.learn) chips.push(`<span class="chip ok">${p.learn.pos}習得中 ${Math.floor(E.apt(p, p.learn.pos))}</span>`);
   if (p.inj > 0) chips.push(`<span class="chip warn">負傷</span>`);
   const d = p.ovr0 != null ? shownDiff(p.ovr, p.ovr0) : 0;
-  return `<li><button class="prow" data-act="train" data-id="${p.id}"><span class="no">${p.num}</span><span class="pos pos-${p.pos}">${p.pos}</span><span class="nm"><b>${esc(p.name)}</b><span>${chips.join('')}</span></span><span class="rt"><span class="ovr ${oc(p.ovr)}">${E.ovr(p)}</span>${dlt(d)}</span></button></li>`;
+  return `<li><button class="prow" data-act="train" data-id="${p.id}"><span class="no">${p.num}</span>${posTag(p)}<span class="nm"><b>${esc(p.name)}</b><span>${chips.join('')}</span></span><span class="rt"><span class="ovr ${oc(p.ovr)}">${E.ovr(p)}</span>${dlt(d)}</span></button></li>`;
 }
 function viewDev() {
   const c = S.clubs[S.my];
@@ -309,7 +328,7 @@ function viewSquad() {
   const all = list.length, avg = list.reduce((a, p) => a + p.ovr, 0) / Math.max(1, all), wages = list.reduce((a, p) => a + E.wage(p), 0);
   if (UI.sq.pos !== 'ALL') list = list.filter(p => p.pos === UI.sq.pos);
   const so = UI.sq.sort;
-  list.sort((a, b) => so === 'ovr' ? b.ovr - a.ovr : so === 'age' ? a.birth.localeCompare(b.birth) * -1 : so === 'cond' ? a.cond - b.cond : (POS_ORD[a.pos] - POS_ORD[b.pos]) || a.num - b.num);
+  list.sort((a, b) => so === 'ovr' ? b.ovr - a.ovr : so === 'age' ? a.birth.localeCompare(b.birth) * -1 : so === 'cond' ? a.cond - b.cond : (POS_ORD[a.pos] - POS_ORD[b.pos]) || (DP_ORD(a) - DP_ORD(b)) || a.num - b.num);
   const sorts = [['pos', 'ポジション'], ['ovr', '能力'], ['age', '若い順'], ['cond', '疲労']];
   return `<div class="row wrap" style="justify-content:space-between"><div><div class="eyebrow">トップチーム</div><b style="font-family:var(--f-display);font-weight:400;font-size:20px">${all}人</b><span class="small muted">　平均能力 ${Math.round(avg)}</span></div><div class="small muted" style="text-align:right">年俸総額<br><b style="color:var(--ink)">${E.money(wages)}</b></div></div>
     <div class="seg" role="group" aria-label="ポジション">${['ALL', 'GK', 'DF', 'MF', 'FW'].map(k => `<button data-act="sqPos" data-k="${k}" aria-pressed="${UI.sq.pos === k}">${k === 'ALL' ? '全員' : k}</button>`).join('')}</div>
@@ -340,12 +359,13 @@ function sheetPlayer(id) {
     foot = open ? `<div class="small muted">移籍金を提示（${club ? esc(club.short) : ''}・〜${jd(E.windowEnd(S.date))}）</div><div class="grid2">${mults.map(m => `<button class="btn ${m === 1.2 ? 'primary' : ''}" data-act="bid" data-id="${p.id}" data-m="${m}">${E.money(Math.round(v * m / 100) * 100)}</button>`).join('')}</div><button class="btn ghost block" data-act="closeSheet">閉じる</button>`
       : `<div class="small muted">移籍期間外です。次の移籍期間は ${jd(E.nextWindowStart(S.date))} から。</div><button class="btn ghost block" data-act="closeSheet">閉じる</button>`;
   }
-  openSheet(`<div class="row"><span class="pos pos-${p.pos}">${p.pos}</span><span class="small muted">#${p.num}・${club ? esc(club.name) : 'フリー'}・${a}歳 ${natChip(p)}</span></div>
+  openSheet(`<div class="row">${posTag(p)}<span class="small muted">#${p.num}・${club ? esc(club.name) : 'フリー'}・${a}歳 ${natChip(p)}</span></div>
     <h2>${esc(p.name)}</h2>
     ${status.length ? `<div class="row wrap">${status.join('')}</div>` : ''}
     <div class="bigovr"><span class="ovr ${oc(p.ovr)}">${E.ovr(p)}</span><dl class="kv" style="flex:1"><dt>伸びしろ</dt><dd><span class="stars">${potStars(p)}</span>${mine ? `（最大 ${p.pot}）` : ''}</dd><dt>市場価値</dt><dd>${E.money(v)}</dd><dt>年俸</dt><dd>${E.money(E.wage(p))}</dd></dl></div>
     ${attrRows(p, mine)}
-    <div><div class="eyebrow" style="margin-bottom:6px">適性ポジション</div><div class="row wrap">${rolesLine(p)}${p.pos2 && p.pos2.length ? `<span class="chip ok">習得済み ${p.pos2.join('・')}</span>` : ''}</div></div>
+    <div><div class="eyebrow" style="margin-bottom:6px">ポジション</div><div class="small" style="margin-bottom:8px">本職 <b>${dpOf(p)}</b>（${E.DP_JP[dpOf(p)]}）${p.learn ? `・<span class="muted">${p.learn.pos}を習得中</span>` : ''}</div>${p.pos === 'GK' ? '' : aptGrid(p, false)}
+      <div class="row wrap" style="margin-top:8px"><span class="small muted">実力の目安</span>${rolesLine(p)}</div></div>
     <div><div class="eyebrow" style="margin-bottom:6px">今季の成績</div><div class="statgrid"><div><small>出場</small><b>${p.st.apps}</b></div><div><small>得点</small><b>${p.st.g}</b></div><div><small>アシスト</small><b>${p.st.a}</b></div><div><small>平均評価</small><b>${avgR}</b></div><div><small>警告</small><b>${p.st.yc}</b></div></div></div>
     ${mine ? `<div class="row small muted">コンディション ${Math.round(p.cond)}%<span class="spacer"></span><span style="display:block;width:120px">${condBar(p.cond)}</span></div>` : ''}
     ${hist}`, foot);
@@ -359,10 +379,10 @@ function sheetTrain(id) {
   const tf = p.tf || 'auto', ti = p.ti || 'norm';
   const menus = Object.entries(E.FOCUS).filter(([k, f]) => p.pos === 'GK' ? ['auto', 'gk', 'pass', 'phys', 'mind'].includes(k) : !f.gk);
   const top = pv ? pv.dAt.map((d, i) => ({ i, d: Math.round(d) })).filter(x => x.d).sort((x, y) => Math.abs(y.d) - Math.abs(x.d)).slice(0, 3) : [];
-  const learnOpts = p.pos === 'GK' ? [] : ['DF', 'MF', 'FW'].filter(x => x !== p.pos);
+  const lp = p.learn && p.learn.pos; const lApt = lp ? E.apt(p, lp) : 0;
   const gap = p.pot - p.ovr;
   const note = gap <= 0.3 && a < 30 ? 'すでに伸びしろの上限近くまで成長しています。' : a >= 30 ? '30歳を過ぎるとスピードやスタミナから衰え始めます。判断力はまだ伸びます。' : '';
-  openSheet(`<div class="row"><span class="pos pos-${p.pos}">${p.pos}</span><span class="small muted">#${p.num}・${a}歳・コンディション ${Math.round(p.cond)}%</span></div>
+  openSheet(`<div class="row">${posTag(p)}<span class="small muted">#${p.num}・${a}歳・コンディション ${Math.round(p.cond)}%</span></div>
     <h2>${esc(p.name)}</h2>
     <div class="bigovr"><span class="ovr ${oc(p.ovr)}">${E.ovr(p)}</span><dl class="kv" style="flex:1"><dt>今季の増減</dt><dd>${dlt(shownDiff(p.ovr, p.ovr0 != null ? p.ovr0 : p.ovr))}</dd><dt>伸びしろ</dt><dd><span class="stars">${potStars(p)}</span>（最大 ${p.pot}）</dd><dt>1か月の見込み</dt><dd>${pv ? dlt(pv.dOvr, true) : '—'}</dd></dl></div>
     ${top.length ? `<p class="fine" style="margin:-4px 0 0">このメニューだと1か月で ${top.map(x => `${E.ATTR[x.i]} ${x.d > 0 ? '+' : ''}${x.d}`).join('、')} ほど。</p>` : pv && pv.dAt.some(d => d >= 0.15) ? '<p class="fine" style="margin:-4px 0 0">1か月では目に見える変化は小さく、少しずつ伸びていきます。</p>' : ''}
@@ -370,9 +390,10 @@ function sheetTrain(id) {
     <div class="ctlrow"><label>個別メニュー</label><div class="menu">${menus.map(([k, f]) => `<button data-act="setTf" data-id="${p.id}" data-k="${k}" aria-pressed="${tf === k}"><b>${f.jp}</b><span>${f.sub}</span></button>`).join('')}</div></div>
     <div class="ctlrow"><label>強度</label><div class="seg">${Object.entries(E.INTENS).map(([k, t]) => `<button data-act="setTi" data-id="${p.id}" data-k="${k}" aria-pressed="${ti === k}">${t.jp}</button>`).join('')}</div>
       <span class="fine">${{ light: '成長はゆっくり。疲れが早く抜けるので連戦向き。', norm: '標準の負荷。', hard: '成長が速い。疲れが抜けにくく、練習中のケガも起きやすい。' }[ti]}</span></div>
-    ${learnOpts.length ? `<div class="ctlrow"><label>ポジション習得${p.learn ? `（${p.learn.pos} ${Math.floor(p.learn.prog)}%）` : ''}</label><div class="seg">${[['', 'しない']].concat(learnOpts.map(x => [x, x])).map(([k, l]) => { const done = k && p.pos2 && p.pos2.includes(k); return `<button data-act="setLearn" data-id="${p.id}" data-k="${k}" aria-pressed="${(p.learn ? p.learn.pos : '') === k}" ${done ? 'disabled' : ''}>${l}${done ? ' 済' : ''}</button>`; }).join('')}</div>
-      ${p.learn ? `<span class="bar" style="height:7px"><i style="width:${Math.min(100, p.learn.prog)}%"></i></span>` : ''}
-      <span class="fine">習得中は能力の伸びが少し落ちます。2〜3か月ほどで新しいポジションでも本職に近い力を出せるようになります。</span></div>` : ''}
+    ${p.pos !== 'GK' ? `<div class="ctlrow"><label>ポジション習得　<span class="muted" style="font-weight:400">本職 ${dpOf(p)}</span></label>
+      ${aptGrid(p, true)}
+      ${lp ? `<div class="row small" style="gap:10px"><span style="flex:1;min-width:0"><b>${lp}</b>（${E.DP_JP[lp]}）を習得中<br><span class="muted">適性 ${Math.floor(lApt)} → ${E.LEARN_MAX}・あと約${E.learnWeeks(S, p, lp)}週</span></span><button class="btn ghost" data-act="setLearn" data-id="${p.id}" data-k="" style="min-height:40px;padding:0 14px;white-space:nowrap;flex:none">やめる</button></div>` : ''}
+      <span class="fine">鍛えたいポジションをタップ。数字は適性（本職=100）で、近いポジションほど早く覚えます。習得中は能力の伸びが少し落ちます。試合でそのポジションに起用しても、少しずつ慣れていきます（適性${E.PLAY_MAX}まで）。</span></div>` : ''}
     <div><div class="eyebrow" style="margin-bottom:6px">能力（右は今季の増減）</div>${attrRows(p, true)}</div>
     <div><div class="eyebrow" style="margin-bottom:6px">適性ポジション</div><div class="row wrap">${rolesLine(p)}</div></div>`,
     '<button class="btn ghost block" data-act="closeSheet">閉じる</button>');
@@ -389,14 +410,14 @@ function viewTactics() {
     const k1 = c.c1, k2 = c.c2, kt = lum(c.c1) > 0.6 ? '#141414' : '#ffffff';
     const style = `left:${s[1]}%;top:${88 - (s[2] - 7) * 1.04}%;--k1:${k1};--k2:${k2};--kt:${kt}`;
     if (!p) return `<button class="tok empty" style="${style}" data-act="slot" data-i="${i}"><span class="shirt">+</span><span class="lbl">${E.ROLE[s[0]].jp}</span></button>`;
-    const warn = E.posPenalty(p, s[0]) < 0 || p.cond < 70;
+    const warn = E.posPenalty(p, s[0]) <= -1.5 || p.cond < 70;
     return `<button class="tok" style="${style}" data-act="slot" data-i="${i}" aria-label="${E.ROLE[s[0]].jp} ${esc(p.name)}"><span class="shirt ${warn ? 'warn' : ''}">${p.num}</span><span class="lbl">${esc(p.short)}</span><span class="ov">${E.ROLE[s[0]].jp}・${E.ovr(p)}</span></button>`;
   }).join('');
   const seg = (act, cur, opts) => `<div class="seg">${opts.map(([k, l]) => `<button data-act="${act}" data-k="${k}" aria-pressed="${cur === k}">${l}</button>`).join('')}</div>`;
   return `<div class="trate"><div><small>攻撃</small><b>${Math.round(r.att)}</b></div><div><small>中盤</small><b>${Math.round(r.mid)}</b></div><div><small>守備</small><b>${Math.round(r.def)}</b></div></div>
     <div class="formrow" role="group" aria-label="フォーメーション">${Object.keys(E.FORMATIONS).map(f => `<button data-act="form" data-k="${f}" aria-pressed="${c.tac.form === f}">${f}</button>`).join('')}</div>
     <div class="pitch">${PITCH_SVG}${toks}</div>
-    <p class="fine">選手をタップすると入れ替えられます。「!」は適性外のポジションか、疲れている選手です。</p>
+    <p class="fine">選手をタップすると入れ替えられます。「!」は適性が低いポジションか、疲れている選手です。</p>
     <div class="ctlrow"><label>攻撃の姿勢</label>${seg('ment', c.tac.ment, [['def', '守備的'], ['bal', 'バランス'], ['att', '攻撃的']])}</div>
     <div class="ctlrow"><label>プレスの強度（高いほど中盤で優位、ただし消耗）</label>${seg('press', c.tac.press, [['low', '低'], ['mid', '中'], ['high', '高']])}</div>
     <button class="toggle" role="switch" aria-checked="${!!S.settings.autoSubs}" data-act="autoSubs"><span><b>交代はおまかせ</b><br><span class="small muted">オフにすると試合中に自分で交代を選びます</span></span><span class="sw"></span></button>
@@ -417,9 +438,9 @@ function sheetBench(outId) {
   const row = p => {
     const av = E.available(p);
     const st = !av ? (p.inj > 0 ? `<span class="chip warn">負傷 ${p.inj}日</span>` : '<span class="chip warn">出場停止</span>') : '';
-    return `<li><button class="prow" data-act="benchIn" data-id="${p.id}" ${av ? '' : 'disabled style="opacity:.5"'}><span class="no">${p.num}</span><span class="pos pos-${p.pos}">${p.pos}</span><span class="nm"><b>${esc(p.name)}</b><span>${E.age(p, S.date)}歳・${Math.round(p.cond)}% ${st}</span></span><span class="rt"><span class="ovr ${oc(p.ovr)}">${E.ovr(p)}</span>${condBar(p.cond)}</span></button></li>`;
+    return `<li><button class="prow" data-act="benchIn" data-id="${p.id}" ${av ? '' : 'disabled style="opacity:.5"'}><span class="no">${p.num}</span>${posTag(p)}<span class="nm"><b>${esc(p.name)}</b><span>${E.age(p, S.date)}歳・${Math.round(p.cond)}% ${st}</span></span><span class="rt"><span class="ovr ${oc(p.ovr)}">${E.ovr(p)}</span>${condBar(p.cond)}</span></button></li>`;
   };
-  openSheet(`<div class="eyebrow">ベンチの入れ替え</div><h2>${esc(o.name)}（${o.pos}・${E.ovr(o)}）と入れ替える選手</h2>
+  openSheet(`<div class="eyebrow">ベンチの入れ替え</div><h2>${esc(o.name)}（${dpOf(o)}・${E.ovr(o)}）と入れ替える選手</h2>
     <p class="fine">ベンチ外の選手です。GKがベンチにいなくなる場合は、自動でGKを1人残します。</p>
     <ul class="list">${reserves.map(row).join('') || '<li class="empty">ベンチ外の選手がいません</li>'}</ul>`,
     `<button class="btn ghost block" data-act="player" data-id="${o.id}">${esc(o.short)}の詳細を見る</button><button class="btn ghost block" data-act="closeSheet">閉じる</button>`);
@@ -434,6 +455,16 @@ function reslot(newForm) {
     for (const id of keep) { if (used.has(id)) continue; const v = E.effective(S.players[id], F[i][0]); if (v > bv) { bv = v; best = id; } }
     if (best) { xi[i] = best; used.add(best); }
   }
+  // then swap pairs while it helps (keeps a striker from ending up at wing-back)
+  const val = (id, i) => E.effective(S.players[id], F[i][0]);
+  for (let round = 0; round < 4; round++) {
+    let better = false;
+    for (let i = 0; i < 11; i++) for (let j = i + 1; j < 11; j++) {
+      if (!xi[i] || !xi[j]) continue;
+      if (val(xi[i], j) + val(xi[j], i) > val(xi[i], i) + val(xi[j], j) + 0.01) { [xi[i], xi[j]] = [xi[j], xi[i]]; better = true; }
+    }
+    if (!better) break;
+  }
   c.tac.xi = xi; E.validateLineup(S, S.my);
 }
 function sheetSlot(i) {
@@ -443,11 +474,11 @@ function sheetSlot(i) {
     .sort((a, b) => (E.available(b.p) - E.available(a.p)) || b.e - a.e);
   const cur = c.tac.xi[i];
   openSheet(`<div class="eyebrow">ポジション</div><h2>${E.ROLE[role].jp} に起用する選手</h2>
-    <p class="fine">数字はこの位置での実力（能力・適性・疲労・調子を反映）。</p>
+    <p class="fine">右の数字はこの位置での実力（能力・適性・疲労・調子を反映）。適性は本職=100。</p>
     <ul class="list">${cands.map(({ p, e }) => {
       const j = c.tac.xi.indexOf(p.id); const av = E.available(p);
       const st = !av ? (p.inj > 0 ? `<span class="chip warn">負傷 ${p.inj}日</span>` : '<span class="chip warn">出場停止</span>') : j >= 0 ? `<span class="chip ok">${E.ROLE[E.FORMATIONS[c.tac.form][j][0]].jp}で先発</span>` : c.tac.bench.includes(p.id) ? '<span class="chip">ベンチ</span>' : '';
-      return `<li><button class="prow" data-act="assign" data-i="${i}" data-id="${p.id}" ${av ? '' : 'disabled'} style="${p.id === cur ? 'background:color-mix(in srgb,var(--accent-bg) 14%,transparent)' : ''}${av ? '' : ';opacity:.5'}"><span class="no">${p.num}</span><span class="pos pos-${p.pos}">${p.pos}</span><span class="nm"><b>${esc(p.name)}</b><span>能力 ${E.ovr(p)}・${Math.round(p.cond)}% ${st}</span></span><span class="rt"><span class="ovr ${oc(e)}">${Math.round(e)}</span></span></button></li>`;
+      return `<li><button class="prow" data-act="assign" data-i="${i}" data-id="${p.id}" ${av ? '' : 'disabled'} style="${p.id === cur ? 'background:color-mix(in srgb,var(--accent-bg) 14%,transparent)' : ''}${av ? '' : ';opacity:.5'}"><span class="no">${p.num}</span>${posTag(p)}<span class="nm"><b>${esc(p.name)}</b><span>能力 ${E.ovr(p)}・適性 ${Math.round(E.roleApt(p, role))}・${Math.round(p.cond)}% ${st}</span></span><span class="rt"><span class="ovr ${oc(e)}">${Math.round(e)}</span></span></button></li>`;
     }).join('')}</ul>`, '<button class="btn ghost block" data-act="closeSheet">閉じる</button>');
 }
 
@@ -566,13 +597,13 @@ function sheetPrematch(fid) {
   const row = (lab, a, b) => { const mx = Math.max(a, b, 1); return `<div class="cmp"><b class="l">${a.toFixed(0)}</b><span class="bar bl"><i style="width:${Math.max(8, 100 - (mx - a) * 9)}%;background:var(--accent-bg)"></i></span><span class="lab">${lab}</span><span class="bar"><i style="width:${Math.max(8, 100 - (mx - b) * 9)}%;background:var(--muted)"></i></span><b>${b.toFixed(0)}</b></div>`; };
   const warn = [];
   const F = E.FORMATIONS[c.tac.form];
-  c.tac.xi.forEach((id, i) => { const p = S.players[id]; if (!p) { warn.push(`${E.ROLE[F[i][0]].jp}が空いています`); return; } if (p.cond < 70) warn.push(`${p.name}が疲れています（${Math.round(p.cond)}%）`); if (E.posPenalty(p, F[i][0]) < 0) warn.push(`${p.name}は${E.ROLE[F[i][0]].jp}が本職ではありません`); });
+  c.tac.xi.forEach((id, i) => { const p = S.players[id]; if (!p) { warn.push(`${E.ROLE[F[i][0]].jp}が空いています`); return; } if (p.cond < 70) warn.push(`${p.name}が疲れています（${Math.round(p.cond)}%）`); if (E.posPenalty(p, F[i][0]) <= -1.5) warn.push(`${p.name}は${E.ROLE[F[i][0]].jp}の適性が低め（${Math.round(E.roleApt(p, F[i][0]))}）`); });
   const keys = o.tac.xi.map(id => S.players[id]).filter(Boolean).sort((a, b) => b.ovr - a.ovr).slice(0, 3);
   openSheet(`<div class="eyebrow">第${f.r}節・${jdw(f.date)}・${f.h === S.my ? 'ホーム' : 'アウェイ'}</div>
     <h2>vs ${esc(o.name)}</h2>
     <div class="row small muted"><span>${esc(c.short)} ${c.tac.form}・${E.MENTALITY[c.tac.ment].jp}</span><span class="spacer"></span><span>${esc(o.short)} ${o.tac.form}</span></div>
     <div style="display:grid;gap:8px">${row('攻撃', me.att, op.att)}${row('中盤', me.mid, op.mid)}${row('守備', me.def, op.def)}</div>
-    <div><div class="eyebrow" style="margin-bottom:6px">警戒する選手</div><div class="row wrap">${keys.map(p => `<span class="chip"><span class="pos pos-${p.pos}" style="width:24px;height:16px;font-size:10px">${p.pos}</span>${esc(p.name)} ${E.ovr(p)}</span>`).join('')}</div></div>
+    <div><div class="eyebrow" style="margin-bottom:6px">警戒する選手</div><div class="row wrap">${keys.map(p => `<span class="chip">${posTag(p, 'width:26px;height:16px;font-size:9px')}${esc(p.name)} ${E.ovr(p)}</span>`).join('')}</div></div>
     ${warn.length ? `<div class="card" style="padding:10px 12px"><div class="eyebrow" style="color:var(--loss)">メンバーの注意点</div><ul style="margin:6px 0 0;padding-left:18px;font-size:13px">${warn.slice(0, 5).map(w => `<li>${esc(w)}</li>`).join('')}</ul></div>` : '<p class="fine">メンバーに問題はありません。</p>'}`,
     `<button class="btn primary block" data-act="kickoff" data-id="${fid}" style="min-height:54px;font-size:16px">キックオフ</button><div class="grid2"><button class="btn ghost" data-act="toTactics">戦術を調整</button><button class="btn ghost" data-act="quick" data-id="${fid}">結果だけ見る</button></div>`);
 }
@@ -836,7 +867,7 @@ function showResult() {
     <div class="row"><span class="res res-${res}">${{ W: '勝', D: '分', L: '敗' }[res]}</span><b>${{ W: '勝利！', D: '引き分け', L: '敗戦' }[res]}</b><span class="spacer"></span><span class="small muted">第${fx.r}節・観客 ${(fx.att || 0).toLocaleString('ja-JP')}人</span></div>
     <div class="scorers"><div>${goals('h')}</div><div>${goals('a')}</div></div>
     <div>${stl('支配率', Math.round(M.st.h.pos / tot * 100) + '%', Math.round(M.st.a.pos / tot * 100) + '%')}${stl('シュート', M.st.h.sh, M.st.a.sh)}${stl('枠内', M.st.h.ot, M.st.a.ot)}${stl('ファウル', M.st.h.fo, M.st.a.fo)}</div>
-    <div><div class="eyebrow" style="margin-bottom:6px">${esc(S.clubs[S.my].short)}の採点</div><ul class="list">${mine.map(([id, pm]) => { const p = S.players[id]; return `<li><div class="row" style="padding:8px 12px"><span class="pos pos-${p.pos}">${p.pos}</span><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.name)} ${pm.g ? `<b class="evb">G${pm.g > 1 ? '×' + pm.g : ''}</b>` : ''}${pm.a ? `<b class="evb a">A${pm.a > 1 ? '×' + pm.a : ''}</b>` : ''}${pm.rc ? '<i class="cardi r"></i>' : pm.yc ? '<i class="cardi y"></i>' : ''}${pm.inj ? '<span class="chip warn">負傷</span>' : ''}</span><span class="small muted">${pm.on ? pm.on + "'〜" : ''}</span><span class="rating ${ratingCls(pm.final)}">${(pm.final || 6).toFixed(1)}</span></div></li>`; }).join('')}</ul></div>
+    <div><div class="eyebrow" style="margin-bottom:6px">${esc(S.clubs[S.my].short)}の採点</div><ul class="list">${mine.map(([id, pm]) => { const p = S.players[id]; return `<li><div class="row" style="padding:8px 12px">${posTag(p)}<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.name)} ${pm.g ? `<b class="evb">G${pm.g > 1 ? '×' + pm.g : ''}</b>` : ''}${pm.a ? `<b class="evb a">A${pm.a > 1 ? '×' + pm.a : ''}</b>` : ''}${pm.rc ? '<i class="cardi r"></i>' : pm.yc ? '<i class="cardi y"></i>' : ''}${pm.inj ? '<span class="chip warn">負傷</span>' : ''}</span><span class="small muted">${pm.on ? pm.on + "'〜" : ''}</span><span class="rating ${ratingCls(pm.final)}">${(pm.final || 6).toFixed(1)}</span></div></li>`; }).join('')}</ul></div>
     ${others.length ? `<div><div class="eyebrow" style="margin-bottom:6px">他会場</div><ul class="list">${others.map(f => `<li><div class="fx"><span class="h">${esc(S.clubs[f.h].short)}${kit(f.h, 'sm')}</span><span class="sc">${f.hg}-${f.ag}</span><span class="a">${kit(f.a, 'sm')}${esc(S.clubs[f.a].short)}</span></div></li>`).join('')}</ul></div>` : ''}
   </div>`;
   renderMatchCtl();
@@ -861,8 +892,8 @@ function sheetMatchTactics() {
     <div class="ctlrow"><label>攻撃の姿勢</label><div class="seg">${[['def', '守備的'], ['bal', 'バランス'], ['att', '攻撃的']].map(([x, l]) => `<button data-act="mMent" data-k="${x}" aria-pressed="${sd.ment === x}">${l}</button>`).join('')}</div></div>
     <button class="toggle" role="switch" aria-checked="${!!S.settings.autoSubs}" data-act="autoSubs"><span><b>交代はおまかせ</b><br><span class="small muted">残り交代 ${left}回</span></span><span class="sw"></span></button>
     <div class="eyebrow">${sel ? 'OUT：' + esc(S.players[sel].name) + ' → 入れる選手を選ぶ' : '下げる選手を選ぶ'}</div>
-    ${sel ? `<ul class="list">${bench.map(id => { const p = S.players[id]; return `<li><button class="prow" data-act="mIn" data-id="${id}"><span class="no">${p.num}</span><span class="pos pos-${p.pos}">${p.pos}</span><span class="nm"><b>${esc(p.name)}</b><span>${Math.round(p.cond)}%</span></span><span class="rt"><span class="ovr ${oc(p.ovr)}">${E.ovr(p)}</span></span></button></li>`; }).join('') || '<li class="empty">控えがいません</li>'}</ul><button class="btn ghost block" data-act="mOut" data-id="">選び直す</button>`
-      : `<ul class="list">${onp.map(s => { const p = S.players[s.pid]; const pm = M.pm[s.pid]; return `<li><button class="prow" data-act="mOut" data-id="${s.pid}" ${left <= 0 ? 'disabled' : ''}><span class="no">${p.num}</span><span class="pos pos-${p.pos}">${p.pos}</span><span class="nm"><b>${esc(p.name)}</b><span>${E.ROLE[s.role].jp}・体力 ${Math.round(sd.cond[s.pid] || 0)}%</span></span><span class="rt"><span class="rating ${ratingCls(pm.rt)}">${pm.rt.toFixed(1)}</span></span></button></li>`; }).join('')}</ul>`}`,
+    ${sel ? `<ul class="list">${bench.map(id => { const p = S.players[id]; return `<li><button class="prow" data-act="mIn" data-id="${id}"><span class="no">${p.num}</span>${posTag(p)}<span class="nm"><b>${esc(p.name)}</b><span>${Math.round(p.cond)}%</span></span><span class="rt"><span class="ovr ${oc(p.ovr)}">${E.ovr(p)}</span></span></button></li>`; }).join('') || '<li class="empty">控えがいません</li>'}</ul><button class="btn ghost block" data-act="mOut" data-id="">選び直す</button>`
+      : `<ul class="list">${onp.map(s => { const p = S.players[s.pid]; const pm = M.pm[s.pid]; return `<li><button class="prow" data-act="mOut" data-id="${s.pid}" ${left <= 0 ? 'disabled' : ''}><span class="no">${p.num}</span>${posTag(p)}<span class="nm"><b>${esc(p.name)}</b><span>${E.ROLE[s.role].jp}・体力 ${Math.round(sd.cond[s.pid] || 0)}%</span></span><span class="rt"><span class="rating ${ratingCls(pm.rt)}">${pm.rt.toFixed(1)}</span></span></button></li>`; }).join('')}</ul>`}`,
     '<button class="btn primary block" data-act="closeSheet">試合に戻る</button>');
 }
 
@@ -903,7 +934,7 @@ const ACT = {
   train(d) { sheetTrain(Number(d.id)); },
   setTf(d) { const p = S.players[d.id]; p.tf = d.k; persist(false); refreshSheet(); render(); },
   setTi(d) { const p = S.players[d.id]; p.ti = d.k; persist(false); refreshSheet(); render(); },
-  setLearn(d) { const p = S.players[d.id]; if (!d.k) p.learn = null; else if (!p.learn || p.learn.pos !== d.k) p.learn = { pos: d.k, prog: 0 }; persist(false); refreshSheet(); render(); },
+  setLearn(d) { const p = S.players[d.id]; if (!d.k) p.learn = null; else if (!p.learn || p.learn.pos !== d.k) p.learn = { pos: d.k }; persist(false); refreshSheet(); render(); },
   form(d) { reslot(d.k); persist(false); render(); },
   ment(d) { S.clubs[S.my].tac.ment = d.k; persist(false); render(); },
   press(d) { S.clubs[S.my].tac.press = d.k; persist(false); render(); },

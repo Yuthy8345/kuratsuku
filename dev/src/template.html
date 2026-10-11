@@ -230,6 +230,22 @@ table.tbl { border-collapse: collapse; width: 100%; font-size: 13px; }
 .kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 13px; margin: 0; }
 .kv dt { color: var(--muted); }
 .kv dd { margin: 0; text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+.aptgrid { display: grid; gap: 6px; }
+.aprow { display: grid; grid-template-columns: 30px 1fr; gap: 6px; align-items: stretch; }
+.apcat { display: grid; place-items: center; border-radius: 8px; color: #fff; font-size: 10px; font-weight: 700; }
+.apcells { display: grid; gap: 6px; }
+.apc { display: grid; gap: 3px; align-content: center; min-height: 52px; padding: 6px 4px 7px; border-radius: 10px; background: var(--surface2); border: 1.5px solid transparent; text-align: center; color: var(--ink); }
+.apc b { font-size: 13px; line-height: 1.1; }
+.apc .apv { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; line-height: 1.1; }
+.apbar { height: 4px; margin: 1px 4px 0; background: color-mix(in srgb, var(--ink) 10%, transparent); border-radius: 2px; overflow: hidden; }
+.apbar > i { display: block; height: 100%; background: var(--win); }
+.apbar > i.mid { background: var(--accent-bg); } .apbar > i.low { background: var(--loss); }
+.apc.own { background: color-mix(in srgb, var(--win) 16%, var(--surface)); }
+.apc.own .apv { color: var(--win); font-weight: 700; }
+.apc.on { border-color: var(--accent-bg); background: color-mix(in srgb, var(--accent-bg) 16%, var(--surface)); }
+.apc.on .apv { color: var(--accent); font-weight: 700; }
+button.apc:disabled { opacity: 1; cursor: default; }
+button.apc:not(:disabled):active { transform: scale(.97); }
 .attr { display: grid; grid-template-columns: 76px 1fr 28px auto; align-items: center; gap: 10px; font-size: 13px; }
 .dlt { font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--muted); min-width: 36px; text-align: right; }
 .dlt.up { color: var(--win); } .dlt.dn { color: var(--loss); }

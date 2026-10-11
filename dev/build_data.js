@@ -28,6 +28,11 @@ const META = {
   nagasaki:  { short: '長崎',   c1: '#0F4C9C', c2: '#F39800', tier: 3, fan: 3, base: 67, abbr: 'NGS', area: '長崎' },
 };
 
+// the shape each club mostly plays in 2026/27 (from the Football LAB formation pages)
+const FORM = { machida: '3-4-2-1', hiroshima: '3-4-2-1', tokyov: '3-4-2-1', fukuoka: '3-4-2-1', okayama: '3-4-2-1', nagasaki: '3-4-2-1', kashiwa: '3-4-2-1', nagoya: '3-4-2-1', cosaka: '3-4-2-1',
+  kawasakif: '4-2-3-1', yokohamafm: '4-2-3-1', gosaka: '4-2-3-1', urawa: '4-2-3-1', kobe: '4-3-3', kyoto: '4-3-3',
+  kashima: '4-4-2', mito: '4-4-2', chiba: '4-4-2', shimizu: '4-4-2', fctokyo: '4-4-2' };
+
 // Club history through the 2025 season. Sources: Wikipedia "J1 League", "J.League Cup", "Emperor's Cup" (titles by club); AFC club titles.
 // j1: J1 titles, lc: J.League Cup, ec: Emperor's Cup in the J.League era (1993-), ecOld: Emperor's Cup as the predecessor company team,
 // acl: Asian club titles (incl. Asian Club Championship, predecessor era included), o10: J.League founding member, sea: J1 seasons 1993-2025.
@@ -136,7 +141,7 @@ for (const file of fs.readdirSync(RAW).filter(f => f.endsWith('.txt')).sort()) {
   const m = META[id];
   if (!m) throw new Error('no meta ' + id);
   const h = HISTORY[id];
-  clubs.push({ id, name, coach, stadium, cap: Number(cap), ...m, pres: prestigeOf(id), titles: { j1: h.j1, lc: h.lc, ec: h.ec + h.ecOld, acl: h.acl }, o10: !!h.o10 });
+  clubs.push({ id, name, coach, stadium, cap: Number(cap), ...m, form: FORM[id] || '4-4-2', pres: prestigeOf(id), titles: { j1: h.j1, lc: h.lc, ec: h.ec + h.ecOld, acl: h.acl }, o10: !!h.o10 });
   const ov = OVR[id] || {};
   const used = new Set();
   for (const line of lines.slice(1)) {
@@ -196,6 +201,90 @@ for (const list of Object.values(byClub)) {
   for (const p of list) cnt[p.short] = (cnt[p.short] || 0) + 1;
   for (const p of list) if (cnt[p.short] > 1 && p.nat === 'JPN') { const given = p.name.split(' ')[1]; if (given) p.short = p.short + given[0]; }
 }
+
+// ---------- detailed positions: 本職 (pp) and extra aptitude (ap) ----------
+// CB SB / DMF CMF OMF SH / CF ST(セカンドトップ・シャドー) WG
+// Source 1: Football LAB formation pages (2026/27 starting slots per player, positions_footballlab.txt).
+// Source 2: ソーイの知識 (PP_KNOWN). Players with neither are spread over what the squad lacks.
+const FL = {};
+for (const l of fs.readFileSync(path.join(__dirname, 'positions_footballlab.txt'), 'utf8').split('\n')) {
+  if (!l || l[0] === '#') continue;
+  const [, slot, list] = l.split('|');
+  for (const e of list.split(', ')) {
+    const mm = e.match(/^(.*) (\d+)$/); const k = mm[1].replace(/\s/g, '');
+    FL[k] = FL[k] || {}; FL[k][slot] = (FL[k][slot] || 0) + Number(mm[2]);
+  }
+}
+const DP_CAT = { GK: 'GK', CB: 'DF', SB: 'DF', DMF: 'MF', CMF: 'MF', OMF: 'MF', SH: 'MF', CF: 'FW', ST: 'FW', WG: 'FW' };
+const DMF_KNOWN = new Set('マテウスブエノ 三竿健斗 舩橋佑 小林祐介 田口泰士 喜田陽 熊坂光希 高宇洋 常盤亨太 橋本拳人 前寛之 ネタラヴィ 橘田健人 知念慶 嶋本悠大 弓場将輝 ウォンドゥジェ 高嶺朋樹 ジョアンペドロ 尹星俊 鈴木徳真 美藤倫 田中駿汰 井手口陽介 鍬先祐弥 宮本英治 オベルダン 藤田息吹 前田快 椎橋慧也 山口蛍'.split(' '));
+// key: name without spaces, or club:name when two players share a name
+const PP_KNOWN = {
+  'chiba:エドゥアルド': 'CMF', ンドカボニフェイス: 'CB', 久保庭良太: 'CB', 鈴木大輔: 'CB', 前貴之: 'SB', 米倉恒貴: 'SH', 椿直起: 'SH', 天笠泰輝: 'DMF', 安井拓也: 'CMF', イサカゼイン: 'SH', 品田愛斗: 'CMF', 呉屋大翔: 'CF', ホシャ: 'CF',
+  登里享平: 'SB', 鷹啄トラビス: 'CB', 上門知樹: 'OMF', 阪田澪哉: 'SH', 柴山昌也: 'SH', パブロサバック: 'CF',
+  大森理生: 'CB', 永野修都: 'CB', 山田楓喜: 'SH', 小湊絆: 'ST', 仲川輝人: 'WG', 尾谷ディヴァインチネドゥ: 'CF', ダニゴメス: 'CF',
+  湯澤聖人: 'SB', 上島拓巳: 'CB', 宮大樹: 'CB', 奥野耕平: 'DMF', 秋野央樹: 'CMF', オリオールロメウ: 'DMF', 城後寿: 'ST', 鶴野怜樹: 'CF',
+  半田陸: 'SB', 三浦弦太: 'CB', 奥抜侃志: 'SH', フアンペ: 'DMF', 倉田秋: 'OMF', 林大地: 'CF', 小柏剛: 'WG', ウェルトン: 'WG',
+  山﨑大地: 'CB', キムジュソン: 'CB', 菅大輝: 'SH', クシニイェンギ: 'CF', 浅野拓磨: 'ST',
+  安西幸輝: 'SB', 千田海人: 'CB', 大川佑梧: 'CB', 元砂晏翔仁ウデンバ: 'CB', 樋口雄太: 'CMF', 田川亨介: 'CF',
+  麻田将吾: 'CB', 犬飼智也: 'CB', 山之内佑成: 'SB', 常藤奏: 'SB', 山田雄士: 'SH', 大久保智明: 'SH', 汰木康也: 'SH', 手塚康平: 'CMF', 仲間隼斗: 'SH', 瀬川祐輔: 'SH', 戸嶋祥郎: 'CMF', 原川力: 'CMF', 細谷真大: 'CF', 満田誠: 'ST',
+  松長根悠仁: 'CB', 大島僚太: 'CMF', 大関友翔: 'OMF', 河原創: 'DMF', 家長昭博: 'SH', 小林悠: 'CF', 宮城天: 'WG',
+  カエターノ: 'CB', 酒井高徳: 'SB', 本間ジャスティン: 'SB', 扇原貴宏: 'DMF', 井出遥也: 'OMF', 渡辺皓太: 'CMF', アンデルソンロペス: 'CF', 佐々木大樹: 'ST', エリキ: 'WG',
+  山中亮輔: 'SB', 志知孝明: 'SB', 奥川雅也: 'SH', 米本拓司: 'DMF', 齊藤未月: 'DMF', マルコトゥーリオ: 'WG', 加藤拓己: 'CF', 平賀大空: 'WG', 長沢駿: 'CF',
+  トーマスアウエヤン: 'SB', キムミンテ: 'CB', 仙頭啓矢: 'OMF', 松尾佑介: 'SH',
+  新井瑞希: 'SH',
+  'nagasaki:エドゥアルド': 'CB', 名倉巧: 'OMF', 澤田崇: 'SH', 中村慶太: 'CMF', 増山朝陽: 'SH', ノーマンキャンベル: 'CF',
+  ダニーロボザ: 'CB', 佐藤瑶大: 'CB', 菊地泰智: 'SH', 小野雅史: 'CMF', 小屋松知哉: 'SH', 森島司: 'OMF',
+  田上大地: 'CB', 竹内涼: 'DMF', 田部井涼: 'CMF', 末吉塁: 'SH', 木村太哉: 'SH', 神谷優太: 'OMF', 西川潤: 'OMF', 佐藤凌我: 'ST',
+  蓮川壮大: 'CB', カピシャーバ: 'SH', 小泉慶: 'DMF', 小塚和季: 'OMF',
+  田邉秀斗: 'CB', 松田陸: 'SB', チョユミン: 'CB', 柴戸海: 'DMF', 藤本寛也: 'CMF', 山見大登: 'ST', 一美和成: 'CF', 寺沼星文: 'CF',
+  片山瑛一: 'SB', サミュエルグスタフソン: 'DMF', 早川隼平: 'OMF', 肥田野蓮治: 'CF',
+  渡邊泰基: 'SB', 松原健: 'SB', トーマスデン: 'CB', 喜田拓也: 'DMF', 遠野大弥: 'ST', ジョルディクルークス: 'WG', オナイウ情滋: 'WG', ディーンデイビッド: 'CF', ユーリアラウージョ: 'WG',
+};
+// where a Football LAB slot puts a player of a given registered category
+function slotDP(slot, cat, key) {
+  if (cat === 'DF') return slot === 'CB' || slot === 'CH' || slot === 'CF' ? 'CB' : 'SB';
+  if (cat === 'MF') return slot === 'CB' ? 'DMF' : slot === 'CH' ? (DMF_KNOWN.has(key) ? 'DMF' : 'CMF') : slot === 'OH' || slot === 'CF' ? 'OMF' : 'SH';
+  return slot === 'CF' || slot === 'CB' ? 'CF' : slot === 'OH' || slot === 'CH' ? 'ST' : 'WG';
+}
+// positions a slot proves the player can play (second one a little lower)
+const SLOT_REAL = { CB: ['CB'], LSB: ['SB'], RSB: ['SB'], LWB: ['SB', 'SH'], RWB: ['SB', 'SH'], CH: ['DMF', 'CMF'], OH: ['OMF', 'ST'], LSH: ['SH', 'WG'], RSH: ['SH', 'WG'], CF: ['CF'] };
+const ppStat = { fl: 0, known: 0, fill: 0 };
+for (const p of players) {
+  const key = p.name.replace(/\s/g, '');
+  if (p.pos === 'GK') { p.pp = 'GK'; continue; }
+  const fl = FL[key]; const known = PP_KNOWN[p.club + ':' + key] || PP_KNOWN[key];
+  const ap = {};
+  if (fl) {
+    const bucket = {};
+    for (const [slot, n] of Object.entries(fl)) { const dp = slotDP(slot, p.pos, key); bucket[dp] = (bucket[dp] || 0) + n; }
+    let pp = null, bv = -1;
+    for (const [dp, n] of Object.entries(bucket)) if (n > bv || (n === bv && dp === 'ST')) { bv = n; pp = dp; }
+    // a forward used both up front and behind/wide is a second striker
+    if (p.pos === 'FW' && bucket.CF >= 2 && (bucket.ST || 0) + (bucket.WG || 0) >= 2) {
+      const o = (bucket.ST || 0) + (bucket.WG || 0);
+      if (Math.min(o, bucket.CF) / Math.max(o, bucket.CF) >= 0.5) pp = 'ST';
+    }
+    p.pp = pp; ppStat.fl++;
+    for (const [slot, n] of Object.entries(fl)) SLOT_REAL[slot].forEach((dp, i) => {
+      const v = (n >= 4 ? 92 : n >= 2 ? 88 : 82) - i * 4;
+      if (v > (ap[dp] || 0)) ap[dp] = v;
+    });
+  }
+  if (known) { if (!fl) ppStat.known++; p.pp = known; }
+  if (p.pp) { delete ap[p.pp]; if (Object.keys(ap).length) p.ap = ap; }
+  if (p.pp && DP_CAT[p.pp] !== p.pos) console.warn('pp outside registered category:', p.club, p.name, p.pos, p.pp);
+}
+// the rest: fill what each squad is short of (best players first)
+const DP_TARGET = { DF: { CB: 5, SB: 4 }, MF: { DMF: 3, CMF: 3, OMF: 2, SH: 3 }, FW: { CF: 3, ST: 1.5, WG: 2 } };
+for (const list of Object.values(byClub)) {
+  const have = {}; for (const p of list) if (p.pp) have[p.pp] = (have[p.pp] || 0) + 1;
+  for (const p of list.filter(q => !q.pp).sort((a, b) => b.ovr - a.ovr)) {
+    const t = DP_TARGET[p.pos]; let best = null, bv = -1e9;
+    for (const [dp, want] of Object.entries(t)) { const v = (want - (have[dp] || 0)) / want; if (v > bv) { bv = v; best = dp; } }
+    p.pp = best; have[best] = (have[best] || 0) + 1; ppStat.fill++;
+  }
+}
+console.log('positions', ppStat);
 
 // Real opening round (2026/27 J1 第1節)
 const round1 = [['yokohamafm', 'kashima'], ['kashiwa', 'mito'], ['fctokyo', 'machida'], ['tokyov', 'kawasakif'], ['nagoya', 'shimizu'], ['gosaka', 'urawa'], ['cosaka', 'okayama'], ['hiroshima', 'chiba'], ['fukuoka', 'kobe'], ['nagasaki', 'kyoto']];

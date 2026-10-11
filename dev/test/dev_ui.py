@@ -40,7 +40,7 @@ async def main():
         await page.click('[data-act="train"] >> nth=1'); await page.wait_for_timeout(400)
         await page.click('#sheet [data-act="setTf"][data-k="shoot"]'); await page.wait_for_timeout(150)
         await page.click('#sheet [data-act="setTi"][data-k="hard"]'); await page.wait_for_timeout(150)
-        await page.click('#sheet [data-act="setLearn"] >> nth=1'); await page.wait_for_timeout(150)
+        await page.click('#sheet .apc[data-act="setLearn"]:not([disabled]) >> nth=1'); await page.wait_for_timeout(150)
         await page.screenshot(path=str(OUT/'d-train.png'))
         await page.evaluate('document.querySelector("#sheet .sheet-body").scrollTop = 2000'); await page.wait_for_timeout(150)
         await page.screenshot(path=str(OUT/'d-train2.png'))
