@@ -113,20 +113,28 @@ const ICON = {
 
 /* ---------- title & club select ---------- */
 // title: the manager's tactics board — 11 of ours (blue) against 11 of theirs (yellow)
-const TB_OPP = [[50, 4, 1], [86, 17, 2], [63, 15, 3], [37, 15, 4], [14, 17, 5], [88, 31, 7], [62, 30, 8], [38, 30, 6], [12, 31, 11], [60, 43, 9], [40, 43, 10]];
-const TB_OWN = [[16, 57, 11], [50, 55, 9], [84, 57, 7], [30, 69, 8], [50, 72, 6], [70, 69, 10], [13, 83, 5], [37, 85, 4], [63, 85, 3], [87, 83, 2], [50, 96, 1]];
+/* Title: the tactics board. Coordinates are in the 362x816 design board and scale with the screen.
+   Opponent (yellow 4-4-2) attacks down, my team (blue 4-2-3-1) attacks up; logo and buttons sit in front of a dimmed board. */
+const TB_W = 362, TB_H = 816;
+const TB_OPP = [[181, 48, 1], [54, 146, 2], [134, 136, 3], [228, 136, 4], [308, 146, 5], [58, 242, 7], [140, 232, 8], [222, 232, 6], [304, 242, 11], [148, 346, 9], [222, 334, 10]];
+const TB_OWN = [[181, 462, 9], [58, 530, 11], [181, 520, 10], [304, 530, 7], [134, 598, 6], [228, 598, 8], [46, 664, 5], [128, 690, 4], [234, 690, 3], [316, 664, 2], [181, 774, 1]];
+const TB_PITCH = '<rect x="20" y="20" width="322" height="776" rx="3"/><path d="M20 408H342M83 20V118H279V20M133 20V54H229V20M148 118A46 46 0 0 0 214 118M83 796V698H279V796M133 796V762H229V796M148 698A46 46 0 0 1 214 698M157 20V11H205V20M157 796V805H205V796M20 28A8 8 0 0 0 28 20M334 20A8 8 0 0 0 342 28M20 788A8 8 0 0 1 28 796M334 796A8 8 0 0 1 342 788"/>';
+const TB_ARROWS = '<path class="w ds" d="M142.8 583.4L171.2 536.3"/><path class="w" d="M171.7 547.1L171.2 536.3L161.4 540.9"/><path class="w" d="M66 515C80 478 98 440 124 410"/><path class="w" d="M122.6 420.7L124 410L113.6 412.9"/><path class="w" d="M186 445Q196 416 200 386"/><path class="w" d="M204.8 395.7L200 386L192.9 394.1"/><path class="w" d="M304 512L306.1 509.3L306.9 506.4L302.8 502.7L301.7 499.5L306.4 497.2L311.1 494.9L309.9 491.7L305.2 487.9L304 484.7L308.7 482.4L313.4 480.1L312.3 476.9L307.5 473.1L306.4 469.8L311.1 467.6L315.8 465.3L314.6 462L309.9 458.3L308.7 455L313.4 452.7L318.1 450.5L317 447.2L312.2 443.4L311.1 440.2L315.8 437.9L317.9 435.2L318 424"/><path class="w" d="M322.5 433.8L318 424L310.7 431.9"/><path class="w" d="M38 646C28 604 26 544 30 488"/><path class="w" d="M35.3 497.4L30 488L23.4 496.5"/><path class="y pr" d="M152 363L164 408"/><path class="y pr" d="M155.9 400.8L164 408L167.5 397.8"/><path class="y pr" d="M154.1 394.1L162.2 401.2L165.7 391"/><path class="y" d="M230 350C248 382 260 422 254 458"/><path class="y" d="M249.6 448.1L254 458L261.4 450.1"/><path class="y" d="M192 284L254 290"/><path class="y" d="M244.5 295.1L254 290L245.6 283.2"/><ellipse class="y zone" cx="74" cy="330" rx="40" ry="24" transform="rotate(-8 74 330)"/><path class="y" d="M304 260L302.2 262.9L301.6 265.8L305.9 269.2L307.3 272.3L302.8 275L298.4 277.6L299.8 280.7L304.8 284.1L306.2 287.2L301.7 289.9L297.2 292.6L298.6 295.7L302.9 299L301.7 302L300 312"/><path class="y" d="M294.7 302.6L300 312L306.7 303.5"/>';
 function viewTitle() {
   const save = pickSave(loadLocal(), Cloud.cand);
   const sc = save && save.clubs[save.my];
-  const mag = cls => ([x, y, n]) => `<span class="mag ${cls}" style="left:${x}%;top:${y}%">${n}</span>`;
+  const pc = v => +(v * 100).toFixed(2) + '%';
+  const mag = cls => ([x, y, n]) => `<span class="mag ${cls}" style="left:${pc(x / TB_W)};top:${pc(y / TB_H)}">${n}</span>`;
   const cont = save ? `<button class="plate yellow" data-act="continue"><span class="mag-dot" style="--c1:${sc.c1};--c2:${sc.c2}" aria-hidden="true"></span><span><b>つづきから</b><small>${esc(sc.name)}　${E.seasonLabel(save.season)}・${jd(save.date)}${save === Cloud.cand ? '・クラウド' : ''}</small></span></button>` : '';
   const fresh = `<button class="plate ${save ? 'chalk' : 'yellow'}" data-act="toSelect"><span class="newmag" aria-hidden="true">NEW</span><b>新しく始める</b></button>`;
   return `<div class="tb-wrap"><main class="tboard">
-    <span class="tb-line tb-outer" aria-hidden="true"></span><span class="tb-line tb-boxtop" aria-hidden="true"></span><span class="tb-line tb-boxbot" aria-hidden="true"></span>
+    <div class="tb-pitch" aria-hidden="true">
+      <svg class="tb-lines" viewBox="0 0 ${TB_W} ${TB_H}" preserveAspectRatio="none">${TB_PITCH}</svg><span class="tb-circle"></span>
+      <svg class="tb-arrows" viewBox="0 0 ${TB_W} ${TB_H}" preserveAspectRatio="none">${TB_ARROWS}</svg>
+      ${TB_OPP.map(mag('opp')).join('')}${TB_OWN.map(mag('own')).join('')}
+    </div>
+    <div class="tb-dim" aria-hidden="true"></div>
     <div class="tb-logo"><h1>クラつく</h1><svg viewBox="0 0 230 22" aria-hidden="true"><path d="M6 14 C 60 4, 140 4, 224 10" fill="none" stroke="#F2C230" stroke-width="5" stroke-linecap="round"></path><path d="M30 19 C 90 12, 150 12, 200 16" fill="none" stroke="#F2C230" stroke-width="2.5" stroke-linecap="round" opacity=".7"></path></svg></div>
-    <div class="tb-field" aria-hidden="true"><span class="tb-half"></span><span class="tb-circle"></span>
-      <svg class="tb-arrows" viewBox="0 0 100 100" preserveAspectRatio="none"><path d="M51 52 C 55 46, 59 42, 64 38"></path><path d="M60.5 39 L64 38 L63.4 41.6"></path><path d="M84 53.5 C 86 49, 87 45, 88 40"></path><path d="M86 42.6 L88 40 L89.6 42.8"></path><path d="M30 66 C 27 63, 22 61, 18 60.5"></path><path d="M20.4 58.4 L18 60.5 L20.8 62.6"></path></svg>
-      ${TB_OPP.map(mag('opp')).join('')}${TB_OWN.map(mag('own')).join('')}</div>
     <div class="tb-menu">${cont}${fresh}<div class="tb-links"><button type="button" data-act="importOpen">引き継ぎコードで復元</button><button type="button" class="about" data-act="aboutOpen">このゲームについて</button></div></div>
   </main></div>`;
 }
