@@ -28,8 +28,7 @@ const pwa = `<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#EEF1EA" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#0A1310" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#163428">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="クラつく">
@@ -61,7 +60,7 @@ fs.writeFileSync(path.join(P, 'index.html'), pwa);
 fs.writeFileSync(path.join(P, 'manifest.webmanifest'), JSON.stringify({
   name: 'クラつく', short_name: 'クラつく', description: '片手で遊べるJ1クラブ経営シミュレーション', lang: 'ja',
   start_url: './', scope: './', display: 'standalone', orientation: 'portrait',
-  background_color: '#0A1310', theme_color: '#0A1310',
+  background_color: '#163428', theme_color: '#163428',
   icons: [
     { src: 'icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
     { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },

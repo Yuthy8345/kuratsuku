@@ -56,7 +56,7 @@ async def main():
         # 3) offline launch
         await ctx.set_offline(True)
         await pg.reload(); await pg.wait_for_timeout(800)
-        ok = await pg.evaluate("!!document.querySelector('.title h1') && document.querySelector('.title h1').textContent")
+        ok = await pg.evaluate("!!document.querySelector('.tboard h1') && document.querySelector('.tboard h1').textContent")
         print('offline reload title:', ok)
         await pg.screenshot(path=str(OUT/'x-offline.png'))
         print('\n'.join(errs) or 'no errors')

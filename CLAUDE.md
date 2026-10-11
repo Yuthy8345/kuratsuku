@@ -15,6 +15,8 @@
 - カップ戦: `S.cups`（天皇杯 `ec` = J1 20 + J2 12、Lカップ `lc` = J1 20）。試合は `S.fixtures` に `cup`/`cr` 付きで入る（リーグ表・節表示は `cup` を除外）。一発勝負、同点はPK（`M.pk`→`f.pk`）。ラウンド終了の翌朝 `progressCups` が次の組み合わせを作る。弱いクラブがホーム、決勝は国立。J2クラブは `S.order` に入らない `S.clubs` として選手を持つ（降格クラブも同じ。旧 `J2:` 付きは移行済み）。
 - 大一番: `hypeMatch` がダービー（`RIVALRY` の名前付きカード → 同じ都道府県 → 同じ地方（`REGION`：関西・東海・九州）→ オリジナル10対決 の順で判定）・上位/残留の直接対決・カップ戦・リベンジ・古巣対決を判定し、試合当日だけ `p.hot`（+12）を付ける。格下ほど起きやすい。攻撃の姿勢 `tac.ment`（def/bal/att）とは別に `tac.ctr`（カウンターを狙う）。カウンターはチャンス数が減る代わりに決定率が上がり、相手の保持率が高いほど・相手が攻撃的なほど効く（`counterQ`）。AIは格上相手に守備的＋カウンターなど（`aiMentality`）。
 - スカウト: `sendScout` → 期日に FA の若手3人（`p.found`）＋ inbox `type:'scout'`。30日で期限切れ。施設 `fac.scout` で伸びしろが上がる。成長は出場時間の割合（`playShare`）で伸び、23歳以下ほど大きい。
+- デザイン: 「作戦ボード」。既定は緑の黒板、クラブ → ボードの見た目 でホワイトボード（`<html data-board="white">`、端末ごとの localStorage `kuratsuku.board`、セーブとは別）。色は `template.html` の `:root` と `:root[data-board="white"]` のトークンで、OSのダークモードには追従しない。クラブ・選手は丸いマグネット、ボタンはマグネットプレート。フォントは見出し Dela Gothic One、ラベル（`.eyebrow`）Yusei Magic（チョーク）、本文 Zen Kaku Gothic New、試合のスコアボードだけ DotGothic16。
+- タイトル: 常に黒板。味方（青）と相手（黄）のマグネットが11個ずつ（`viewTitle` の `TB_OWN`/`TB_OPP`、%座標）。「つづきから」の丸は自クラブの色、「新しく始める」は青い NEW マグネット。
 - `dev/icons/real.py` — アプリアイコン（SVG生成）。PNGはリポジトリ直下。
 
 ## Build & deploy
@@ -33,7 +35,7 @@ git add -A && git commit && git push             # Pages が1分ほどで反映
 - `python3 dev/test/bench.py` / `python3 dev/test/match2d.py` — ベンチ入れ替え／試合画面の通し再生
 - `python3 dev/test/positions.py` — 適性グリッド・ポジション習得・旧セーブ（v2）からの移行
 - `python3 dev/test/suspend.py` — 出場停止・負傷の選手がいると試合に進めず、復帰しても勝手にメンバーに戻らないこと
-- `python3 dev/test/retire.py` — 引退選手のポップアップ（ライト/ダーク）とシーズン移行
+- `python3 dev/test/retire.py` — 引退選手のポップアップ（黒板/ホワイトボード）とシーズン移行
 - `python3 dev/test/presets.py` — 戦術の保存・読み込み（出場停止の選手が入ったまま読み込まれ、試合に進めないこと）
 - `python3 dev/test/cups.py` — カップ戦の表示・PK・大一番（燃えている選手）・カウンター・スカウト
 - 番狂わせの目安（4〜6シーズン回す）: 下位5クラブの上位5クラブ相手の勝率 18〜22%、1試合2.4〜2.6点、優勝勝点 74〜88

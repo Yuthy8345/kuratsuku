@@ -10,6 +10,16 @@ const ORDER = ['kashima', 'mito', 'urawa', 'chiba', 'kashiwa', 'fctokyo', 'tokyo
 const WD = ['日', '月', '火', '水', '木', '金', '土'];
 
 let S = null;
+// board look: green chalkboard (default) or a magnetic whiteboard; a per-device preference
+const BOARD_KEY = 'kuratsuku.board';
+function getBoard() { try { return localStorage.getItem(BOARD_KEY) === 'white' ? 'white' : 'chalk'; } catch (e) { return 'chalk'; } }
+function applyBoard() {
+  const white = getBoard() === 'white';
+  if (white) document.documentElement.setAttribute('data-board', 'white'); else document.documentElement.removeAttribute('data-board');
+  const m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', white ? '#F3F5F6' : '#163428');
+}
+function setBoard(k) { try { localStorage.setItem(BOARD_KEY, k === 'white' ? 'white' : 'chalk'); } catch (e) { /* storage blocked: only this session */ } applyBoard(); }
+applyBoard();
 let UI = { screen: 'title', tab: 'home', sq: { pos: 'ALL', sort: 'pos' }, lg: { view: 'table', round: null, cup: 'ec' }, cl: { view: 'main' }, mk: { pos: '', q: '', fa: false } };
 let sheetState = null;
 let MATCH = null;
@@ -102,36 +112,33 @@ const ICON = {
 };
 
 /* ---------- title & club select ---------- */
+// title: the manager's tactics board — 11 of ours (blue) against 11 of theirs (yellow)
+const TB_OPP = [[50, 4, 1], [86, 17, 2], [63, 15, 3], [37, 15, 4], [14, 17, 5], [88, 31, 7], [62, 30, 8], [38, 30, 6], [12, 31, 11], [60, 43, 9], [40, 43, 10]];
+const TB_OWN = [[16, 57, 11], [50, 55, 9], [84, 57, 7], [30, 69, 8], [50, 72, 6], [70, 69, 10], [13, 83, 5], [37, 85, 4], [63, 85, 3], [87, 83, 2], [50, 96, 1]];
 function viewTitle() {
+  const save = pickSave(loadLocal(), Cloud.cand);
+  const sc = save && save.clubs[save.my];
+  const mag = cls => ([x, y, n]) => `<span class="mag ${cls}" style="left:${x}%;top:${y}%">${n}</span>`;
+  const cont = save ? `<button class="plate yellow" data-act="continue"><span class="mag-dot" style="--c1:${sc.c1};--c2:${sc.c2}" aria-hidden="true"></span><span><b>つづきから</b><small>${esc(sc.name)}　${E.seasonLabel(save.season)}・${jd(save.date)}${save === Cloud.cand ? '・クラウド' : ''}</small></span></button>` : '';
+  const fresh = `<button class="plate ${save ? 'chalk' : 'yellow'}" data-act="toSelect"><span class="newmag" aria-hidden="true">NEW</span><b>新しく始める</b></button>`;
+  return `<div class="tb-wrap"><main class="tboard">
+    <span class="tb-line tb-outer" aria-hidden="true"></span><span class="tb-line tb-boxtop" aria-hidden="true"></span><span class="tb-line tb-boxbot" aria-hidden="true"></span>
+    <div class="tb-logo"><h1>クラつく</h1><svg viewBox="0 0 230 22" aria-hidden="true"><path d="M6 14 C 60 4, 140 4, 224 10" fill="none" stroke="#F2C230" stroke-width="5" stroke-linecap="round"></path><path d="M30 19 C 90 12, 150 12, 200 16" fill="none" stroke="#F2C230" stroke-width="2.5" stroke-linecap="round" opacity=".7"></path></svg></div>
+    <div class="tb-field" aria-hidden="true"><span class="tb-half"></span><span class="tb-circle"></span>
+      <svg class="tb-arrows" viewBox="0 0 100 100" preserveAspectRatio="none"><path d="M51 52 C 55 46, 59 42, 64 38"></path><path d="M60.5 39 L64 38 L63.4 41.6"></path><path d="M84 53.5 C 86 49, 87 45, 88 40"></path><path d="M86 42.6 L88 40 L89.6 42.8"></path><path d="M30 66 C 27 63, 22 61, 18 60.5"></path><path d="M20.4 58.4 L18 60.5 L20.8 62.6"></path></svg>
+      ${TB_OPP.map(mag('opp')).join('')}${TB_OWN.map(mag('own')).join('')}</div>
+    <div class="tb-menu">${cont}${fresh}<div class="tb-links"><button type="button" data-act="importOpen">引き継ぎコードで復元</button><button type="button" class="about" data-act="aboutOpen">このゲームについて</button></div></div>
+  </main></div>`;
+}
+function sheetAbout() {
   const se = E.seasonForDate(TODAY, 2026);
-  const local = loadLocal();
-  const save = pickSave(local, Cloud.cand);
-  const saveLine = save ? `<div class="card"><div class="eyebrow">セーブデータ</div><div class="row" style="margin-top:6px">${kitFor(save, save.my)}<div><b>${esc(save.clubs[save.my].name)}</b><div class="small muted">${E.seasonLabel(save.season)}・${fmtDate(save.date)}${save === Cloud.cand ? '・クラウド' : ''}</div></div></div></div>` : '';
-  return `<div class="title">
-    <div class="title-top">
-      <div>
-        <div class="eyebrow">J1 CLUB MANAGEMENT</div>
-        <h1>クラつく</h1>
-        <p class="lede">Jのクラブをつくろう。片手で回すクラブ経営。</p>
-      </div>
-      <div class="led" aria-label="シーズン情報">
-        <div class="ln"><span>SEASON</span><span>KICK OFF</span></div>
-        <div class="ln"><span class="big">26/27</span><span class="big">8.07</span></div>
-        <div class="ln"><span>J1 20 CLUBS</span><span>38 ROUNDS</span></div>
-      </div>
-      <dl class="kv">
-        <dt>開始日</dt><dd>${fmtLong(TODAY)}</dd>
-        <dt>対象シーズン</dt><dd>2026/27（開幕 2026年8月7日）</dd>
-      </dl>
-      ${se.note ? `<p class="fine">今日の日付からは${E.seasonLabel(se.computed)}シーズンにあたりますが、収録データは2026/27シーズン版のため、2026/27の開幕から始まります。</p>` : `<p class="fine">開始日が含まれる2026/27シーズンの開幕（8月7日）からスタートします。</p>`}
-      ${saveLine}
-      <p class="fine">選手と在籍クラブはJリーグ公式サイトの2026/27シーズン登録選手（2026年9月時点）をもとにしています。能力値は独自の推定です。クラブのエンブレムは使用していません。非商用のファンメイドゲームです。</p>
-    </div>
-    <div class="title-actions">
-      ${save ? `<button class="btn primary block" data-act="continue">続きから</button><button class="btn ghost block" data-act="toSelect">新しく始める</button>` : `<button class="btn primary block" data-act="toSelect">新しく始める</button>`}
-      <button class="btn ghost block" data-act="importOpen" style="min-height:46px;font-size:14px">引き継ぎコードで復元</button>
-    </div>
-  </div>`;
+  sheetState = { type: 'about' };
+  openSheet(`<div class="eyebrow">このゲームについて</div><h2>クラつく</h2>
+    <p class="small" style="margin:0">Jリーグのクラブを率いる、片手で遊べるクラブ経営シミュレーションです。</p>
+    <dl class="kv"><dt>開始日</dt><dd>${fmtLong(TODAY)}</dd><dt>対象シーズン</dt><dd>2026/27（開幕 2026年8月7日）</dd></dl>
+    <p class="fine">${se.note ? `今日の日付からは${E.seasonLabel(se.computed)}シーズンにあたりますが、収録データは2026/27シーズン版のため、2026/27の開幕から始まります。` : '開始日が含まれる2026/27シーズンの開幕（8月7日）からスタートします。'}</p>
+    <p class="fine">選手と在籍クラブはJリーグ公式サイトの2026/27シーズン登録選手（2026年9月時点）をもとにしています。能力値は独自の推定です。クラブのエンブレムは使用していません。非商用のファンメイドゲームです。</p>`,
+    '<button class="btn ghost block" data-act="closeSheet">閉じる</button>');
 }
 function kitFor(st, cid) { const c = st.clubs[cid]; return `<span class="kit lg" style="--c1:${c.c1};--c2:${c.c2}" aria-hidden="true"></span>`; }
 function pickSave(a, b) { if (a && b) return (b.savedAt || 0) > (a.savedAt || 0) ? b : a; return a || b || null; }
@@ -617,6 +624,8 @@ function viewClub() {
       ${S.scout ? `<section class="card"><div class="row"><span class="chip acc">派遣中</span><b>${esc(E.SCOUT[S.scout.key].jp)}</b><span class="spacer"></span><span class="small muted">${jd(S.scout.back)}ごろ戻る</span></div></section>`
         : `<ul class="list">${Object.entries(E.SCOUT).map(([k, x]) => `<li><div class="row" style="padding:12px;gap:12px"><div style="flex:1;min-width:0"><b>${esc(x.jp)}</b><div class="small muted">${esc(x.sub)}・${x.days}日</div></div><button class="btn" data-act="scout" data-k="${k}" ${c.funds < x.cost ? 'disabled' : ''}>派遣<br><span class="small">${E.money(x.cost)}</span></button></div></li>`).join('')}</ul>`}
       <p class="fine">スカウトは有望な若手を3人見つけてきます。フリーの選手なので契約金だけで獲得できます。スカウト網のレベルが高いほど伸びしろの大きい選手が見つかります。レポートは30日で期限切れになり、残った選手はほかのクラブへ行きます。</p>
+      <h3 class="sec-h">ボードの見た目</h3>
+      <div class="seg" role="group" aria-label="ボードの見た目">${[['chalk', '黒板（緑）'], ['white', 'ホワイトボード']].map(([k, l]) => `<button data-act="board" data-k="${k}" aria-pressed="${getBoard() === k}">${l}</button>`).join('')}</div>
       <h3 class="sec-h">データ</h3>
       <section class="card" style="display:grid;gap:8px"><dl class="kv"><dt>この端末</dt><dd>${UI.localOk === false ? '保存できません' : '自動保存中'}</dd><dt>クラウド</dt><dd>${Cloud.status === 'on' ? (Cloud.err ? '保存に失敗（' + esc(Cloud.err) + '）' : Cloud.last ? '保存済み ' + new Date(Cloud.last).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) : '有効（試合後に保存）') : Cloud.status === 'checking' ? '確認中' : 'なし（引き継ぎコードで保管できます）'}</dd><dt>監督</dt><dd>${esc(S.manager)}</dd></dl>
       <div class="grid2"><button class="btn" data-act="exportOpen">引き継ぎコードを作る</button><button class="btn" data-act="importOpen">コードで復元</button></div>
@@ -1066,6 +1075,8 @@ function go() {
 }
 const ACT = {
   toSelect() { UI.screen = 'select'; render(); window.scrollTo(0, 0); },
+  aboutOpen() { sheetAbout(); },
+  board(d) { setBoard(d.k); render(); },
   toTitle() { UI.screen = 'title'; render(); },
   pickClub(d) { sheetClub(d.id); },
   startClub(d) {

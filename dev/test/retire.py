@@ -11,10 +11,10 @@ pid = lambda name: next(p['id'] for p in DATA['players'] if p['name'] == name)
 OSAKO, SAKAI = pid('大迫 勇也'), pid('酒井 高徳')
 LOAD = "() => JSON.parse(LZString.decompressFromBase64(localStorage.getItem('touchline.j1.save').slice(3)))"
 async def run(scheme):
-    (ROOT/'test/page.html').write_text(wrapped.replace('SCHEME', scheme, 1))
+    (ROOT/'test/page.html').write_text(wrapped.replace('SCHEME', 'dark', 1))
     async with async_playwright() as p:
         b = await p.chromium.launch()
-        ctx = await b.new_context(viewport={'width': 390, 'height': 844}, device_scale_factor=2, has_touch=True, color_scheme=scheme)
+        ctx = await b.new_context(viewport={'width': 390, 'height': 844}, device_scale_factor=2, has_touch=True)
         page = await ctx.new_page(); errs = []
         page.on('pageerror', lambda e: errs.append('PAGEERROR: ' + str(e)))
         page.on('console', lambda m: errs.append(m.text) if m.type == 'error' and 'ERR_FAILED' not in m.text else None)
@@ -23,6 +23,7 @@ async def run(scheme):
             else: await r.abort()
         await page.route('https://**/*', route)
         await page.goto('file://' + str(ROOT/'test/page.html')); await page.wait_for_timeout(300)
+        if scheme == 'white': await page.evaluate("localStorage.setItem('kuratsuku.board', 'white')"); await page.reload(); await page.wait_for_timeout(300)
         await page.click('text=新しく始める'); await page.click('[data-id="kobe"]'); await page.wait_for_timeout(350)
         await page.click('[data-act="startClub"]'); await page.wait_for_timeout(400)
         # jump to the end of the season: mark every fixture played and open the season-end state (an old-style save: no retirements decided yet)
@@ -53,4 +54,4 @@ async def run(scheme):
         print(scheme, 'farewells', names, '| last button', btn, '| season now', st['season'], '| farewell players gone', not any(n in left for n in names), '| veteran shown', '外町 俊之輔' in names)
         print('\n'.join(errs) or 'no errors')
         await b.close()
-asyncio.run(run('light')); asyncio.run(run('dark'))
+asyncio.run(run('chalk')); asyncio.run(run('white'))  # board look: green chalkboard / whiteboard
