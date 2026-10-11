@@ -787,7 +787,7 @@ function stepMatch(S, M) {
     const sd = { ...side, slots: side.slots.map(s => ({ ...s, pid: side.sent.includes(s.pid) ? null : s.pid })) };
     const r = teamRating(S, sd);
     // a player on fire lifts the whole side
-    if (sd.slots.some(s => s.pid && S.players[s.pid] && S.players[s.pid].hot)) { r.att += HOT_TEAM; r.mid += HOT_TEAM * 0.6; }
+    if (sd.slots.some(s => s.pid && S.players[s.pid] && S.players[s.pid].hot)) { r.att += HYPE.team; r.mid += HYPE.team * 0.6; }
     return r;
   };
   const rh = live(H), ra = live(A);
@@ -1326,11 +1326,11 @@ function takeJob(S, cid) {
 
 /* ---------- special matches: derbies, six-pointers, revenge, cup ties ---------- */
 // In a big game one player may catch fire for that match only (more often for the underdog).
-const HOT_BOOST = 12, HOT_TEAM = 1.5;
-// how often players catch fire. k: chance per unit of big-game weight (times the underdog factor), cap: its ceiling;
-// maxN/more/decay: after the first, each extra player catches fire with more*under*decay^(i-1); upTag: weight added when
-// the opponent is 4+ stronger (格上挑戦); floor: weight every match has at least; former: chance per former-club player
-const HYPE = { k: 0.25, cap: 0.75, maxN: 1, more: 0, decay: 0.5, upTag: 0, floor: 0, former: 0.3 };
+// how often players catch fire and by how much. k: chance per unit of big-game weight (times the underdog factor), cap: its
+// ceiling; maxN/more/decay: after the first, each extra player catches fire with more*under*decay^(i-1); upTag: weight added
+// when the opponent is 4+ stronger (格上挑戦); floor: weight every match has at least; former: chance per former-club
+// player; boost: ovr added for that match; team: attack lift for the side while a hot player is on (midfield 0.6x). Pattern D「お祭り」with a +10 boost (was k .25 cap .75, one player, +12).
+const HYPE = { k: 0.45, cap: 0.9, maxN: 3, more: 0.5, decay: 0.6, upTag: 0.6, floor: 0.3, former: 0.3, boost: 10, team: 1.5 };
 // named fixtures (as the clubs / J.League / media bill them), then same prefecture, then same region, then two Original 10 clubs
 const RIVALRY = [
   ['kawasakif', 'fctokyo', '多摩川クラシコ'], ['tokyov', 'machida', '東京クラシック'], ['yokohamafm', 'tokyov', 'Jリーグ開幕カード', 0.8],
@@ -1402,7 +1402,7 @@ function hypeMatch(S, f) {
     }
     for (const p of picked) {
       const why = formerClubs(p).has(opp) ? '古巣対決' : lost ? 'リベンジに燃える' : tags.length ? tags[0].jp : up ? '格上相手に燃える' : W0 > 0 ? '大一番' : '気合十分';
-      p.hot = { d: f.date, b: HOT_BOOST, why };
+      p.hot = { d: f.date, b: HYPE.boost, why };
       hy.hot.push({ pid: p.id, side: cid === f.h ? 'h' : 'a', why });
     }
   }
@@ -1768,7 +1768,7 @@ const API = {
   createMatch, stepMatch, simulateFull, finishMatch, doSub, benchOptions, onPitch, setMentality, bestSubFor, setCounter, mentLabel,
   advance, nextDay, simAIToday, myFixtureToday, nextMyFixture, todaysFixtures, inWindow, windowEnd, nextWindowStart,
   acceptOffer, rejectOffer, bid, decideRetirements, shortlist, shortEntry, unshort, bidBlock,
-  CUPS, CUP_PRIZE, NATIONAL, fxLabel, cupResult, cupWinner, hypeMatch, HYPE, bigGame, rivalry, SCOUT, sendScout, playShare, HOT_BOOST, marketList, ensureFreeAgents, upgrade, facCost, takeJob, rollover, endSeason, news, fire,
+  CUPS, CUP_PRIZE, NATIONAL, fxLabel, cupResult, cupWinner, hypeMatch, HYPE, bigGame, rivalry, SCOUT, sendScout, playShare, marketList, ensureFreeAgents, upgrade, facCost, takeJob, rollover, endSeason, news, fire,
 };
 if (typeof module !== 'undefined' && module.exports) module.exports = API; else root.Engine = API;
 })(typeof window !== 'undefined' ? window : globalThis);

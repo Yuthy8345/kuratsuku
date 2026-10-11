@@ -13,7 +13,7 @@
 - 戦術の保存: クラブごとに `c.presets`（最大 `PRESET_MAX`=5、フォーメーション・進め方・プレス・先発・ベンチ）。`loadPreset` は保存したとおりに戻し、負傷・出場停止の選手もそのまま（入れ替えは監督が行う）。移籍した選手の枠だけ空く。
 - 引退: シーズン終了時（`endSeason` → `decideRetirements`）に決まり、自クラブの引退選手は `S.seasonEnd.ret` のカードで、「次のシーズンへ」を押したときに1人ずつポップアップ表示（セレモニーの代わり）。そのあと `rollover` でクラブから外れる。
 - カップ戦: `S.cups`（天皇杯 `ec` = J1 20 + J2 12、Lカップ `lc` = J1 20）。試合は `S.fixtures` に `cup`/`cr` 付きで入る（リーグ表・節表示は `cup` を除外）。一発勝負、同点はPK（`M.pk`→`f.pk`）。ラウンド終了の翌朝 `progressCups` が次の組み合わせを作る。弱いクラブがホーム、決勝は国立。J2クラブは `S.order` に入らない `S.clubs` として選手を持つ（降格クラブも同じ。旧 `J2:` 付きは移行済み）。
-- 大一番: `hypeMatch` がダービー（`RIVALRY` の名前付きカード → 同じ都道府県 → 同じ地方（`REGION`：関西・東海・九州）→ オリジナル10対決 の順で判定）・上位/残留の直接対決・カップ戦・リベンジ・古巣対決を判定し、試合当日だけ `p.hot`（+12）を付ける。格下ほど起きやすい。攻撃の姿勢 `tac.ment`（def/bal/att）とは別に `tac.ctr`（カウンターを狙う）。カウンターはチャンス数が減る代わりに決定率が上がり、相手の保持率が高いほど・相手が攻撃的なほど効く（`counterQ`）。AIは格上相手に守備的＋カウンターなど（`aiMentality`）。
+- 大一番: `hypeMatch` がダービー（`RIVALRY` の名前付きカード → 同じ都道府県 → 同じ地方（`REGION`：関西・東海・九州）→ オリジナル10対決 の順で判定）・上位/残留の直接対決・カップ戦・リベンジ・古巣対決を判定し、試合当日だけ `p.hot`（+10）を付ける。格下ほど起きやすい。確率と人数は `HYPE`（2026-10-12 から案D「お祭り」: 大一番で燃えやすく最大3人、相手が4以上強いと「格上挑戦」、普段の試合にも少しチャンス。上がり幅 `boost` 10、燃えた選手がいる間のチーム全体の上乗せ `team` 1.5）。攻撃の姿勢 `tac.ment`（def/bal/att）とは別に `tac.ctr`（カウンターを狙う）。カウンターはチャンス数が減る代わりに決定率が上がり、相手の保持率が高いほど・相手が攻撃的なほど効く（`counterQ`）。AIは格上相手に守備的＋カウンターなど（`aiMentality`）。
 - スカウト: `sendScout` → 期日に FA の若手3人（`p.found`）＋ inbox `type:'scout'`。30日で期限切れ。施設 `fac.scout` で伸びしろが上がる。成長は出場時間の割合（`playShare`）で伸び、23歳以下ほど大きい。
 - ショートリスト: 入札した選手は `bid` の中で `noteBid` が `S.shortlist`（`{pid, since, last, n, fee, res, guide, club}`、res は club/player/thin/funds/full）に入れる。獲得は `moveP` で自クラブに来たとき `unshort`、引退（club が RET）は `shortlist()` が外す。他クラブへ移った選手は残る（入札時のクラブを `club` に保持）。本人に断られた期間は `bidBlock` で入札ボタンを出さない。UI はクラブ → 移籍市場 の「ショートリスト」。`S.v` 6 で旧セーブの `S._bids` から作る。
 - デザイン: 「作戦ボード」。既定は緑の黒板、クラブ → ボードの見た目 でホワイトボード（`<html data-board="white">`、端末ごとの localStorage `kuratsuku.board`、セーブとは別）。色は `template.html` の `:root` と `:root[data-board="white"]` のトークンで、OSのダークモードには追従しない。クラブ・選手は丸いマグネット、ボタンはマグネットプレート。フォントは見出し Dela Gothic One、ラベル（`.eyebrow`）Yusei Magic（チョーク）、本文 Zen Kaku Gothic New、試合のスコアボードだけ DotGothic16。
@@ -42,5 +42,5 @@ git add -A && git commit && git push             # Pages が1分ほどで反映
 - `node dev/test/shortlist.js` / `python3 dev/test/shortlist.py` — ショートリスト（入札で入る・獲得と引退で外れる・移籍しても残る・旧セーブ移行／画面・保存・外す）
 - `python3 dev/test/presets.py` — 戦術の保存・読み込み（出場停止の選手が入ったまま読み込まれ、試合に進めないこと）
 - `python3 dev/test/cups.py` — カップ戦の表示・PK・大一番（燃えている選手）・カウンター・スカウト
-- `node dev/test/hype.js <now|A|B|C|D> <シーズン数>` — ビッグプレーヤー（燃える選手）の発動の比較。確率と人数は `Engine.HYPE`（k・cap・maxN・more・decay・upTag・floor・former）で決まり、パターンはその上書き
-- 番狂わせの目安（4〜6シーズン回す）: 下位5クラブの上位5クラブ相手の勝率 18〜22%、1試合2.4〜2.6点、優勝勝点 74〜88
+- `node dev/test/hype.js <now|A|B|C|D> <シーズン数>` — ビッグプレーヤー（燃える選手）の発動の比較。確率・人数・上がり幅は `Engine.HYPE`（k・cap・maxN・more・decay・upTag・floor・former・boost・team）で決まり、パターンはその上書き。番狂わせ率は40シーズンでも±2ポイントほどぶれるので、比べるときは100シーズン以上回す
+- 番狂わせの目安: 下位5クラブの上位5クラブ相手の勝率 23〜26%（案D・上がり幅+10 で100シーズン平均 24.5%。以前の設定は 22.1%）、1試合2.4〜2.6点、優勝勝点 74〜88。番狂わせ率は数シーズンでは大きくぶれるので `dev/test/hype.js` で100シーズン以上回して比べる

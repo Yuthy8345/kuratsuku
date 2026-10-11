@@ -1,12 +1,13 @@
 // Big-player patterns: how often teams catch fire, how many players, and what it does to upsets / goals / title points.
-// usage: node dev/test/hype.js <now|A|B|C|D> <seasons> [club]   (patterns override Engine.HYPE for this run only)
+// usage: node dev/test/hype.js <now|old|A|B|C|D12> <seasons> [club]   (patterns override Engine.HYPE for this run only)
 const E = require('../src/engine.js'); const DATA = require('../data.json');
 const PAT = {
-  now: {},
-  A: { k: 0.35, cap: 0.85, maxN: 2, more: 0.35 },
-  B: { k: 0.35, cap: 0.85, maxN: 3, more: 0.5, decay: 0.5, upTag: 0.5 },
-  C: { k: 0.35, cap: 0.85, maxN: 2, more: 0.4, upTag: 0.5, floor: 0.2 },
-  D: { k: 0.45, cap: 0.9, maxN: 3, more: 0.5, decay: 0.6, upTag: 0.6, floor: 0.3 },
+  now: {},                                                                                           // current defaults (D, +10)
+  old: { k: 0.25, cap: 0.75, maxN: 1, more: 0, decay: 0.5, upTag: 0, floor: 0, boost: 12 },            // before 2026-10-12
+  A: { k: 0.35, cap: 0.85, maxN: 2, more: 0.35, decay: 0.5, upTag: 0, floor: 0, boost: 12 },
+  B: { k: 0.35, cap: 0.85, maxN: 3, more: 0.5, decay: 0.5, upTag: 0.5, floor: 0, boost: 12 },
+  C: { k: 0.35, cap: 0.85, maxN: 2, more: 0.4, decay: 0.5, upTag: 0.5, floor: 0.2, boost: 12 },
+  D12: { k: 0.45, cap: 0.9, maxN: 3, more: 0.5, decay: 0.6, upTag: 0.6, floor: 0.3, boost: 12 },
 };
 const name = process.argv[2] || 'now', runs = +(process.argv[3] || 3), club = process.argv[4] || 'kashima';
 Object.assign(E.HYPE, PAT[name]);
