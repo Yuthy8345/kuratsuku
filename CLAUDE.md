@@ -25,6 +25,7 @@ cd dev && node build_data.js && node build.js   # data.json → index.html / sw.
 git add -A && git commit && git push             # Pages が1分ほどで反映
 ```
 - `sw.js` のキャッシュ名はビルドごとに変わる。index.html はネットワーク優先なので、修正はオンラインなら次回起動で反映。
+- 安全領域: PWA の index.html は `:root` をノッチ・ホームバー分（`env(safe-area-inset-*)`）だけ上下に詰めている。画面側で同じ値を足すと二重になって1画面からはみ出すので、`--sat`/`--sab` を使って差し引く（タイトルの `.tb-wrap` 参照）。
 - セーブは localStorage キー `touchline.j1.save`（変えない）。端末間の移動は「引き継ぎコード」（`KTK1.` + lz圧縮JSON）。
 - 既存セーブの互換: `Engine.migrate(S, DATA)` で能力値・格・生年月日・本職の更新を流し込む（`S.v` 3 で細分化ポジション。旧 `pos2`/`learn` のカテゴリ習得は適性に変換）。格の計算式を変えたら `PRES_BASE` に旧値を残して `presV` を上げる。
 
@@ -36,6 +37,7 @@ git add -A && git commit && git push             # Pages が1分ほどで反映
 - `python3 dev/test/positions.py` — 適性グリッド・ポジション習得・旧セーブ（v2）からの移行
 - `python3 dev/test/suspend.py` — 出場停止・負傷の選手がいると試合に進めず、復帰しても勝手にメンバーに戻らないこと
 - `python3 dev/test/retire.py` — 引退選手のポップアップ（黒板/ホワイトボード）とシーズン移行
+- `python3 dev/test/iphones.py` — タイトルとクラブ画面が現行の全iPhone（SE〜Pro Max、ホーム画面アプリとSafari）で1画面に収まり、ノッチ・ホームバーに掛からないこと（安全領域は px で再現。`KTK_FONTS` に @fontsource を指すと本物の書体でスクショ）
 - `python3 dev/test/presets.py` — 戦術の保存・読み込み（出場停止の選手が入ったまま読み込まれ、試合に進めないこと）
 - `python3 dev/test/cups.py` — カップ戦の表示・PK・大一番（燃えている選手）・カウンター・スカウト
 - 番狂わせの目安（4〜6シーズン回す）: 下位5クラブの上位5クラブ相手の勝率 18〜22%、1試合2.4〜2.6点、優勝勝点 74〜88
