@@ -67,11 +67,12 @@ async def main():
                 problems = []
                 want = 'fixed' if mode == 'safari' else 'absolute'
                 if m['pos'] != want: problems.append(f"title is {m['pos']}, want {want}")
-                exp = h - bot - 10 + (0 if mode == 'safari' else 1)  # home-screen app: screen height + 1px
+                exp = h - 10 + (0 if mode == 'safari' else 1)  # 10px frame like the top (home-screen app: screen height + 1px)
                 if abs(m['board'][1] - exp) > 1: problems.append(f"board bottom {m['board'][1]:.0f}, want {exp}")
                 if m['sh'] > (m['ih'] if mode == 'safari' else h + 1) + 1: problems.append(f"scrolls {m['sh']}>{m['ih']}")
                 if m['sw'] > m['iw'] + 1: problems.append('horizontal scroll')
-                if m['board'][1] > h - bot + 1.5: problems.append(f"board bottom {m['board'][1]:.0f} under home bar ({h - bot})")
+                if m['linksBottom'] > h - bot + 0.5: problems.append(f"links {m['linksBottom']:.0f} under the home bar ({h - bot})")
+                if abs((m['board'][0] - top) - (h - m['board'][1])) > 1.5: problems.append(f"frame above {m['board'][0] - top:.0f} / below {h - m['board'][1]:.0f} differ")
                 if m['board'][0] < top - 0.5: problems.append(f"board top {m['board'][0]:.0f} under notch ({top})")
                 if m['logoBottom'] > m['menuTop'] - 8: problems.append(f"logo {m['logoBottom']:.0f} touches buttons {m['menuTop']:.0f}")
                 if m['linksBottom'] > m['board'][1]: problems.append('links outside the board')
