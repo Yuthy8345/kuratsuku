@@ -400,9 +400,29 @@ function viewTactics() {
     <div class="ctlrow"><label>攻撃の姿勢</label>${seg('ment', c.tac.ment, [['def', '守備的'], ['bal', 'バランス'], ['att', '攻撃的']])}</div>
     <div class="ctlrow"><label>プレスの強度（高いほど中盤で優位、ただし消耗）</label>${seg('press', c.tac.press, [['low', '低'], ['mid', '中'], ['high', '高']])}</div>
     <button class="toggle" role="switch" aria-checked="${!!S.settings.autoSubs}" data-act="autoSubs"><span><b>交代はおまかせ</b><br><span class="small muted">オフにすると試合中に自分で交代を選びます</span></span><span class="sw"></span></button>
-    <h3 class="sec-h">ベンチ<small>コンディションと能力から自動で9人</small></h3>
-    <ul class="list">${c.tac.bench.map(id => prow(S.players[id])).join('') || '<li class="empty">控え選手がいません</li>'}</ul>
+    <h3 class="sec-h">ベンチ（${c.tac.bench.length}人）<small>${c.tac.benchManual ? '自分で選んだメンバー' : 'おまかせ（能力とコンディション順）'}</small></h3>
+    <p class="fine" style="margin:-6px 0 0">選手をタップすると、ベンチ外の選手と入れ替えられます。</p>
+    <ul class="list">${c.tac.bench.map(id => benchRow(S.players[id])).join('') || '<li class="empty">控え選手がいません</li>'}</ul>
+    ${c.tac.benchManual ? '<button class="btn ghost block" data-act="benchAuto">ベンチをおまかせに戻す</button>' : ''}
     <div class="subnav"><button class="btn primary block" data-act="autoXI">おまかせでベストメンバーを組む</button></div>`;
+}
+function benchRow(p) {
+  return prow(p).replace('data-act="player"', 'data-act="benchPick"').replace('<span class="chip">ベンチ</span>', '');
+}
+function sheetBench(outId) {
+  const c = S.clubs[S.my]; const o = S.players[outId];
+  sheetState = { type: 'bench', id: outId };
+  const reserves = E.squad(S, S.my).filter(p => !c.tac.xi.includes(p.id) && !c.tac.bench.includes(p.id))
+    .sort((a, b) => (E.available(b) - E.available(a)) || (POS_ORD[a.pos] - POS_ORD[b.pos]) || b.ovr - a.ovr);
+  const row = p => {
+    const av = E.available(p);
+    const st = !av ? (p.inj > 0 ? `<span class="chip warn">負傷 ${p.inj}日</span>` : '<span class="chip warn">出場停止</span>') : '';
+    return `<li><button class="prow" data-act="benchIn" data-id="${p.id}" ${av ? '' : 'disabled style="opacity:.5"'}><span class="no">${p.num}</span><span class="pos pos-${p.pos}">${p.pos}</span><span class="nm"><b>${esc(p.name)}</b><span>${E.age(p, S.date)}歳・${Math.round(p.cond)}% ${st}</span></span><span class="rt"><span class="ovr ${oc(p.ovr)}">${E.ovr(p)}</span>${condBar(p.cond)}</span></button></li>`;
+  };
+  openSheet(`<div class="eyebrow">ベンチの入れ替え</div><h2>${esc(o.name)}（${o.pos}・${E.ovr(o)}）と入れ替える選手</h2>
+    <p class="fine">ベンチ外の選手です。GKがベンチにいなくなる場合は、自動でGKを1人残します。</p>
+    <ul class="list">${reserves.map(row).join('') || '<li class="empty">ベンチ外の選手がいません</li>'}</ul>`,
+    `<button class="btn ghost block" data-act="player" data-id="${o.id}">${esc(o.short)}の詳細を見る</button><button class="btn ghost block" data-act="closeSheet">閉じる</button>`);
 }
 function reslot(newForm) {
   const c = S.clubs[S.my]; const keep = c.tac.xi.filter(Boolean);
@@ -649,7 +669,7 @@ function closeSheet() {
 function refreshSheet() {
   if (!sheetState) return;
   const s = sheetState;
-  if (s.type === 'player') sheetPlayer(s.id); else if (s.type === 'train') sheetTrain(s.id); else if (s.type === 'slot') sheetSlot(s.i); else if (s.type === 'pre') sheetPrematch(s.id); else if (s.type === 'msub') sheetMatchTactics();
+  if (s.type === 'player') sheetPlayer(s.id); else if (s.type === 'train') sheetTrain(s.id); else if (s.type === 'bench') sheetBench(s.id); else if (s.type === 'slot') sheetSlot(s.i); else if (s.type === 'pre') sheetPrematch(s.id); else if (s.type === 'msub') sheetMatchTactics();
 }
 let toastT = null;
 function toast(msg) { toastEl.textContent = msg; toastEl.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => toastEl.classList.remove('on'), 2600); }
@@ -874,12 +894,23 @@ const ACT = {
   press(d) { S.clubs[S.my].tac.press = d.k; persist(false); render(); },
   autoSubs() { S.settings.autoSubs = !S.settings.autoSubs; persist(false); if (sheetState && sheetState.type === 'msub') refreshSheet(); else render(); },
   autoXI() { E.autoLineup(S, S.my); persist(false); render(); toast('ベストメンバーを組みました'); },
+  benchPick(d) { sheetBench(Number(d.id)); },
+  benchIn(d) {
+    const outId = sheetState && sheetState.id; const o = S.players[outId], p = S.players[d.id];
+    if (E.benchSwap(S, outId, Number(d.id))) { persist(false); closeSheet(); render(); toast(`${p.short}をベンチに入れました（${o.short}はベンチ外）`); }
+  },
+  benchAuto() { const c = S.clubs[S.my]; c.tac.benchManual = false; E.autoBench(S, S.my, true); persist(false); render(); toast('ベンチをおまかせに戻しました'); },
   slot(d) { sheetSlot(Number(d.i)); },
   assign(d) {
     const c = S.clubs[S.my]; const i = Number(d.i), pid = Number(d.id); const xi = c.tac.xi; const j = xi.indexOf(pid);
     if (j === i) { closeSheet(); return; }
-    if (j >= 0) { const t = xi[i]; xi[i] = xi[j]; xi[j] = t; } else xi[i] = pid;
-    E.autoBench(S, S.my); persist(false); closeSheet(); render();
+    if (j >= 0) { const t = xi[i]; xi[i] = xi[j]; xi[j] = t; }
+    else {
+      const old = xi[i]; const bi = c.tac.bench.indexOf(pid);
+      xi[i] = pid;
+      if (bi >= 0) { if (old) c.tac.bench[bi] = old; else c.tac.bench.splice(bi, 1); }
+    }
+    E.validateLineup(S, S.my); persist(false); closeSheet(); render();
   },
   lgView(d) { UI.lg.view = d.k; render(); },
   round(d) { UI.lg.round = Math.max(1, Math.min(38, (UI.lg.round || curRound()) + Number(d.d))); render(); },

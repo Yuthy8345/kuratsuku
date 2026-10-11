@@ -453,15 +453,37 @@ function autoLineup(S, cid, opts) {
     if (best) { xi[i] = best.id; used.add(best.id); }
   }
   c.tac.xi = xi;
-  autoBench(S, cid);
+  c.tac.benchManual = false;
+  autoBench(S, cid, true);
 }
-function autoBench(S, cid) {
+const BENCH_SIZE = 9;
+// force=true rebuilds the whole bench; otherwise a manager-picked bench is kept and only topped up
+function autoBench(S, cid, force) {
   const c = S.clubs[cid];
   const rest = squad(S, cid).filter(p => available(p) && !c.tac.xi.includes(p.id)).sort((a, b) => b.ovr - a.ovr);
-  const bench = [];
-  const gk = rest.find(p => p.pos === 'GK'); if (gk) bench.push(gk.id);
-  for (const p of rest) { if (bench.length >= 9) break; if (p.pos === 'GK') continue; bench.push(p.id); }
+  let bench = [];
+  if (c.tac.benchManual && !force) {
+    bench = (c.tac.bench || []).filter(id => rest.some(p => p.id === id)).slice(0, BENCH_SIZE);
+    if (!bench.some(id => S.players[id].pos === 'GK')) { const gk = rest.find(p => p.pos === 'GK' && !bench.includes(p.id)); if (gk) bench.length >= BENCH_SIZE ? bench[bench.length - 1] = gk.id : bench.push(gk.id); }
+    for (const p of rest) { if (bench.length >= BENCH_SIZE) break; if (!bench.includes(p.id) && p.pos !== 'GK') bench.push(p.id); }
+  } else {
+    const gk = rest.find(p => p.pos === 'GK'); if (gk) bench.push(gk.id);
+    for (const p of rest) { if (bench.length >= BENCH_SIZE) break; if (p.pos === 'GK') continue; bench.push(p.id); }
+  }
   c.tac.bench = bench;
+}
+// manager swaps one bench player (outId) for a reserve or starter (inId)
+function benchSwap(S, outId, inId) {
+  const c = S.clubs[S.my]; const p = S.players[inId];
+  if (!p || p.club !== S.my || !available(p)) return false;
+  const bi = c.tac.bench.indexOf(outId);
+  const xi = c.tac.xi.indexOf(inId);
+  if (xi >= 0) { c.tac.xi[xi] = outId >= 0 && bi >= 0 ? outId : null; }
+  if (bi >= 0) c.tac.bench[bi] = inId; else if (!c.tac.bench.includes(inId)) c.tac.bench.push(inId);
+  c.tac.bench = c.tac.bench.filter((id, i, a) => a.indexOf(id) === i && !c.tac.xi.includes(id));
+  c.tac.benchManual = true;
+  validateLineup(S, S.my);
+  return true;
 }
 function clubRating(S, cid) {
   const c = S.clubs[cid];
@@ -1148,7 +1170,7 @@ const API = {
   D, jdate, FORMATIONS, ROLE, MENTALITY, PRESS, TRAINING, FACILITY, ATTR, ATTR_SHOW, FOCUS, INTENS,
   calcOvr, roleScore, bestRoles, devPreview, migrate, weekly, power, presStars, presLabel,
   newGame, seasonForDate, seasonLabel, squad, strength, table, position, age, ovr, value, wage, money, attrs,
-  autoLineup, autoBench, clubRating, validateLineup, effective, posPenalty, available, teamRating,
+  autoLineup, autoBench, benchSwap, clubRating, validateLineup, effective, posPenalty, available, teamRating,
   createMatch, stepMatch, simulateFull, finishMatch, doSub, benchOptions, onPitch, setMentality, bestSubFor,
   advance, nextDay, simAIToday, myFixtureToday, nextMyFixture, todaysFixtures, inWindow, windowEnd, nextWindowStart,
   acceptOffer, rejectOffer, bid, marketList, ensureFreeAgents, upgrade, facCost, takeJob, rollover, endSeason, news, fire,
