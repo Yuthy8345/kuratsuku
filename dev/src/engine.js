@@ -79,7 +79,14 @@ const DP_GEN = { GK: { GK: 1 }, DF: { CB: 5, SB: 4 }, MF: { DMF: 3, CMF: 3, OMF:
 const DP2_GAP = 15;      // a near position (dp2) counts as this much less aptitude
 const LEARN_MAX = 95;    // training stops here (本職 = 100)
 const PLAY_MAX = 85;     // match experience alone takes a position this far
-const MENTALITY = { def: { own: 0.86, opp: 0.88, jp: '守備的' }, bal: { own: 1, opp: 1, jp: 'バランス' }, att: { own: 1.14, opp: 1.1, jp: '攻撃的' } };
+// own: my chance rate, opp: the opponent's chance rate when I play this way,
+// sq: how much of a stronger opponent's attacking edge a deep block takes away, q: finishing of my chances
+const MENTALITY = {
+  def: { own: 0.88, opp: 0.86, sq: 0.5, jp: '守備的', sub: '引いて守る。格上ほど効く' },
+  ctr: { own: 0.84, opp: 0.9, sq: 0.4, q: 1.35, jp: 'カウンター', sub: '守って速攻。数は少ないが決まりやすい' },
+  bal: { own: 1, opp: 1, jp: 'バランス', sub: '' },
+  att: { own: 1.14, opp: 1.1, jp: '攻撃的', sub: '押し込む。打ち合いになりやすい' },
+};
 const PRESS = { low: { mid: -1.5, drain: -3, jp: '低' }, mid: { mid: 0, drain: 0, jp: '中' }, high: { mid: 1.8, drain: 5, jp: '高' } };
 const TRAINING = {
   bal: { jp: 'バランス', grow: 1.0, rec: 0 },
@@ -92,6 +99,7 @@ const FACILITY = {
   youth: { jp: 'ユース', desc: '昇格してくる若手の質と人数が上がる' },
   stadium: { jp: 'スタジアム設備', desc: '観客動員と入場料収入が増える' },
   medical: { jp: 'メディカル', desc: '疲労回復が早まり、ケガが減る' },
+  scout: { jp: 'スカウト網', desc: 'スカウトが見つける若手の伸びしろが大きくなる' },
 };
 // J2 clubs (for promotion). Squads are generated (fictional names).
 const J2 = [
@@ -297,7 +305,14 @@ function migrate(S, DATA) {
     }
     for (const cid of S.order) if (cid !== S.my && S.clubs[cid]) autoLineup(S, cid);
   }
-  S.v = Math.max(S.v || 1, 3);
+  // v4: cups (天皇杯・Lカップ), J2 clubs keep their own ids, scouting facility
+  if ((S.v || 1) < 4) {
+    for (const p of Object.values(S.players)) if (typeof p.club === 'string' && p.club.startsWith('J2:')) p.club = p.club.slice(3);
+    for (const c of Object.values(S.clubs)) if (c.fac && c.fac.scout == null) c.fac.scout = 1;
+    if (!S.cups && !S.seasonEnd) { setupCups(S); news(S, '今季から天皇杯とLカップが開催される。組み合わせはリーグ画面の「カップ戦」から。', 'big'); }
+    for (const f of todaysFixtures(S)) hypeMatch(S, f);
+  }
+  S.v = Math.max(S.v || 1, 4);
   return S;
 }
 // how good the player is in each detailed position (rested, form left out)
@@ -320,7 +335,9 @@ function devWeek(S, p, dry) {
   let g = 0;
   if (gap > 0) {
     const k = a <= 19 ? 0.055 : a <= 22 ? 0.045 : a <= 25 ? 0.03 : 0.015;
-    const playing = p.st.mins > 0 ? Math.min(1.3, 0.75 + p.st.mins / 2000) : 0.75;
+    // playing time: regulars grow faster, young regulars much faster
+    const sh = playShare(S, p);
+    const playing = sh == null ? 1 : a <= 23 ? 0.75 + sh * 0.9 : 0.8 + sh * 0.45;
     g = gap * k / 4.33 * (1 + (c.fac.train - 2) * 0.12) * (isMy ? TRAINING[S.training].grow : 1) * it.g * playing;
     if (p.learn) g *= 0.75;
   }
@@ -394,9 +411,11 @@ function newGame(DATA, clubId, managerName, todayISO) {
     S.players[p.id] = { ...p, cond: 100, form: 6.5, inj: 0, sus: 0, ycAcc: 0, listed: false, st: blankStats(), hist: [], joined: DATA.start };
     initAttrs(S.players[p.id]);
   }
-  S.v = 3; S.presV = 4;
+  S.v = 4; S.presV = 4;
   for (const id of S.order) autoLineup(S, id);
   S.fixtures = genFixtures(S.order, DATA.round1, sy);
+  setupCups(S);
+  for (const f of todaysFixtures(S)) hypeMatch(S, f);
   ensureFreeAgents(S);
   setSponsors(S);
   setExpectations(S);
@@ -405,17 +424,17 @@ function newGame(DATA, clubId, managerName, todayISO) {
   return S;
 }
 function blankStats() { return { apps: 0, g: 0, a: 0, yc: 0, rc: 0, rt: 0, mins: 0 }; }
-function addClub(S, c) {
+function addClub(S, c, guest) {
   const startFunds = [0, 30000, 50000, 80000, 120000, 180000][c.tier];
   S.clubs[c.id] = {
     id: c.id, name: c.name, short: c.short, abbr: c.abbr, c1: c.c1, c2: c.c2, stadium: c.stadium, cap: c.cap,
     coach: c.coach || '', tier: c.tier, fan: c.fan, area: c.area,
     pres: c.pres || 2, titles: Object.assign({ j1: 0, lc: 0, ec: 0, acl: 0 }, c.titles || {}), o10: !!c.o10,
-    funds: startFunds, fac: { train: 2, youth: 2, stadium: 2, medical: 2 },
+    funds: startFunds, fac: { train: 2, youth: 2, stadium: 2, medical: 2, scout: 1 },
     tac: { form: FORMATIONS[c.form] ? c.form : '4-4-2', ment: 'bal', press: 'mid', xi: [], bench: [] },
     fin: { gate: 0, spon: 0, wages: 0, trans: 0, prize: 0, fac: 0 },
   };
-  if (!S.order.includes(c.id)) S.order.push(c.id);
+  if (!guest && !S.order.includes(c.id)) S.order.push(c.id);
 }
 function squad(S, cid) { return Object.values(S.players).filter(p => p.club === cid); }
 function strength(S, cid) {
@@ -520,7 +539,7 @@ function effective(p, role, cond) {
   const c = cond == null ? p.cond : cond;
   const formAdj = clamp((p.form - 6.5) * 1.2, -2, 2);
   const fit = p.at ? clamp((roleScore(p, role) - p.ovr) * 0.4, -2.5, 2.5) : 0;
-  return p.ovr + posPenalty(p, role) + fit - Math.max(0, 100 - c) * 0.12 + formAdj;
+  return p.ovr + posPenalty(p, role) + fit - Math.max(0, 100 - c) * 0.12 + formAdj + (p.hot ? p.hot.b : 0);
 }
 function autoLineup(S, cid, opts) {
   const c = S.clubs[cid];
@@ -697,10 +716,13 @@ function createMatch(S, fx) {
     fid: fx.id, min: 0, half: 1, done: false, h: sideFor(S, fx.h), a: sideFor(S, fx.a), hg: 0, ag: 0,
     ev: [], st: { h: { sh: 0, ot: 0, pos: 0, fo: 0 }, a: { sh: 0, ot: 0, pos: 0, fo: 0 } },
     pm: {}, mom: 0, ball: { x: 50, y: 50, side: 'h' }, userSide: fx.h === S.my ? 'h' : fx.a === S.my ? 'a' : null,
-    lg: leagueAvg(S),
+    lg: leagueAvg(S), cup: fx.cup || null, neutral: !!fx.neutral,
   };
   for (const k of ['h', 'a']) for (const s of M[k].slots) if (s.pid) M.pm[s.pid] = { side: k, role: s.role, rt: 6.0, g: 0, a: 0, yc: 0, rc: 0, on: 0, off: null, inj: 0 };
-  M.ev.push({ m: 0, t: 'ko', text: `キックオフ　${S.clubs[fx.h].short} vs ${S.clubs[fx.a].short}` });
+  M.ev.push({ m: 0, t: 'ko', text: `キックオフ　${S.clubs[fx.h].short} vs ${S.clubs[fx.a].short}` + (fx.cup ? `（${fxLabel(fx)}）` : '') });
+  // players on fire for this match
+  const hy = hypeMatch(S, fx); M.hot = {};
+  for (const h of hy.hot) { const p = S.players[h.pid]; if (!p || !p.hot) continue; M.hot[h.pid] = h.why; if (M.pm[h.pid] || M[h.side].bench.includes(h.pid)) M.ev.push({ m: 0, t: 'hot', side: h.side, pid: h.pid, text: `【覚醒】${p.name}が燃えている！（${h.why}）` }); }
   return M;
 }
 function onPitch(side) { return side.slots.filter(s => s.pid && !side.sent.includes(s.pid)); }
@@ -715,19 +737,28 @@ function stepMatch(S, M) {
   // live ratings (recomputed with current cond and red cards)
   const live = side => {
     const sd = { ...side, slots: side.slots.map(s => ({ ...s, pid: side.sent.includes(s.pid) ? null : s.pid })) };
-    return teamRating(S, sd);
+    const r = teamRating(S, sd);
+    // a player on fire lifts the whole side
+    if (sd.slots.some(s => s.pid && S.players[s.pid] && S.players[s.pid].hot)) { r.att += HOT_TEAM; r.mid += HOT_TEAM * 0.6; }
+    return r;
   };
   const rh = live(H), ra = live(A);
-  const pH = 1 / (1 + Math.exp(-((rh.mid - ra.mid) + 1.0) / 7));
+  const pH = 1 / (1 + Math.exp(-((rh.mid - ra.mid) + 1.0) / 8));
   M.st.h.pos += pH; M.st.a.pos += 1 - pH; M.pH = pH;
   const ms = MENTALITY, lg = M.lg;
-  const base = 0.101;
-  const rate = (r, o, p, ownM, oppM) => base * (1 + (p - 0.5) * 0.4) * Math.exp(((r.att - lg.att) - (o.def - lg.def)) / 37) * Math.pow(r.attV / 4.1, 0.35) * Math.pow(o.defV / 4.6, -0.35) * ms[ownM].own * ms[oppM].opp;
+  const base = 0.109;
+  const rate = (r, o, p, ownM, oppM) => {
+    let adv = (r.att - lg.att) - (o.def - lg.def);
+    if (adv > 0 && ms[oppM].sq) adv *= 1 - ms[oppM].sq; // a deep block blunts a stronger attack
+    let v = base * (1 + (p - 0.5) * 0.4) * Math.exp(adv / 44) * Math.pow(r.attV / 4.1, 0.35) * Math.pow(o.defV / 4.6, -0.35) * ms[ownM].own * ms[oppM].opp;
+    if (ownM === 'ctr' && oppM === 'att') v *= 1.2; // space behind an attacking side
+    return v;
+  };
   const lateBoost = (M.min > 80 ? 1.08 : 1);
   // 終盤、リードされている／追いつきたい名門は粘る
   const grit = (sd, own, opp) => M.min >= 75 && own <= opp ? 1 + ((sd.pres || 2) - 3) * 0.04 : 1;
-  const rH = rate(rh, ra, pH, H.ment, A.ment) * lateBoost * (1.03 + (H.fan || 2) * 0.01) * grit(H, M.hg, M.ag);
-  const rA = rate(ra, rh, 1 - pH, A.ment, H.ment) * lateBoost * 0.97 * grit(A, M.ag, M.hg);
+  const rH = rate(rh, ra, pH, H.ment, A.ment) * lateBoost * (M.neutral ? 1 : 1.05 + (H.fan || 2) * 0.01) * grit(H, M.hg, M.ag);
+  const rA = rate(ra, rh, 1 - pH, A.ment, H.ment) * lateBoost * (M.neutral ? 1 : 0.95) * grit(A, M.ag, M.hg);
   // condition drain
   for (const sd of [H, A]) {
     const drain = 0.19 + PRESS[sd.press].drain * 0.012;
@@ -774,7 +805,11 @@ function stepMatch(S, M) {
   if (M.min === 45) { push({ t: 'ht', text: `前半終了　${M.hg} - ${M.ag}` }); M.half = 2; }
   if (M.min >= 90 + (M.extra || 0)) {
     if (M.extra == null) { M.extra = ri(2, 5); }
-    else { M.done = true; push({ t: 'ft', text: `試合終了　${S.clubs[M.h.cid].short} ${M.hg} - ${M.ag} ${S.clubs[M.a.cid].short}` }); }
+    else {
+      M.done = true;
+      if (M.cup && M.hg === M.ag) { shootout(S, M); push({ t: 'pk', text: `PK戦 ${M.pk[0]}-${M.pk[1]}　${S.clubs[(M.pk[0] > M.pk[1] ? M.h : M.a).cid].short}が勝ち抜け` }); }
+      push({ t: 'ft', text: `試合終了　${S.clubs[M.h.cid].short} ${M.hg} - ${M.ag} ${S.clubs[M.a.cid].short}` + (M.pk ? `（PK ${M.pk[0]}-${M.pk[1]}）` : '') });
+    }
   }
   // ambient build-up text (for live view)
   if (!out.length && R() < 0.05) {
@@ -788,13 +823,13 @@ function chance(S, M, k, r, o, push) {
   const sd = M[k], opp = M[k === 'h' ? 'a' : 'h'];
   const shooters = onPitch(sd).filter(s => s.role !== 'GK');
   if (!shooters.length) return;
-  const sh = wpick(shooters, s => (ROLE[s.role].a * 3 + 0.15) * Math.pow(S.players[s.pid].ovr / 70, 3));
+  const sh = wpick(shooters, s => (ROLE[s.role].a * 3 + 0.15) * Math.pow(S.players[s.pid].ovr / 70, 3) * (S.players[s.pid].hot ? 2.2 : 1));
   const P = S.players[sh.pid];
   const atk = P.at ? P.at[0] : P.ovr;
   M.st[k].sh++;
   M.ball = { x: sh.x, y: 85, side: k };
   const shotSkill = (effective(P, sh.role, sd.cond[sh.pid]) * 0.5 + atk * 0.5);
-  const q = 0.112 * Math.exp((shotSkill - o.gk) / 30);
+  const q = 0.112 * Math.exp((shotSkill - o.gk) / 40) * (MENTALITY[sd.ment].q || 1);
   const onT = R() < 0.36 + (shotSkill - 65) * 0.006;
   const gkPid = (onPitch(opp).find(s => s.role === 'GK') || {}).pid;
   if (onT) M.st[k].ot++;
@@ -872,8 +907,12 @@ function simulateFull(S, M) { while (!M.done) stepMatch(S, M); return M; }
 function finishMatch(S, M) {
   const fx = S.fixtures.find(f => f.id === M.fid);
   fx.hg = M.hg; fx.ag = M.ag; fx.played = true;
+  if (M.pk) fx.pk = M.pk;
   fx.sc = M.ev.filter(e => e.t === 'goal' || e.t === 'red').map(e => [e.m, e.side, e.t === 'goal' ? 'g' : 'r', e.pid]);
-  const res = { h: M.hg > M.ag ? 'W' : M.hg < M.ag ? 'L' : 'D' };
+  const cup = !!fx.cup;
+  // in a cup tie the shootout decides who goes through
+  const hw = cup ? cupWinner(fx) === fx.h : null;
+  const res = { h: cup ? (hw ? 'W' : 'L') : M.hg > M.ag ? 'W' : M.hg < M.ag ? 'L' : 'D' };
   res.a = res.h === 'W' ? 'L' : res.h === 'L' ? 'W' : 'D';
   // serve existing suspensions (suspended players were not in this match)
   for (const cid of [fx.h, fx.a]) for (const p of squad(S, cid)) if (p.sus > 0 && !M.pm[p.id]) p.sus--;
@@ -887,34 +926,38 @@ function finishMatch(S, M) {
     if (p.pos === 'GK' || p.pos === 'DF') rt += conceded === 0 ? 0.4 : -0.1 * conceded;
     rt = clamp(Math.round(rt * 10) / 10, 3.5, 10);
     pm.final = rt;
-    p.st.apps++; p.st.g += pm.g; p.st.a += pm.a; p.st.mins += Math.max(1, mins); p.st.rt += rt;
+    if (cup) { p.cs = p.cs || { apps: 0, g: 0, a: 0 }; p.cs.apps++; p.cs.g += pm.g; p.cs.a += pm.a; p.st.mins += Math.max(1, mins); } // cup games: own record, but the minutes still help growth
+    else { p.st.apps++; p.st.g += pm.g; p.st.a += pm.a; p.st.mins += Math.max(1, mins); p.st.rt += rt; }
+    if (p.hot) delete p.hot;
     // playing out of position slowly gets a player used to it
     const dp = pm.role && ROLE[pm.role] ? ROLE[pm.role].dp : null;
     if (dp && dp !== 'GK' && p.pos !== 'GK' && mins >= 45 && dp !== ppOf(p)) { const cur = apt(p, dp); if (cur < PLAY_MAX) { p.ap = p.ap || {}; p.ap[dp] = Math.round(Math.min(PLAY_MAX, cur + 0.6) * 10) / 10; } }
     p.form = p.form * 0.6 + rt * 0.4;
     p.cond = Math.round(sd.cond[pidS] != null ? sd.cond[pidS] : p.cond - 10);
-    if (pm.yc && !pm.rc) { p.st.yc++; p.ycAcc++; if (p.ycAcc >= 4) { p.sus = 1; p.ycAcc = 0; if (p.club === S.my) news(S, `${p.name}は累積警告で次節出場停止。`, 'warn'); } }
+    if (pm.yc && !pm.rc && !cup) { p.st.yc++; p.ycAcc++; if (p.ycAcc >= 4) { p.sus = 1; p.ycAcc = 0; if (p.club === S.my) news(S, `${p.name}は累積警告で次節出場停止。`, 'warn'); } }
     if (pm.rc) { p.st.rc++; p.sus = Math.max(p.sus, pm.yc >= 2 ? 1 : 2); if (p.club === S.my) news(S, `${p.name}は退場処分で出場停止（${p.sus}試合）。`, 'warn'); }
     if (pm.inj) { p.inj = pm.inj; if (p.club === S.my) news(S, `${p.name}が負傷。全治およそ${pm.inj}日の見込み。`, 'warn'); }
   }
-  // finances: gate for home club
+  // finances: gate for home club (a final at 国立 is shared)
   const hc = S.clubs[fx.h];
-  const att = attendance(S, fx.h, fx.a);
+  let att = attendance(S, fx.h, fx.a);
+  if (cup) att = fx.neutral ? Math.round(NATIONAL.cap * (0.75 + R() * 0.2)) : Math.round(att * (fx.cr >= CUPS[fx.cup].rounds.length - 2 ? 0.9 : 0.55));
   fx.att = att;
   const gate = Math.round(att * (0.2 + hc.fac.stadium * 0.01));
-  hc.funds += gate; hc.fin.gate += gate;
+  if (fx.neutral) { for (const id of [fx.h, fx.a]) { S.clubs[id].funds += Math.round(gate / 2); S.clubs[id].fin.gate += Math.round(gate / 2); } }
+  else { hc.funds += gate; hc.fin.gate += gate; }
   // board
   if (M.userSide) {
     const k = M.userSide, opp = k === 'h' ? fx.a : fx.h;
     const myS = strength(S, S.my), opS = strength(S, opp) - (k === 'h' ? 1 : -1);
     const expPts = clamp(1.35 + (myS - opS) * 0.18, 0.4, 2.4);
     const pts = res[k] === 'W' ? 3 : res[k] === 'D' ? 1 : 0;
-    S.board = clamp(Math.round(S.board + (pts - expPts) * 3.2), 0, 100);
-    const mg = k === 'h' ? M.hg : M.ag, og = k === 'h' ? M.ag : M.hg;
-    S.lastResult = { fid: fx.id, res: res[k], text: `${S.clubs[fx.h].short} ${M.hg}-${M.ag} ${S.clubs[fx.a].short}` };
+    S.board = clamp(Math.round(S.board + (pts - expPts) * (cup ? 1.6 : 3.2)), 0, 100);
+    const pk = M.pk ? `（PK ${M.pk[0]}-${M.pk[1]}）` : '';
+    S.lastResult = { fid: fx.id, res: res[k], text: `${S.clubs[fx.h].short} ${M.hg}-${M.ag} ${S.clubs[fx.a].short}${pk}` };
     const potm = Object.entries(M.pm).filter(([, pm]) => pm.side === k).sort((a, b) => b[1].final - a[1].final)[0];
-    news(S, `第${fx.r}節　${S.clubs[fx.h].short} ${M.hg}-${M.ag} ${S.clubs[fx.a].short}（${res[k] === 'W' ? '勝利' : res[k] === 'D' ? '引き分け' : '敗戦'}）` + (potm ? `　チーム最高評価：${S.players[potm[0]].name}（${potm[1].final.toFixed(1)}）` : ''), res[k] === 'W' ? 'win' : res[k] === 'L' ? 'loss' : 'draw');
-    void mg; void og;
+    const giant = res[k] === 'W' && power(S, opp) - power(S, S.my) >= 4 ? '　ジャイアントキリング！' : '';
+    news(S, `${fxLabel(fx)}　${S.clubs[fx.h].short} ${M.hg}-${M.ag} ${S.clubs[fx.a].short}${pk}（${res[k] === 'W' ? (cup ? '勝ち抜け' : '勝利') : res[k] === 'D' ? '引き分け' : '敗戦'}）${giant}` + (potm ? `　チーム最高評価：${S.players[potm[0]].name}（${potm[1].final.toFixed(1)}）` : ''), res[k] === 'W' ? 'win' : res[k] === 'L' ? 'loss' : 'draw');
   }
   M.applied = true;
   return fx;
@@ -956,7 +999,7 @@ function simAIToday(S) {
     const M = createMatch(S, f); simulateFull(S, M); finishMatch(S, M);
   }
 }
-function seasonOver(S) { return S.fixtures.every(f => f.played); }
+function seasonOver(S) { return S.fixtures.every(f => f.played) && cupsDone(S); }
 
 // Advance until something needs the manager. Returns a stop descriptor.
 function advance(S, maxDays) {
@@ -988,21 +1031,33 @@ function nextDay(S) {
     const med = c.fac.medical;
     const mine = p.club === S.my;
     const it = INTENS[mine ? (p.ti || 'norm') : 'norm'];
+    if (p.hot && p.hot.d !== S.date) delete p.hot;
     let rec = 6 + med * 0.6 + (mine ? TRAINING[S.training].rec + it.rec : 0);
     if (age(p, S.date) >= 31) rec -= 1;
     p.cond = Math.min(100, p.cond + rec);
     if (mine && it.inj && p.inj <= 0 && R() < it.inj * (1.15 - med * 0.06)) { p.inj = ri(3, 14); news(S, `${p.name}がハードトレーニング中に負傷。全治およそ${p.inj}日。`, 'warn'); }
     if (p.inj > 0) { p.inj--; if (p.inj === 0 && p.club === S.my) news(S, `${p.name}が負傷から復帰。`, 'info'); }
   }
-  for (const it of S.inbox) if (!it.done && it.exp && S.date > it.exp) { it.done = true; it.result = 'expired'; }
+  for (const it of S.inbox) if (!it.done && it.exp && S.date > it.exp) { it.done = true; it.result = 'expired'; scoutExpire(S, it); }
+  scoutReturns(S);
   if (D.dow(S.date) === 1) weekly(S);
   if (D.d(S.date) === 1) monthly(S);
   if (isIn) transferDay(S);
   // board patience
   if (S.board <= 8 && S.fixtures.filter(f => f.played && (f.h === S.my || f.a === S.my)).length >= 10) fire(S, '成績不振による解任');
-  // AI lineups refresh (cheap): before each matchday
-  for (const cid of S.order) if (cid !== S.my && S.fixtures.some(f => f.date === S.date && !f.played && (f.h === cid || f.a === cid))) autoLineup(S, cid, { rotate: true });
-  if (S.fixtures.some(f => f.date === S.date && !f.played && (f.h === S.my || f.a === S.my))) validateLineup(S, S.my);
+  matchdayPrep(S);
+}
+// the morning of a matchday: cup draws, who is on fire, and the other clubs' team sheets and game plans
+function matchdayPrep(S) {
+  progressCups(S);
+  const today = todaysFixtures(S);
+  for (const f of today) hypeMatch(S, f);
+  for (const f of today) for (const [cid, opp] of [[f.h, f.a], [f.a, f.h]]) {
+    if (cid === S.my || !S.clubs[cid]) continue;
+    autoLineup(S, cid, { rotate: true });
+    S.clubs[cid].tac.ment = aiMentality(S, cid, opp);
+  }
+  if (today.some(f => f.h === S.my || f.a === S.my)) validateLineup(S, S.my);
 }
 function monthly(S) {
   // wages & sponsors for every club
@@ -1066,6 +1121,7 @@ function moveP(S, p, toCid, fee) {
   if (from) { from.funds += fee; from.fin.trans += fee; from.tac.xi = from.tac.xi.map(x => x === p.id ? null : x); from.tac.bench = from.tac.bench.filter(x => x !== p.id); }
   if (to) { to.funds -= fee; to.fin.trans -= fee; }
   const oldClub = p.club;
+  if (S.clubs[oldClub]) p.prev = oldClub; // for 古巣対決
   p.club = toCid; p.listed = false; p.joined = S.date; p.cond = Math.min(p.cond, 90);
   // shirt number
   const used = new Set(squad(S, toCid).filter(x => x.id !== p.id).map(x => x.num));
@@ -1193,6 +1249,295 @@ function takeJob(S, cid) {
   news(S, `${S.clubs[cid].name}の新監督に就任。目標は「${S.clubs[cid].target.jp}」。`, 'big');
 }
 
+/* ---------- special matches: derbies, six-pointers, revenge, cup ties ---------- */
+// In a big game one player may catch fire for that match only (more often for the underdog).
+const HOT_BOOST = 12, HOT_TEAM = 1.5;
+const RIVALRY = [
+  ['kawasakif', 'fctokyo', '多摩川クラシコ'], ['gosaka', 'cosaka', '大阪ダービー'], ['yokohamafm', 'yokohamafc', '横浜ダービー'],
+  ['chiba', 'kashiwa', '千葉ダービー'], ['kashima', 'mito', '茨城ダービー'], ['shimizu', 'iwata', '静岡ダービー'], ['sendai', 'yamagata', 'みちのくダービー'],
+];
+const REGION = { fukuoka: '九州', nagasaki: '九州', tosu: '九州', oita: '九州' };
+function rivalry(S, a, b) {
+  for (const [x, y, n] of RIVALRY) if ((a === x && b === y) || (a === y && b === x)) return n;
+  if (REGION[a] && REGION[a] === REGION[b]) return REGION[a] + 'ダービー';
+  const A = S.clubs[a], B = S.clubs[b];
+  if (A && B && A.area && A.area === B.area) return A.area + 'ダービー';
+  return null;
+}
+function bigGame(p) { return hash(p.name + '|' + p.birth) % 9 === 0; } // 大舞台に強い（1割ほど）
+function formerClubs(p) {
+  const s = new Set((p.hist || []).map(h => h.c).filter(c => c && c !== p.club));
+  if (p.prev && p.prev !== p.club) s.add(p.prev);
+  return s;
+}
+function lastMeeting(S, a, b) {
+  return S.fixtures.filter(f => f.played && ((f.h === a && f.a === b) || (f.h === b && f.a === a))).sort((x, y) => y.date.localeCompare(x.date))[0];
+}
+function matchStory(S, f) {
+  const tags = [];
+  const riv = rivalry(S, f.h, f.a); if (riv) tags.push({ k: 'derby', jp: riv, w: 1 });
+  if (f.cup) {
+    const last = CUPS[f.cup].rounds.length - 1;
+    tags.push({ k: 'cup', jp: fxLabel(f), w: f.cr === last ? 1.2 : f.cr === last - 1 ? 0.8 : 0.4 });
+  } else if (f.r >= 10) {
+    const t = table(S); const n = t.length;
+    const ph = t.findIndex(r => r.id === f.h) + 1, pa = t.findIndex(r => r.id === f.a) + 1;
+    if (ph && pa && Math.abs(ph - pa) <= 3) {
+      if (Math.max(ph, pa) <= 5) tags.push({ k: 'top', jp: '上位対決', w: 0.8 });
+      else if (Math.min(ph, pa) > n - 6) tags.push({ k: 'low', jp: '残留争いの直接対決', w: 0.8 });
+    }
+  }
+  return tags;
+}
+// decided once per fixture on its morning; hot players get p.hot for that day
+function hypeMatch(S, f) {
+  if (f.hype) return f.hype;
+  const tags = matchStory(S, f);
+  const hy = { tags: tags.map(t => t.jp), hot: [] };
+  const W0 = tags.reduce((a, t) => a + t.w, 0);
+  for (const [cid, opp] of [[f.h, f.a], [f.a, f.h]]) {
+    if (!S.clubs[cid] || !S.clubs[opp]) continue;
+    const gap = power(S, opp) - power(S, cid);
+    const under = clamp(1 + gap / 6, 0.4, 2.2);
+    const lm = lastMeeting(S, cid, opp);
+    const lost = !!lm && (lm.h === cid ? lm.ag - lm.hg : lm.hg - lm.ag) >= 3;
+    if (lost) hy.rev = (hy.rev || []).concat(cid);
+    const W = W0 + (lost ? 0.8 : 0) + (f.cup && gap >= 3 ? 0.6 : 0);
+    const pool = squad(S, cid).filter(p => available(p) && !p.retire);
+    const picked = new Set();
+    for (const p of pool) if (formerClubs(p).has(opp) && R() < 0.3 * under) picked.add(p);
+    if (W > 0 && R() < clamp(0.25 * W * under, 0, 0.75)) {
+      const top = pool.slice().sort((a, b) => b.ovr - a.ovr).slice(0, 18);
+      const p = top.length ? wpick(top, q => (bigGame(q) ? 4 : 1) * (q.pos === 'FW' ? 1.6 : q.pos === 'MF' ? 1.3 : q.pos === 'GK' ? 0.5 : 1) * Math.pow(q.ovr / 70, 2)) : null;
+      if (p) picked.add(p);
+    }
+    for (const p of picked) {
+      const why = formerClubs(p).has(opp) ? '古巣対決' : lost ? 'リベンジに燃える' : tags.length ? tags[0].jp : '大一番';
+      p.hot = { d: f.date, b: HOT_BOOST, why };
+      hy.hot.push({ pid: p.id, side: cid === f.h ? 'h' : 'a', why });
+    }
+  }
+  f.hype = hy;
+  return hy;
+}
+// the side's mood for this match (AI clubs): sit deep against a much stronger side, go for it against a weak one
+function aiMentality(S, cid, opp) {
+  const gap = power(S, opp) - power(S, cid);
+  if (gap >= 3) return R() < 0.6 ? 'ctr' : 'def';
+  if (gap <= -4) return R() < 0.2 ? 'att' : 'bal';
+  return 'bal';
+}
+
+/* ---------- cups: 天皇杯 and Lカップ (single matches, PK if level after 90 minutes) ---------- */
+const CUPS = {
+  ec: { jp: '天皇杯', en: "EMPEROR'S CUP", rounds: ['2回戦', '3回戦', '準々決勝', '準決勝', '決勝'], enr: ['R2', 'R3', 'QF', 'SF', 'FINAL'] },
+  lc: { jp: 'Lカップ', en: 'L CUP', rounds: ['1回戦', 'ラウンド16', '準々決勝', '準決勝', '決勝'], enr: ['R1', 'R16', 'QF', 'SF', 'FINAL'] },
+};
+const CUP_PRIZE = { win: 15000, final: 5000, sf: 2000, qf: 1000 }; // 万円
+const NATIONAL = { stadium: '国立競技場', cap: 67750 };
+function fxLabel(f) { return f.cup ? `${CUPS[f.cup].jp} ${CUPS[f.cup].rounds[f.cr]}` : `第${f.r}節`; }
+function nthDow(y, m, n, dow) { // n-th weekday of a month (n = -1: the last one)
+  if (n > 0) { let d = `${y}-${String(m).padStart(2, '0')}-01`; while (D.dow(d) !== dow) d = D.add(d, 1); return D.add(d, 7 * (n - 1)); }
+  let d = D.add(m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, '0')}-01`, -1);
+  while (D.dow(d) !== dow) d = D.add(d, -1);
+  return d;
+}
+function cupDefaultDates(sy, key) {
+  if (key === 'ec') return [nthDow(sy, 9, 3, 3), nthDow(sy, 10, 2, 3), nthDow(sy, 11, 3, 3), nthDow(sy, 12, 4, 3), `${sy + 1}-01-01`];
+  return [nthDow(sy, 9, 1, 3), nthDow(sy, 9, -1, 3), nthDow(sy, 10, -1, 3), nthDow(sy, 11, -1, 3), nthDow(sy + 1, 1, 2, 6)];
+}
+// round dates for this season: the usual midweeks, pushed later if they have already passed (a save started mid-season)
+function cupSchedule(S) {
+  const busy = new Set(S.fixtures.filter(f => !f.cup).map(f => f.date));
+  const taken = new Set(); const out = {};
+  for (const key of ['lc', 'ec']) {
+    const want = cupDefaultDates(S.season, key); const dates = [];
+    let prev = D.add(S.date, 2);
+    for (const w of want) {
+      let d = w > prev ? w : null;
+      if (!d) { d = D.add(prev, 5); while (D.dow(d) !== 3) d = D.add(d, 1); }
+      while (busy.has(d) || taken.has(d)) d = D.add(d, 7);
+      dates.push(d); taken.add(d); prev = D.add(d, 6);
+    }
+    out[key] = dates;
+  }
+  return out;
+}
+function genSquad(S, cid, base, plan) {
+  const used = new Set(squad(S, cid).map(p => p.num)); let n = 1;
+  for (const [pos, k] of plan) for (let i = 0; i < k; i++) {
+    while (used.has(n)) n++;
+    const a = ri(19, 33);
+    genPlayer(S, cid, { pos, age: a, ovr: Math.round(base + (i < 2 ? 3 : i < 5 ? 1 : -2) + R() * 4 - 2 - (a < 21 ? 5 : 0)), num: n, foreign: i === 0 && pos !== 'GK' && R() < 0.6 });
+    used.add(n);
+  }
+}
+const PLAN_FULL = [['GK', 3], ['DF', 9], ['MF', 10], ['FW', 6]];
+const PLAN_CUP = [['GK', 2], ['DF', 7], ['MF', 8], ['FW', 5]];
+// clubs from below J1 that enter the 天皇杯 (J2 clubs; relegated clubs keep their players)
+function cupGuests(S, n) {
+  const ids = J2.map(c => c.id).filter(id => !S.order.includes(id));
+  for (const id of Object.keys(S.clubs)) if (!S.order.includes(id) && !ids.includes(id)) ids.push(id);
+  const pr = id => (S.clubs[id] ? S.clubs[id].pres : (J2.find(c => c.id === id) || {}).pres) || 1.5;
+  const key = Object.fromEntries(ids.map(id => [id, pr(id) + R() * 1.2]));
+  const pickd = ids.sort((a, b) => key[b] - key[a]).slice(0, n);
+  for (const id of pickd) {
+    if (!S.clubs[id]) { const c = J2.find(x => x.id === id); addClub(S, { ...c, coach: '' }, true); }
+    if (squad(S, id).length < 18) genSquad(S, id, 62 + (S.clubs[id].tier || 2), PLAN_CUP);
+    autoLineup(S, id);
+  }
+  return pickd;
+}
+function shuffle(a) { const b = a.slice(); for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(R() * (i + 1)); [b[i], b[j]] = [b[j], b[i]]; } return b; }
+function setupCups(S) {
+  const dates = cupSchedule(S);
+  S.nextFid = Math.max(S.nextFid || 0, ...S.fixtures.map(f => f.id)) + 1;
+  const guests = cupGuests(S, 12);
+  S.cups = {
+    season: S.season,
+    ec: { r: 0, dates: dates.ec, alive: S.order.concat(guests), guests, out: {}, champ: null, runner: null },
+    lc: { r: 0, dates: dates.lc, alive: [...S.order], out: {}, champ: null, runner: null },
+  };
+  drawCupRound(S, 'ec'); drawCupRound(S, 'lc');
+}
+function drawCupRound(S, key) {
+  const cu = S.cups[key]; const r = cu.r; const last = CUPS[key].rounds.length - 1;
+  let pairs = [], rest = [];
+  const pairUp = arr => { const out = []; for (let i = 0; i + 1 < arr.length; i += 2) out.push([arr[i], arr[i + 1]]); if (arr.length % 2) rest.push(arr[arr.length - 1]); return out; };
+  if (key === 'lc' && r === 0 && cu.alive.length > 16) {
+    // the 8 weakest J1 clubs play a first round; the rest come in at the last 16
+    const ranked = cu.alive.slice().sort((a, b) => power(S, b) - power(S, a));
+    const k = (cu.alive.length - 16) * 2;
+    cu.bye = ranked.slice(0, ranked.length - k);
+    pairs = pairUp(shuffle(ranked.slice(ranked.length - k)));
+  } else if (key === 'ec' && r === 0) {
+    // clubs from below are drawn against J1 sides first
+    const g = shuffle(cu.alive.filter(c => !S.order.includes(c))), j = shuffle(cu.alive.filter(c => S.order.includes(c)));
+    while (g.length && j.length) pairs.push([g.pop(), j.pop()]);
+    pairs = pairs.concat(pairUp(g.concat(j)));
+  } else pairs = pairUp(shuffle(cu.alive));
+  cu.carry = rest;
+  const final = r === last;
+  for (const [x, y] of pairs) {
+    const [h, a] = power(S, x) <= power(S, y) ? [x, y] : [y, x]; // the smaller club hosts; the final is at 国立
+    S.fixtures.push({ id: S.nextFid++, cup: key, cr: r, date: cu.dates[r], h, a, hg: null, ag: null, played: false, neutral: final || undefined });
+    if (h === S.my || a === S.my) {
+      const opp = h === S.my ? a : h;
+      news(S, `${CUPS[key].jp} ${CUPS[key].rounds[r]}の相手は${S.clubs[opp].name}（${jdate(cu.dates[r], true)}・${final ? '国立' : h === S.my ? 'ホーム' : 'アウェイ'}）。`, 'info');
+    }
+  }
+}
+function cupWinner(f) { return f.hg > f.ag ? f.h : f.hg < f.ag ? f.a : f.pk ? (f.pk[0] > f.pk[1] ? f.h : f.a) : f.h; }
+// after a round is complete: pay out, then draw the next round (or crown the winner)
+function progressCups(S) {
+  if (!S.cups) return;
+  for (const key of ['lc', 'ec']) {
+    const cu = S.cups[key]; if (!cu || cu.champ) continue;
+    const cur = S.fixtures.filter(f => f.cup === key && f.cr === cu.r);
+    if (!cur.length || !cur.every(f => f.played)) continue;
+    const last = CUPS[key].rounds.length - 1; const name = CUPS[key].jp;
+    const win = [];
+    for (const f of cur) {
+      const w = cupWinner(f), l = w === f.h ? f.a : f.h;
+      win.push(w); cu.out[l] = cu.r;
+      const pz = cu.r === last ? CUP_PRIZE.final : cu.r === last - 1 ? CUP_PRIZE.sf : cu.r === last - 2 ? CUP_PRIZE.qf : 0;
+      if (pz && S.clubs[l]) { S.clubs[l].funds += pz; S.clubs[l].fin.prize += pz; }
+      if (l === S.my && cu.r < last) news(S, `${name}は${CUPS[key].rounds[cu.r]}で敗退。${pz ? `賞金 ${money(pz)}。` : ''}`, 'loss');
+    }
+    if (cu.r === last) {
+      const champ = win[0]; const f = cur[0];
+      cu.champ = champ; cu.runner = f.h === champ ? f.a : f.h;
+      const c = S.clubs[champ];
+      c.funds += CUP_PRIZE.win; c.fin.prize += CUP_PRIZE.win;
+      c.titles = Object.assign({ j1: 0, lc: 0, ec: 0, acl: 0 }, c.titles || {}); c.titles[key]++;
+      c.pres = clamp(Math.round(((c.pres || 2) + 0.12) * 100) / 100, 1, 5);
+      if (champ === S.my) { S.board = clamp(S.board + 12, 0, 100); news(S, `${name}優勝！ ${S.clubs[cu.runner].short}を破ってタイトルを獲得。賞金 ${money(CUP_PRIZE.win)}。`, 'big'); }
+      else news(S, `${name}は${c.name}が優勝（決勝で${S.clubs[cu.runner].short}を下す）。`, cu.runner === S.my ? 'loss' : 'info');
+      continue;
+    }
+    cu.alive = win.concat(key === 'lc' && cu.r === 0 ? cu.bye || [] : []).concat(cu.carry || []);
+    cu.r++;
+    drawCupRound(S, key);
+  }
+}
+function cupsDone(S) { return !S.cups || ['ec', 'lc'].every(k => !S.cups[k] || S.cups[k].champ); }
+// how far a club got: 'champ' | 'runner' | round index it went out in | null (still in / not entered)
+function cupResult(S, key, cid) {
+  const cu = S.cups && S.cups[key]; if (!cu) return null;
+  if (cu.champ === cid) return '優勝';
+  if (cu.runner === cid) return '準優勝';
+  if (cu.out[cid] != null) return CUPS[key].rounds[cu.out[cid]] + '敗退';
+  if (cu.alive.includes(cid) || (cu.bye || []).includes(cid)) return '勝ち残り';
+  return '不参加';
+}
+// PK shootout: best finishers first, the keeper's saving matters
+function shootout(S, M) {
+  const kickers = k => onPitch(M[k]).filter(s => s.role !== 'GK').map(s => S.players[s.pid]).sort((a, b) => (b.at ? b.at[0] + b.at[7] : b.ovr * 2) - (a.at ? a.at[0] + a.at[7] : a.ovr * 2));
+  const keeper = k => { const g = onPitch(M[k]).find(s => s.role === 'GK'); return g ? S.players[g.pid] : null; };
+  const tk = { h: kickers('h'), a: kickers('a') }, gk = { h: keeper('h'), a: keeper('a') };
+  const sc = { h: 0, a: 0 }, n = { h: 0, a: 0 };
+  const kick = k => {
+    const o = k === 'h' ? 'a' : 'h'; const list = tk[k]; const p = list.length ? list[n[k] % list.length] : null; n[k]++;
+    const sk = p ? (p.at ? p.at[0] * 0.6 + p.at[7] * 0.4 : p.ovr) : 50;
+    const g = gk[o] ? (gk[o].at ? gk[o].at[8] : gk[o].ovr) : 40;
+    if (R() < clamp(0.75 + (sk - 65) * 0.004 - (g - 65) * 0.004 + (p && p.hot ? 0.05 : 0), 0.55, 0.92)) sc[k]++;
+  };
+  for (let i = 0; i < 5; i++) for (const k of ['h', 'a']) {
+    kick(k);
+    if (sc.h > sc.a + (5 - n.a) || sc.a > sc.h + (5 - n.h)) { i = 5; break; }
+  }
+  while (sc.h === sc.a && n.h < 30) { kick('h'); kick('a'); }
+  M.pk = [sc.h, sc.a];
+}
+
+/* ---------- scouting: send a scout, get young prospects to sign as free agents ---------- */
+const SCOUT = {
+  dom: { jp: '国内の高校・大学', sub: '17〜21歳。時間はかかるが伸びしろ十分', cost: 300, days: 14, age: [17, 21], ovr: [50, 58], pot: [70, 80] },
+  low: { jp: 'J2・J3', sub: '20〜24歳。すぐ戦力になりやすい', cost: 600, days: 14, age: [20, 24], ovr: [60, 66], pot: [68, 76] },
+  sa: { jp: '南米', sub: '18〜22歳。当たれば大物', cost: 1500, days: 21, age: [18, 22], ovr: [56, 64], pot: [72, 84], foreign: true },
+};
+function sendScout(S, key) {
+  const sc = SCOUT[key]; const c = S.clubs[S.my];
+  if (!sc) return { ok: false, msg: '派遣先が不明です' };
+  if (S.scout) return { ok: false, msg: 'スカウトはまだ戻っていません' };
+  if (c.funds < sc.cost) return { ok: false, msg: '資金が足りません' };
+  c.funds -= sc.cost; c.fin.fac += sc.cost;
+  S.scout = { key, back: D.add(S.date, sc.days) };
+  news(S, `スカウトを${sc.jp}へ派遣（${money(sc.cost)}）。${jdate(S.scout.back)}ごろ戻る予定。`, 'info');
+  return { ok: true, msg: `スカウトを${sc.jp}へ派遣しました` };
+}
+function scoutReturns(S) {
+  if (!S.scout || S.date < S.scout.back) return;
+  const sc = SCOUT[S.scout.key]; const lv = (S.clubs[S.my].fac.scout || 1);
+  const pids = [];
+  for (let i = 0; i < 3; i++) {
+    const a = ri(sc.age[0], sc.age[1]);
+    const ovr = ri(sc.ovr[0], sc.ovr[1]) + (lv >= 4 ? 1 : 0);
+    const pot = Math.min(90, ri(sc.pot[0], sc.pot[1]) + (lv - 1) * 2);
+    const pos = wpick(['GK', 'DF', 'MF', 'FW'], x => ({ GK: 0.5, DF: 3, MF: 3.5, FW: 3 })[x]);
+    const p = genPlayer(S, 'FA', { age: a, ovr, pot, pos, foreign: !!sc.foreign });
+    p.found = { by: S.my, d: S.date, at: S.scout.key };
+    pids.push(p.id);
+  }
+  S.inbox.unshift({ id: S.nextInboxId++, type: 'scout', pids, at: S.scout.key, d: S.date, exp: D.add(S.date, 30), seen: false, done: false });
+  news(S, `スカウトが${sc.jp}から戻った。有望な若手を${pids.length}人リストアップ。`, 'grow');
+  S.scout = null;
+}
+// players the scout found and nobody signed go elsewhere when the report expires
+function scoutExpire(S, it) {
+  if (it.type !== 'scout') return;
+  for (const id of it.pids) { const p = S.players[id]; if (p && p.club === 'FA') delete S.players[id]; }
+}
+// games a club has played this season (league + cups), for playing-time growth
+let _cgKey = null, _cg = null;
+function clubGames(S, cid) {
+  const key = S.date + '|' + S.season;
+  if (_cgKey !== key) { _cg = {}; for (const f of S.fixtures) if (f.played) { _cg[f.h] = (_cg[f.h] || 0) + 1; _cg[f.a] = (_cg[f.a] || 0) + 1; } _cgKey = key; }
+  return _cg[cid] || 0;
+}
+// share of the club's minutes this season (0..1)
+function playShare(S, p) { const gp = clubGames(S, p.club); return gp < 3 ? null : clamp(p.st.mins / (90 * gp), 0, 1); }
+
 /* ---------- season end & rollover ---------- */
 const PRIZE = [30000, 12000, 6000, 3000, 2000, 1500, 1200, 1000, 900, 800, 700, 600, 500, 400, 300, 200, 100, 0, 0, 0]; // 万円
 function endSeason(S) {
@@ -1223,8 +1568,9 @@ function endSeason(S) {
   if (verdict === 'champion' || verdict === 'met') S.board = clamp(S.board + 20, 0, 100);
   else if (verdict === 'near') S.board = clamp(S.board - 5, 0, 100);
   else if (verdict === 'missed') S.board = clamp(S.board - 25, 0, 100);
-  S.seasonEnd = { label: seasonLabel(S.season), champ, myPos, rel, scorers, verdict, prize: PRIZE[myPos - 1] || 0, pts: t[myPos - 1].pts, target: target.jp };
-  S.history.unshift({ season: seasonLabel(S.season), club: S.my, pos: myPos, pts: t[myPos - 1].pts, champ, verdict });
+  const cups = S.cups ? Object.fromEntries(['ec', 'lc'].filter(k => S.cups[k]).map(k => [k, { champ: S.cups[k].champ, runner: S.cups[k].runner, my: cupResult(S, k, S.my) }])) : null;
+  S.seasonEnd = { label: seasonLabel(S.season), champ, myPos, rel, scorers, verdict, prize: PRIZE[myPos - 1] || 0, pts: t[myPos - 1].pts, target: target.jp, cups };
+  S.history.unshift({ season: seasonLabel(S.season), club: S.my, pos: myPos, pts: t[myPos - 1].pts, champ, verdict, ec: cups && cups.ec ? cups.ec.my : null, lc: cups && cups.lc ? cups.lc.my : null });
   decideRetirements(S);
   news(S, `${seasonLabel(S.season)}シーズン終了。優勝は${S.clubs[champ].name}。${S.clubs[S.my].short}は${myPos}位。`, 'big');
 }
@@ -1271,32 +1617,20 @@ function rollover(S) {
     if (p.st.apps || p.club === S.my) p.hist.unshift({ s: seasonLabel(S.season), c: p.club, ovr: Math.round(p.ovr), ...p.st });
     if (p.at) { p.at0 = p.at.slice(); p.ovr0 = p.ovr; }
     if (p.hist.length > 8) p.hist.length = 8;
-    p.st = blankStats(); p.ycAcc = 0; p.sus = 0;
+    p.st = blankStats(); p.ycAcc = 0; p.sus = 0; delete p.cs; delete p.hot;
   }
   // relegation / promotion
   const promoted = [];
   const pool = J2.filter(c => !S.clubs[c.id] || !S.order.includes(c.id));
-  for (const rid of se.rel) {
-    S.order = S.order.filter(c => c !== rid);
-    for (const p of Object.values(S.players)) if (p.club === rid) p.club = 'J2:' + rid;
-  }
-  // relegated clubs' rosters are parked under "J2:<id>" (kept so they can return later)
+  // relegated clubs drop out of the league but keep their players (they play in J2 and can come back or enter the 天皇杯)
+  for (const rid of se.rel) S.order = S.order.filter(c => c !== rid);
   while (promoted.length < se.rel.length && pool.length) {
     const c = pool.splice(Math.floor(R() * pool.length), 1)[0];
     promoted.push(c.id);
-    if (S.clubs[c.id] && Object.values(S.players).some(p => p.club === 'J2:' + c.id)) {
-      S.order.push(c.id);
-      for (const p of Object.values(S.players)) if (p.club === 'J2:' + c.id) p.club = c.id;
-    } else {
-      addClub(S, { ...c, coach: '' });
-      const base = 64 + c.tier;
-      const plan = [['GK', 3], ['DF', 9], ['MF', 10], ['FW', 6]];
-      let n = 1;
-      for (const [pos, k] of plan) for (let i = 0; i < k; i++) {
-        const a = ri(19, 33);
-        genPlayer(S, c.id, { pos, age: a, ovr: Math.round(base + (i < 2 ? 3 : i < 5 ? 1 : -2) + R() * 4 - 2 - (a < 21 ? 5 : 0)), num: n++, foreign: i === 0 && pos !== 'GK' && R() < 0.6 });
-      }
-    }
+    if (!S.clubs[c.id]) addClub(S, { ...c, coach: '' });
+    else if (!S.order.includes(c.id)) S.order.push(c.id);
+    const have = squad(S, c.id).length;
+    if (have < 26) genSquad(S, c.id, 64 + (S.clubs[c.id].tier || 2), have ? [['GK', Math.max(0, 3 - squad(S, c.id).filter(p => p.pos === 'GK').length)], ['DF', 3], ['MF', 3], ['FW', 2]] : PLAN_FULL);
   }
   // youth intake
   for (const cid of S.order) {
@@ -1326,6 +1660,7 @@ function rollover(S) {
   S.seasonEnd = null;
   ensureFreeAgents(S);
   for (const cid of S.order) if (cid !== S.my) autoLineup(S, cid);
+  setupCups(S);
   validateLineup(S, S.my); // the manager's XI stays as he left it (players who left are taken out)
   setSponsors(S);
   setExpectations(S);
@@ -1343,7 +1678,8 @@ const API = {
   autoLineup, autoBench, benchSwap, benchRemove, lineupIssues, BENCH_SIZE, clubRating, validateLineup, effective, posPenalty, available, teamRating,
   createMatch, stepMatch, simulateFull, finishMatch, doSub, benchOptions, onPitch, setMentality, bestSubFor,
   advance, nextDay, simAIToday, myFixtureToday, nextMyFixture, todaysFixtures, inWindow, windowEnd, nextWindowStart,
-  acceptOffer, rejectOffer, bid, decideRetirements, marketList, ensureFreeAgents, upgrade, facCost, takeJob, rollover, endSeason, news, fire,
+  acceptOffer, rejectOffer, bid, decideRetirements,
+  CUPS, CUP_PRIZE, NATIONAL, fxLabel, cupResult, cupWinner, hypeMatch, bigGame, rivalry, SCOUT, sendScout, playShare, HOT_BOOST, marketList, ensureFreeAgents, upgrade, facCost, takeJob, rollover, endSeason, news, fire,
 };
 if (typeof module !== 'undefined' && module.exports) module.exports = API; else root.Engine = API;
 })(typeof window !== 'undefined' ? window : globalThis);

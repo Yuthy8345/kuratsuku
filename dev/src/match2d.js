@@ -110,7 +110,7 @@ function openness(V, p) { const o = nearest(teamOf(V, other(p.side), true), p); 
 /* ---------- targets ---------- */
 function shapeTarget(V, p, inPoss) {
   const b = V.ball; const bxf = frameX(p.side, b.x); const byf = p.side === 'h' ? b.y : PH - b.y;
-  const ment = V.M[p.side].ment; const ms = ment === 'att' ? 5 : ment === 'def' ? -5 : 0;
+  const ment = V.M[p.side].ment; const ms = ment === 'att' ? 5 : ment === 'def' ? -5 : ment === 'ctr' ? -7 : 0;
   let along, across;
   if (inPoss) {
     along = p.bA + 9 + (bxf - CX) * 0.42 + ms;
@@ -411,8 +411,14 @@ function draw(V, ctx, W, H, col) {
   for (const p of V.players) {
     ctx.beginPath(); ctx.ellipse(X(p.x), Y(p.y) + r * 0.75, r * 0.95, r * 0.4, 0, 0, Math.PI * 2); ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.fill();
   }
+  const hot = (V.M && V.M.hot) || {};
   for (const p of V.players) {
     const k = p.side === 'h' ? col.home : col.away;
+    if (p.pid && hot[p.pid]) { // a player on fire glows
+      const g = ctx.createRadialGradient(X(p.x), Y(p.y), r * 0.6, X(p.x), Y(p.y), r * 2.3);
+      g.addColorStop(0, 'rgba(255,170,40,.75)'); g.addColorStop(1, 'rgba(255,90,0,0)');
+      ctx.beginPath(); ctx.arc(X(p.x), Y(p.y), r * 2.3, 0, Math.PI * 2); ctx.fillStyle = g; ctx.fill();
+    }
     ctx.beginPath(); ctx.arc(X(p.x), Y(p.y), r, 0, Math.PI * 2);
     ctx.fillStyle = p.gk ? k.gk : k.c1; ctx.fill();
     ctx.lineWidth = Math.max(1.2, r * 0.28); ctx.strokeStyle = p.gk ? '#111' : k.c2; ctx.stroke();

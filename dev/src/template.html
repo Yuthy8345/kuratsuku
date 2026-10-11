@@ -138,6 +138,15 @@ h1, h2, h3 { text-wrap: balance; margin: 0; }
 .ticket-perf::before, .ticket-perf::after { content: ""; position: absolute; top: -10px; width: 18px; height: 18px; border-radius: 50%; background: var(--bg); border: 1px solid var(--line); }
 .ticket-perf::before { left: -24px; } .ticket-perf::after { right: -24px; }
 .ticket-foot { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 14px 12px; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
+.ticket-story { display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; padding: 0 12px 12px; }
+.ticket.cup .ticket-top { background: linear-gradient(90deg, var(--led-bg), color-mix(in srgb, var(--accent-bg) 22%, var(--led-bg))); }
+.chip.story { background: color-mix(in srgb, var(--accent-bg) 20%, transparent); color: var(--accent); }
+.chip.fire { background: linear-gradient(90deg, #ff9a1f, #ff5a1f); color: #fff; }
+.card.fire { border-color: color-mix(in srgb, #ff7a1f 55%, var(--line)); background: color-mix(in srgb, #ff7a1f 8%, var(--surface)); padding: 10px 12px; }
+.card.fire .eyebrow { color: #e0601a; }
+.card.fire ul { margin: 6px 0 0; padding-left: 18px; font-size: 13px; display: grid; gap: 4px; }
+.card.fire li .chip { margin-left: 6px; }
+.cuphead { display: grid; gap: 8px; }
 .formline { display: inline-flex; gap: 3px; }
 
 /* board meter */
@@ -186,6 +195,9 @@ table.tbl { border-collapse: collapse; width: 100%; font-size: 13px; }
 .fx .a { display: flex; align-items: center; gap: 7px; font-weight: 700; min-width: 0; }
 .fx .sc { font-family: var(--f-led); font-size: 17px; min-width: 56px; text-align: center; padding: 2px 6px; border-radius: 6px; background: var(--led-bg); color: var(--led); }
 .fx .sc.pending { background: transparent; color: var(--muted); font-family: var(--f-body); font-size: 12px; }
+.fx .sc small { display: block; font-size: 10px; line-height: 1.1; color: color-mix(in srgb, var(--led) 75%, #fff); }
+.fx .h small, .fx .a small { font-size: 9px; font-weight: 700; color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 0 3px; }
+.fx .h.win, .fx .a.win { text-decoration: underline; text-decoration-color: var(--accent-bg); text-decoration-thickness: 2px; text-underline-offset: 4px; }
 .fx.me { background: color-mix(in srgb, var(--accent-bg) 12%, transparent); }
 .roundnav { display: grid; grid-template-columns: 52px 1fr 52px; align-items: center; gap: 8px; }
 .roundnav b { text-align: center; font-family: var(--f-display); font-weight: 400; font-size: 16px; }
@@ -201,6 +213,8 @@ table.tbl { border-collapse: collapse; width: 100%; font-size: 13px; }
 .tok .shirt.warn::after { content: "!"; position: absolute; top: -6px; right: -6px; width: 17px; height: 17px; border-radius: 50%; background: var(--loss); color: #fff; font: 700 11px/17px var(--f-body); text-align: center; }
 .tok .lbl { font-size: 11px; line-height: 16px; font-weight: 700; color: #fff; background: rgba(0,0,0,.55); padding: 0 6px; border-radius: 5px; max-width: 74px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tok .ov { font-size: 10px; color: rgba(255,255,255,.85); line-height: 1; }
+.tok.hot .shirt { box-shadow: 0 0 0 3px rgba(255,140,30,.85), 0 0 18px 6px rgba(255,110,20,.55); }
+.tok.hot .ov::before { content: "燃"; display: inline-block; margin-right: 3px; padding: 0 3px; border-radius: 3px; background: #ff6a1f; color: #fff; font-weight: 700; }
 .tok.out .shirt { background: repeating-linear-gradient(135deg, #5a5f5c 0 5px, #474b49 5px 10px); border-color: var(--loss); color: #fff; opacity: .9; }
 .tok.out .shirt::after { content: "×"; position: absolute; top: -6px; right: -6px; width: 17px; height: 17px; border-radius: 50%; background: var(--loss); color: #fff; font: 700 12px/17px var(--f-body); text-align: center; }
 .tok.out .lbl { text-decoration: line-through; }
@@ -349,6 +363,7 @@ button.apc:not(:disabled):active { transform: scale(.97); }
 .feed li.goal span { color: var(--accent); }
 .feed li.red span { color: var(--loss); }
 .feed li.sys span { color: var(--muted); font-weight: 700; }
+.feed li.hot span { color: #e0601a; font-weight: 700; }
 @keyframes rise { from { opacity: 0; transform: translateY(-4px); } }
 .mctl { padding: 10px 12px calc(12px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--line); display: grid; gap: 8px; background: var(--bg); }
 .mctl .row > * { flex: 1; }
