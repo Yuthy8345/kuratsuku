@@ -20,23 +20,29 @@ function applyBoard() {
 }
 function setBoard(k) { try { localStorage.setItem(BOARD_KEY, k === 'white' ? 'white' : 'chalk'); } catch (e) { /* storage blocked: only this session */ } applyBoard(); }
 applyBoard();
-/* iOS home-screen apps (iOS 26/27): at launch the layout viewport can come out short by the status-bar height (59-62px)
-   until the first swipe (WebKit bug 301994), so fixed elements stop above the home bar. The area below is still drawn:
-   measure the gap with a fixed probe and let bottom-anchored fixed elements reach the real screen bottom (--vgap). */
+/* iOS home-screen apps (iOS 26/27): at launch the viewport can come out short by the status-bar height (59-62px) until the
+   first swipe (WebKit bug 301994). Fixed layers are then clipped to the short viewport, but page content below it is drawn.
+   Measure the gap with a fixed probe; while it is there, html.vgap lays the title out in the page at the real screen
+   height (--apph) instead of fixed. Other fixed parts (dock, sheets, match) stay inside the short viewport. */
 const vgapProbe = document.createElement('div');
 vgapProbe.setAttribute('aria-hidden', 'true');
 vgapProbe.style.cssText = 'position:fixed;top:0;bottom:0;left:0;width:0;visibility:hidden;pointer-events:none';
 let vgapNow = -1, vgapSeen = 0;  // vgapSeen: the gap found at launch (shown in このゲームについて)
 function fixViewportGap() {
-  let gap = 0;
+  let gap = 0, full = 0;
   if (navigator.standalone === true) {  // iOS home-screen app only (Android and Safari report their real viewport)
     if (!vgapProbe.isConnected) document.body.appendChild(vgapProbe);
     const h = vgapProbe.getBoundingClientRect().height, portrait = innerHeight >= innerWidth;
-    const full = portrait ? Math.max(screen.width, screen.height) : Math.min(screen.width, screen.height);
+    full = portrait ? Math.max(screen.width, screen.height) : Math.min(screen.width, screen.height);
     const d = Math.round(full - h);
     if (d > 0 && d <= 100) gap = d;  // bigger = keyboard or something else: leave it alone
   }
-  if (gap !== vgapNow) { vgapNow = gap; document.documentElement.style.setProperty('--vgap', gap + 'px'); }
+  if (gap !== vgapNow) {
+    vgapNow = gap;
+    const de = document.documentElement;
+    de.classList.toggle('vgap', gap > 0);
+    if (gap > 0) de.style.setProperty('--apph', full + 'px'); else de.style.removeProperty('--apph');
+  }
   if (gap && !vgapSeen) vgapSeen = gap;
 }
 fixViewportGap();

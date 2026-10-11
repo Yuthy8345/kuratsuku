@@ -3,7 +3,8 @@
 # Serves the repo root (the real PWA index.html). Chromium has no safe areas, so they are injected as px.
 # 'launch' = the iOS 26/27 home-screen bug (WebKit 301994): at launch the viewport is short by the status bar until the
 # first swipe. Reproduced with a viewport that short and navigator.standalone / screen size of the real phone;
-# the board and the dock must still reach the real screen bottom.
+# iOS clips fixed layers to the short viewport but draws page content below it, so the title must then be laid out in the
+# page (absolute) at the real screen height, and fixed parts (dock) must stay inside the short viewport.
 import asyncio, pathlib, os, re, threading, http.server, functools
 from playwright.async_api import async_playwright
 REPO = pathlib.Path('/home/claude/kuratsuku'); OUT = REPO/'dev/test/shots'
@@ -63,9 +64,10 @@ async def main():
                     board: [board.top, board.bottom, board.width], logoBottom: r('.tb-logo svg').bottom, logoW: logo.width, menuTop: menu.top, linksBottom: links.bottom,
                     plates: document.querySelectorAll('.tb-menu .plate').length }; }''')
                 problems = []
-                if m['pos'] != 'fixed': problems.append('title not position:fixed (vh/dvh are wrong at launch in iOS home-screen apps)')
+                want = 'absolute' if mode == 'launch' else 'fixed'
+                if m['pos'] != want: problems.append(f"title is {m['pos']}, want {want} (fixed: vh/dvh are wrong at launch; launch: fixed layers are clipped)")
                 if abs(m['board'][1] - (h - bot - 10)) > 1: problems.append(f"board bottom {m['board'][1]:.0f} not 10px above the home bar ({h - bot - 10})")
-                if m['sh'] > m['ih'] + 1: problems.append(f"scrolls {m['sh']}>{m['ih']}")
+                if m['sh'] > max(m['ih'], h if mode == 'launch' else 0) + 1: problems.append(f"scrolls {m['sh']}>{m['ih']}")
                 if m['sw'] > m['iw'] + 1: problems.append('horizontal scroll')
                 if m['board'][1] > h - bot + 0.5: problems.append(f"board bottom {m['board'][1]:.0f} under home bar ({h - bot})")
                 if m['board'][0] < top - 0.5: problems.append(f"board top {m['board'][0]:.0f} under notch ({top})")
@@ -76,6 +78,13 @@ async def main():
                 print(f"{tag:41s} board {m['board'][0]:.0f}-{m['board'][1]:.0f} logo-bottom {m['logoBottom']:.0f} buttons {m['menuTop']:.0f} | {'OK' if not problems else ' / '.join(problems)}")
                 if problems: bad.append(tag)
                 await page.screenshot(path=str(OUT/f"ip-{'save' if save else 'new'}-{mode}-{w}x{h}.png"))
+                if mode == 'launch':  # the first swipe fixes the viewport: back to fixed, still exactly one screen
+                    await page.set_viewport_size({'width': w, 'height': h}); await page.wait_for_timeout(150)
+                    f = await page.evaluate('''() => ({ pos: getComputedStyle(document.querySelector('.tb-wrap')).position, bottom: document.querySelector('.tboard').getBoundingClientRect().bottom,
+                      sh: document.scrollingElement.scrollHeight, cls: document.documentElement.classList.contains('vgap') })''')
+                    if f['pos'] != 'fixed' or f['cls'] or abs(f['bottom'] - (h - bot - 10)) > 1 or f['sh'] > h + 1:
+                        print(f"   {name} after swipe: {f}"); bad.append(f'{tag} after swipe')
+                    vh = h
                 if save:  # the club screens too: header below the notch, dock on the home bar, no sideways scroll
                     await page.click('[data-act="continue"]'); await page.wait_for_timeout(400)
                     for tab in ('home', 'squad', 'tactics', 'league', 'club'):
@@ -84,7 +93,7 @@ async def main():
                           return { hdrTop: hd.top, dockBottom: dk.bottom, sw: document.scrollingElement.scrollWidth, iw: innerWidth }; }''')
                         q = []
                         if g['hdrTop'] < top - 0.5: q.append(f"header under notch {g['hdrTop']:.0f}")
-                        if abs(g['dockBottom'] - h) > 1: q.append(f"dock bottom {g['dockBottom']:.0f}")
+                        if abs(g['dockBottom'] - vh) > 1: q.append(f"dock bottom {g['dockBottom']:.0f} (viewport {vh})")
                         if g['sw'] > g['iw'] + 1: q.append('horizontal scroll')
                         if q: print(f"   {name} {tab}: {' / '.join(q)}"); bad.append(f'{tag} {tab}')
                     await page.locator('[data-tab="home"]').dispatch_event('click'); await page.wait_for_timeout(150)
