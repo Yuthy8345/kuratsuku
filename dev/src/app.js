@@ -747,14 +747,12 @@ function sheetPresets() {
   const row = (pr, i) => {
     const st = E.presetStatus(S, pr);
     const sus = st.out.filter(id => S.players[id].inj <= 0).length, inj = st.out.length - sus;
-    const names = pr.xi.map(id => S.players[id] && S.players[id].club === S.my ? S.players[id].short : '—').join('・');
     const chips = [sus ? `<span class="chip warn">出場停止 ${sus}</span>` : '', inj ? `<span class="chip warn">負傷 ${inj}</span>` : '', st.gone.length ? `<span class="chip">移籍・退団 ${st.gone.length}</span>` : ''].join('');
     const head = ui.edit === i
       ? `<div class="row" style="gap:8px"><input class="input" id="pr-name" maxlength="16" value="${esc(pr.name)}" autocomplete="off" style="flex:1"><button class="btn" data-act="presetRename" data-i="${i}">決定</button></div>`
       : `<div class="row"><b>${esc(pr.name)}</b><span class="spacer"></span><span class="small muted">${jd(pr.d)}保存</span></div>`;
     return `<li><div class="preset">${head}
       <div class="small muted">${pr.form}・${esc(E.mentLabel(pr))}・プレス${esc(E.PRESS[pr.press].jp)}</div>
-      <div class="small preset-xi">${esc(names)}</div>
       ${chips ? `<div class="row wrap">${chips}</div>` : ''}
       <div class="preset-act"><button class="btn primary" data-act="presetLoad" data-i="${i}">読み込む</button><button class="btn ghost" data-act="presetSave" data-i="${i}">上書き</button><button class="btn ghost" data-act="presetEdit" data-i="${i}">名前</button><button class="btn ghost ${ui.del === i ? 'danger' : ''}" data-act="presetDel" data-i="${i}">${ui.del === i ? '本当に削除' : '削除'}</button></div>
     </div></li>`;
