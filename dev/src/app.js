@@ -675,16 +675,19 @@ let toastT = null;
 function toast(msg) { toastEl.textContent = msg; toastEl.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => toastEl.classList.remove('on'), 2600); }
 
 /* ---------- match ---------- */
-const SPEEDS = { 1: 430, 2: 170, 4: 50 };
+const SPEEDS = { 1: 430, 2: 170, 4: 50 };   // real ms per match minute
+const VIS_SPEED = { 1: 1.7, 2: 2.6, 4: 3.6 }; // how fast the 2D players move relative to real time
+const SHOT_EV = { goal: 1, save: 1, miss: 1 };
 function startMatch(fid, quick) {
   closeSheet();
   const fx = S.fixtures.find(f => f.id === fid); if (!fx || fx.played) return;
   E.validateLineup(S, S.my);
   const M = E.createMatch(S, fx);
   const k = M.userSide;
-  MATCH = { M, fx, k, speed: S.settings.speed || 1, paused: false, timer: null, raf: null, sel: null, ball: { x: 50, y: 50 }, tgt: { x: 50, y: 50 }, pos: {} };
+  MATCH = { M, fx, k, speed: S.settings.speed || 1, paused: false, timer: null, raf: null, sel: null, evq: [], hold: false, shown: { h: 0, a: 0 }, ftShown: false };
   buildMatchLayer();
   if (quick) { E.simulateFull(S, M); finishLive(); return; }
+  MATCH.viz = window.Match2D.create(S, M, { resolved: onShotResolved, done: onShotDone });
   M.ev.forEach(e => feedAdd(e));
   tickLoop(); drawLoop();
 }
@@ -713,37 +716,66 @@ function renderMatchCtl() {
   const el = document.getElementById('mctl'); if (!el) return;
   const { M } = MATCH;
   if (MATCH.finished) { el.innerHTML = '<button class="btn primary block" data-act="mClose" style="min-height:54px;font-size:16px">クラブに戻る</button>'; return; }
-  if (M.done) { el.innerHTML = '<button class="btn primary block" data-act="mResult" style="min-height:54px;font-size:16px">試合結果を見る</button>'; return; }
+  if (M.done && MATCH.ftShown) { el.innerHTML = '<button class="btn primary block" data-act="mResult" style="min-height:54px;font-size:16px">試合結果を見る</button>'; return; }
   if (MATCH.ht) { el.innerHTML = `<div class="row"><button class="btn" data-act="mTac">采配</button><button class="btn primary" data-act="m2nd" style="flex:2">後半キックオフ</button></div><button class="btn ghost block" data-act="mSkip">結果までとばす</button>`; return; }
   el.innerHTML = `<div class="row"><button class="btn" data-act="mTac">采配${M[MATCH.k] ? `<span class="small muted">　交代${5 - M[MATCH.k].subs}</span>` : ''}</button><button class="btn" data-act="mSpeed" aria-label="試合速度">×${MATCH.speed}</button><button class="btn" data-act="mPause">${MATCH.paused ? '▶ 再開' : 'Ⅱ 停止'}</button></div><button class="btn ghost block" data-act="mSkip">結果までとばす</button>`;
 }
 function tickLoop() {
   if (!MATCH) return;
   clearTimeout(MATCH.timer);
-  if (MATCH.paused || MATCH.ht || MATCH.M.done) return;
+  if (MATCH.paused || MATCH.ht || MATCH.M.done || MATCH.hold) return;
   MATCH.timer = setTimeout(() => { matchTick(); tickLoop(); }, SPEEDS[MATCH.speed] || 430);
 }
 function matchTick() {
   const { M } = MATCH; if (M.done) return;
   const evs = E.stepMatch(S, M);
-  for (const e of evs) {
+  if (MATCH.viz) { MATCH.viz.hint(M.pH == null ? 0.5 : M.pH); MATCH.viz.sync(); }
+  MATCH.evq.push(...evs);
+  processQueue();
+  updateScoreboard();
+}
+// Events wait in a queue so that a chance is shown in full (the clock stops) before the next one.
+function processQueue() {
+  while (MATCH && MATCH.evq.length && !MATCH.hold) {
+    const e = MATCH.evq.shift();
+    if (SHOT_EV[e.t] && MATCH.viz) {
+      if (MATCH.speed >= 4 || document.hidden) { applyShot(e); MATCH.viz.instant(e); continue; }
+      MATCH.hold = true; MATCH.viz.shoot(e); break;
+    }
+    if (SHOT_EV[e.t]) { applyShot(e); continue; }
     feedAdd(e);
-    if (e.t === 'goal' || e.t === 'save' || e.t === 'miss') { MATCH.tgt = { x: e.side === 'h' ? 94 : 6, y: 40 + Math.random() * 20 }; }
-    if (e.t === 'goal') { const sb = document.getElementById('sb'); if (sb) { sb.classList.remove('flash'); void sb.offsetWidth; sb.classList.add('flash'); } MATCH.afterGoal = 3; }
+    if (MATCH.viz) {
+      if (e.t === 'yc' || e.t === 'red') MATCH.viz.foul(e);
+      if (e.t === 'red' || e.t === 'sub' || e.t === 'inj') MATCH.viz.sync();
+      if (e.t === 'ht') MATCH.viz.restart('a');
+    }
     if (e.t === 'ht') { MATCH.ht = true; renderMatchCtl(); }
-    if (e.t === 'ft') renderMatchCtl();
-  }
-  if (!evs.some(e => ['goal', 'save', 'miss'].includes(e.t))) {
-    if (MATCH.afterGoal) { MATCH.afterGoal--; if (!MATCH.afterGoal) MATCH.tgt = { x: 50, y: 50 }; }
-    else { const s = M.ball.side; MATCH.tgt = { x: s === 'h' ? 52 + Math.random() * 30 : 18 + Math.random() * 30, y: 12 + Math.random() * 76 }; }
+    if (e.t === 'ft') { MATCH.ftShown = true; renderMatchCtl(); }
   }
   updateScoreboard();
+}
+function applyShot(e) {
+  feedAdd(e);
+  if (e.t === 'goal') {
+    MATCH.shown[e.side]++;
+    const sb = document.getElementById('sb'); if (sb) { sb.classList.remove('flash'); void sb.offsetWidth; sb.classList.add('flash'); }
+  }
+  updateScoreboard();
+}
+function onShotResolved(e) { if (MATCH) applyShot(e); }
+function onShotDone() {
+  if (!MATCH) return;
+  MATCH.hold = false;
+  processQueue();
+  renderMatchCtl();
+  tickLoop();
 }
 function updateScoreboard() {
   const { M } = MATCH;
   const sc = document.getElementById('sb-score'), cl = document.getElementById('sb-clock');
-  if (sc) sc.textContent = `${M.hg}-${M.ag}`;
-  if (cl) cl.textContent = M.done ? 'FULL TIME' : MATCH.ht ? 'HALF TIME' : M.min > 90 ? `90+${M.min - 90}'` : `${M.min}'`;
+  const live = !MATCH.finished && !(M.done && MATCH.ftShown) && MATCH.viz;
+  if (sc) sc.textContent = live ? `${MATCH.shown.h}-${MATCH.shown.a}` : `${M.hg}-${M.ag}`;
+  if (cl) cl.textContent = (M.done && (MATCH.ftShown || MATCH.finished)) ? 'FULL TIME' : MATCH.ht ? 'HALF TIME' : M.min > 90 ? `90+${M.min - 90}'` : `${M.min}'`;
   const tot = M.st.h.pos + M.st.a.pos || 1; const ph = Math.round(M.st.h.pos / tot * 100);
   const a = document.getElementById('ph'), b = document.getElementById('pa'), x = document.getElementById('pbh'), y = document.getElementById('pba');
   if (a) { a.textContent = ph + '%'; b.textContent = (100 - ph) + '%'; x.style.width = ph + '%'; y.style.width = (100 - ph) + '%'; }
@@ -760,41 +792,24 @@ function feedAdd(e) {
   while (feed.children.length > 70) feed.lastChild.remove();
 }
 function drawLoop() {
-  if (!MATCH) return;
+  if (!MATCH || !MATCH.viz) return;
   const cv = document.getElementById('cv');
   if (!cv) return;
   const r = cv.getBoundingClientRect(); const dpr = Math.min(2, window.devicePixelRatio || 1);
   if (cv.width !== Math.round(r.width * dpr)) { cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr); }
-  const ctx = cv.getContext('2d'); const W = cv.width, Hh = cv.height;
-  if (!MATCH.col || (MATCH.colT = (MATCH.colT || 0) + 1) % 120 === 0) { const cs = getComputedStyle(document.documentElement); MATCH.col = [cs.getPropertyValue('--pitch').trim() || '#2E6A45', cs.getPropertyValue('--pitch2').trim() || '#2A6140', cs.getPropertyValue('--pitch-line').trim() || 'rgba(255,255,255,.6)']; }
-  const [g1, g2, ln] = MATCH.col;
-  for (let i = 0; i < 10; i++) { ctx.fillStyle = i % 2 ? g1 : g2; ctx.fillRect(i * W / 10, 0, W / 10 + 1, Hh); }
-  ctx.strokeStyle = ln; ctx.lineWidth = Math.max(1, W / 360);
-  const px = x => x / 100 * W, py = y => y / 100 * Hh;
-  ctx.strokeRect(px(2), py(3), px(96), py(94));
-  ctx.beginPath(); ctx.moveTo(px(50), py(3)); ctx.lineTo(px(50), py(97)); ctx.stroke();
-  ctx.beginPath(); ctx.arc(px(50), py(50), Hh * 0.16, 0, Math.PI * 2); ctx.stroke();
-  ctx.strokeRect(px(2), py(28), px(13), py(44)); ctx.strokeRect(px(85), py(28), px(13), py(44));
-  ctx.strokeRect(px(2), py(40), px(4.5), py(20)); ctx.strokeRect(px(93.5), py(40), px(4.5), py(20));
-  const { M } = MATCH; const st = MATCH;
-  st.ball.x += (st.tgt.x - st.ball.x) * 0.07; st.ball.y += (st.tgt.y - st.ball.y) * 0.07;
-  const shift = (st.ball.x - 50) * 0.32;
-  const H = S.clubs[M.h.cid], A = S.clubs[M.a.cid]; const clash = kitClash(H, A);
-  const draw = (side, fill, stroke) => {
-    const sd = M[side];
-    for (const s of sd.slots) {
-      if (!s.pid || sd.sent.includes(s.pid)) continue;
-      const key = side + s.x + '_' + s.y;
-      const fx = side === 'h' ? 5 + s.y * 0.6 + shift : 95 - s.y * 0.6 + shift;
-      const fy = side === 'h' ? 8 + s.x * 0.84 : 92 - s.x * 0.84;
-      const tx = fx + (st.ball.y - fy) * 0.04, ty = fy + (st.ball.y - fy) * 0.12;
-      const cur = st.pos[key] || (st.pos[key] = { x: tx, y: ty });
-      cur.x += (tx - cur.x) * 0.05; cur.y += (ty - cur.y) * 0.05;
-      ctx.beginPath(); ctx.arc(px(cur.x), py(cur.y), W * 0.016, 0, Math.PI * 2); ctx.fillStyle = fill; ctx.fill(); ctx.lineWidth = W * 0.005; ctx.strokeStyle = stroke; ctx.stroke();
-    }
-  };
-  draw('h', H.c1, H.c2); draw('a', clash ? A.c2 : A.c1, clash ? A.c1 : A.c2);
-  ctx.beginPath(); ctx.arc(px(st.ball.x), py(st.ball.y), W * 0.011, 0, Math.PI * 2); ctx.fillStyle = '#fff'; ctx.shadowColor = 'rgba(0,0,0,.5)'; ctx.shadowBlur = 4; ctx.fill(); ctx.shadowBlur = 0;
+  const ctx = cv.getContext('2d');
+  const now = performance.now(); const dt = Math.min(0.05, (now - (MATCH.lastT || now)) / 1000); MATCH.lastT = now;
+  const frozen = MATCH.paused || MATCH.ht || MATCH.finished || (MATCH.M.done && MATCH.ftShown);
+  if (!frozen) MATCH.viz.step(dt * (VIS_SPEED[MATCH.speed] || 1.7));
+  if (!MATCH.col || (MATCH.colT = (MATCH.colT || 0) + 1) % 120 === 0) {
+    const cs = getComputedStyle(document.documentElement); const M = MATCH.M;
+    const H = S.clubs[M.h.cid], A = S.clubs[M.a.cid]; const clash = kitClash(H, A);
+    const txt = c => lum(c) > 0.6 ? '#141414' : '#FFFFFF';
+    const ac1 = clash ? A.c2 : A.c1, ac2 = clash ? A.c1 : A.c2;
+    MATCH.col = { g1: cs.getPropertyValue('--pitch').trim() || '#2E6A45', g2: cs.getPropertyValue('--pitch2').trim() || '#2A6140', line: cs.getPropertyValue('--pitch-line').trim() || 'rgba(255,255,255,.6)', led: cs.getPropertyValue('--led').trim() || '#F5B43C',
+      home: { c1: H.c1, c2: H.c2, txt: txt(H.c1), gk: '#F28C28' }, away: { c1: ac1, c2: ac2, txt: txt(ac1), gk: '#B455E0' } };
+  }
+  MATCH.viz.draw(ctx, cv.width, cv.height, MATCH.col);
   MATCH.raf = requestAnimationFrame(drawLoop);
 }
 function finishLive() {
@@ -953,13 +968,13 @@ const ACT = {
   mSpeed() { MATCH.speed = MATCH.speed === 1 ? 2 : MATCH.speed === 2 ? 4 : 1; S.settings.speed = MATCH.speed; renderMatchCtl(); tickLoop(); },
   mPause() { MATCH.paused = !MATCH.paused; renderMatchCtl(); tickLoop(); },
   m2nd() { MATCH.ht = false; feedAdd({ m: 46, t: 'ko', text: '後半キックオフ' }); renderMatchCtl(); tickLoop(); },
-  mSkip() { clearTimeout(MATCH.timer); E.simulateFull(S, MATCH.M); MATCH.ht = false; finishLive(); },
+  mSkip() { clearTimeout(MATCH.timer); MATCH.evq = []; MATCH.hold = false; E.simulateFull(S, MATCH.M); MATCH.ht = false; finishLive(); },
   mResult() { finishLive(); },
   mClose() { closeMatch(); },
   mTac() { if (!MATCH.paused && !MATCH.ht) { MATCH.paused = true; MATCH.resumeOnClose = true; clearTimeout(MATCH.timer); } MATCH.sel = null; sheetMatchTactics(); },
   mMent(d) { E.setMentality(MATCH.M, MATCH.k, d.k); refreshSheet(); },
   mOut(d) { MATCH.sel = d.id ? Number(d.id) : null; refreshSheet(); },
-  mIn(d) { const ok = E.doSub(S, MATCH.M, MATCH.k, MATCH.sel, Number(d.id)); if (ok) { const ev = MATCH.M.ev[MATCH.M.ev.length - 1]; feedAdd(ev); toast('交代しました'); } MATCH.sel = null; refreshSheet(); renderMatchCtl(); },
+  mIn(d) { const ok = E.doSub(S, MATCH.M, MATCH.k, MATCH.sel, Number(d.id)); if (ok) { const ev = MATCH.M.ev[MATCH.M.ev.length - 1]; feedAdd(ev); if (MATCH.viz) MATCH.viz.sync(); toast('交代しました'); } MATCH.sel = null; refreshSheet(); renderMatchCtl(); },
 };
 document.addEventListener('click', e => {
   const el = e.target.closest('[data-act]'); if (!el || el.disabled) return;

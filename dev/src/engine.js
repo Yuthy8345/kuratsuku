@@ -579,7 +579,7 @@ function stepMatch(S, M) {
   };
   const rh = live(H), ra = live(A);
   const pH = 1 / (1 + Math.exp(-((rh.mid - ra.mid) + 1.0) / 7));
-  M.st.h.pos += pH; M.st.a.pos += 1 - pH;
+  M.st.h.pos += pH; M.st.a.pos += 1 - pH; M.pH = pH;
   const ms = MENTALITY, lg = M.lg;
   const base = 0.101;
   const rate = (r, o, p, ownM, oppM) => base * (1 + (p - 0.5) * 0.4) * Math.exp(((r.att - lg.att) - (o.def - lg.def)) / 37) * Math.pow(r.attV / 4.1, 0.35) * Math.pow(o.defV / 4.6, -0.35) * ms[ownM].own * ms[oppM].opp;

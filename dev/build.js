@@ -7,9 +7,10 @@ let tpl = fs.readFileSync(path.join(d, 'src/template.html'), 'utf8');
 const data = fs.readFileSync(path.join(d, 'data.json'), 'utf8');
 const eng = fs.readFileSync(path.join(d, 'src/engine.js'), 'utf8');
 const app = fs.readFileSync(path.join(d, 'src/app.js'), 'utf8');
-if (/<\/script/i.test(data + eng + app)) throw new Error('script close tag inside inline code');
+const m2d = fs.readFileSync(path.join(d, 'src/match2d.js'), 'utf8');
+if (/<\/script/i.test(data + eng + app + m2d)) throw new Error('script close tag inside inline code');
 function fill(html) {
-  for (const [k, v] of [['/*DATA*/', data], ['/*ENGINE*/', eng], ['/*APP*/', app]]) { const i = html.indexOf(k); if (i < 0) throw new Error(k); html = html.slice(0, i) + v + html.slice(i + k.length); }
+  for (const [k, v] of [['/*DATA*/', data], ['/*ENGINE*/', eng], ['/*M2D*/', m2d], ['/*APP*/', app]]) { const i = html.indexOf(k); if (i < 0) throw new Error(k); html = html.slice(0, i) + v + html.slice(i + k.length); }
   return html;
 }
 // ---- artifact
