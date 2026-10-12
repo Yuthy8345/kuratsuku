@@ -3386,15 +3386,13 @@ function sheetName(id, keep) {
   openSheet(`<div class="mgr-card" style="--k1:${c.c1};--k2:${c.c2};--kt:${kt}">
       <div class="eyebrow">新監督の就任</div>
       <div class="mgr-club"><span class="kit lg" style="--c1:${c.c1};--c2:${c.c2}" aria-hidden="true"></span><b>${esc(c.name)}</b></div>
-      <label class="mgr-plate" for="mgr-name"><span class="mgr-plate-k">監督</span><input id="mgr-name" maxlength="12" placeholder="あなた" autocomplete="off" enterkeyhint="go" value="${esc(keep || '')}" aria-label="監督名"></label>
+      <label class="mgr-plate" for="mgr-name"><span class="mgr-plate-k">監督</span><input id="mgr-name" maxlength="12" placeholder="あなた" autocomplete="off" enterkeyhint="done" value="${esc(keep || '')}" aria-label="監督名"></label>
       <p class="fine" style="margin:0">あなたの名前を入れてください（12文字まで）。空欄のままなら「あなた」で始まります。</p>
     </div>`,
     `<button class="btn primary block" data-act="startClub" data-id="${id}">${esc(c.short)}の監督に就任する</button><button class="btn ghost block" data-act="pickClub" data-id="${id}">戻る</button>`);
+  // the keyboard's done key only closes the keyboard (starting is the button's job)
   const inp = document.getElementById('mgr-name');
-  if (inp) {
-    inp.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); ACT.startClub({ id }); } });
-    try { inp.focus({ preventScroll: true }); } catch (e) { /* no focus */ }
-  }
+  if (inp) inp.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); inp.blur(); } });
 }
 
 /* ---------- main shell ---------- */

@@ -50,7 +50,7 @@ git add -A && git commit && git push             # Pages が1分ほどで反映
 - `node dev/test/shortlist.js` / `python3 dev/test/shortlist.py` — ショートリスト（入札で入る・獲得と引退で外れる・移籍しても残る・旧セーブ移行／画面・保存・外す）
 - `node dev/test/youth.js` / `node dev/test/loan.js` / `python3 dev/test/youth.py` — 育成（出場時間の効果・大物の伸び方・開花・若手育成・月次レポート・逸材の確率・データ補正の旧セーブ反映／期限付き移籍の出し入れ・J2成績・復帰／成長グラフ・レンタル画面・レポート・旧セーブ v6）
 - 育成のバランスの目安: 6シーズン回してリーグ上位14人平均が 71〜72 で横ばい、ベンチの若手（出場15%未満）が1季 +3前後、主力の若手 +7〜8
-- `python3 dev/test/manager.py` — 監督名（クラブの「◯◯で始める」→ 名札のポップアップ `sheetName`、Enterでも就任、戻る、空欄は「あなた」）。テストで新しく始めるときは `nameClub` → `#sheet [data-act="startClub"]` の2段
+- `python3 dev/test/manager.py` — 監督名（クラブの「◯◯で始める」→ 名札のポップアップ `sheetName`。入力欄に自動でフォーカスしない、Enter はキーボードを閉じるだけ、就任はボタンで、戻る、空欄は「あなた」）。テストで新しく始めるときは `nameClub` → `#sheet [data-act="startClub"]` の2段
 - `node dev/test/reborn.js` / `python3 dev/test/reborn.py` — 転生選手（1年目は来ない・確率・確定・各1回・クラブ移動でリセット・背番号・特徴・シーズン移行で入団／ポップアップ・背番号を託す・閉じたら出ない・選手シート）
 - `node dev/test/board.js` / `python3 dev/test/board.py` — フロントの厳しさ（1年目の猶予・2年続けて目標を大きく下回ると解任・降格・途中解任は下位のときだけ・警告／クラブ画面の切り替え・旧セーブはふつう・ホームの警告）
 - `node dev/test/tenure.js <club> <回数> <シーズン数> <easy|mid|hard>` — 自動采配で何シーズン続けられるか（解任の理由別）。1シーズン約5秒

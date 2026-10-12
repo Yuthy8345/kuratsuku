@@ -1,5 +1,5 @@
-# 監督名: the club sheet has no name field any more; 「◯◯で始める」 opens the nameplate, the field has focus, Enter or
-# 「就任する」 starts, 「戻る」 goes back to the club, and an empty name starts as 「あなた」.
+# 監督名: the club sheet has no name field any more; 「◯◯で始める」 opens the nameplate (no focus until tapped), Enter only
+# closes the keyboard, 「就任する」 starts, 「戻る」 goes back to the club, and an empty name starts as 「あなた」.
 import asyncio, pathlib, os, re
 from playwright.async_api import async_playwright
 ROOT = pathlib.Path('/home/claude/kuratsuku/dev'); OUT = ROOT/'test'/'shots'
@@ -37,16 +37,19 @@ async def main():
             print(board, '| club sheet inputs', inputs, '| button', btn); bad += [] if inputs == 0 and btn.endswith('で始める') else ['club sheet']
             await page.click('#sheet [data-act="nameClub"]'); await page.wait_for_timeout(400)
             focused = await page.evaluate("document.activeElement && document.activeElement.id")
-            print('nameplate shown, focus on', focused); bad += [] if focused == 'mgr-name' else ['focus']
+            print('nameplate shown, focus on', focused); bad += [] if focused != 'mgr-name' else ['focus']
             if board == 'chalk':
                 # 戻る → the club again, then forward
                 await page.click('#sheet [data-act="pickClub"]'); await page.wait_for_timeout(300)
                 back = await page.locator('#sheet [data-act="nameClub"]').count(); print('back to the club:', back); bad += [] if back else ['back']
                 await page.click('#sheet [data-act="nameClub"]'); await page.wait_for_timeout(300)
-                await page.keyboard.type('ソーイ'); await page.wait_for_timeout(200)
+                await page.click('#mgr-name'); await page.keyboard.type('ソーイ'); await page.wait_for_timeout(200)
+                await page.keyboard.press('Enter'); await page.wait_for_timeout(400)
+                still = await page.locator('#sheet [data-act="startClub"]').count(); blurred = await page.evaluate("document.activeElement && document.activeElement.id") != 'mgr-name'
+                print('Enter -> still on the nameplate', bool(still), '| keyboard closed', blurred); bad += [] if still and blurred else ['enter']
                 await page.wait_for_timeout(300); await page.screenshot(path=str(OUT/'mgr-name.png'))
-                await page.keyboard.press('Enter'); await page.wait_for_timeout(600)
-                st = await page.evaluate(LOAD); print('Enter -> manager', st['manager'], '| club', st['my']); bad += [] if st['manager'] == 'ソーイ' and st['my'] == 'yokohamafm' else ['enter']
+                await page.click('#sheet [data-act="startClub"]'); await page.wait_for_timeout(600)
+                st = await page.evaluate(LOAD); print('就任 -> manager', st['manager'], '| club', st['my']); bad += [] if st['manager'] == 'ソーイ' and st['my'] == 'yokohamafm' else ['start']
             else:
                 await page.wait_for_timeout(300); await page.screenshot(path=str(OUT/'mgr-name-white.png'))
                 await page.click('#sheet [data-act="startClub"]'); await page.wait_for_timeout(600)
