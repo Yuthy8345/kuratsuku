@@ -2,6 +2,7 @@
 
 片手で遊べるJ1クラブ経営シミュレーション。GitHub Pages で公開: https://yuthy8345.github.io/kuratsuku/
 同じゲームは Claude のアーティファクトとしても公開している（`dev/dist/touchline.html` を publish、URL https://claude.ai/artifact/4Jd2aRS9rhaZUvATXRBqVD）。
+進め方・ユーザーの好み・経緯・やり残しは `HANDOFF.md`（Claude のプロジェクト機能へ引き継ぐときのメモ）。
 
 ## Layout
 - repo root = 公開サイト（`index.html`, `manifest.webmanifest`, `sw.js`, アイコン, `lz-string.min.js`）。**手で編集しない**。`dev/build.js` が生成する。
