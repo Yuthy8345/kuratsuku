@@ -335,6 +335,65 @@ button.apc:not(:disabled):active { transform: scale(.97); }
 .farewell h2.fw-name { position: relative; margin: 10px 0 2px; font-family: var(--f-display); font-weight: 400; font-size: 28px; line-height: 1.2; color: #fff; }
 .fw-sub { position: relative; font-size: 12px; color: rgba(255,255,255,.72); }
 .fw-msg { position: relative; margin: 12px 0 0; font-size: 14px; line-height: 1.7; color: rgba(255,255,255,.92); text-wrap: balance; }
+/* 転生 pop-up: the legend's old number re-ignites in gold, the new magnet snaps on, a red seal lands */
+.reborn { --gold: #f3cf7a; position: relative; overflow: hidden; isolation: isolate; border-radius: 16px; padding: 12px 16px 16px; text-align: center; color: #fff;
+  background: radial-gradient(110% 62% at 50% 30%, color-mix(in srgb, var(--k1) 62%, #070a12) 0%, #070a12 64%), #070a12;
+  box-shadow: inset 0 0 0 1px rgba(243,207,122,.28), inset 0 0 60px rgba(0,0,0,.6); }
+.reborn::after { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: radial-gradient(60% 34% at 50% 30%, rgba(243,207,122,.22), rgba(243,207,122,0) 70%); animation: rbglow 3.6s 1.6s ease-in-out infinite alternate both; }
+@keyframes rbglow { from { opacity: .55; } to { opacity: 1; } }
+.rb-rays { position: absolute; left: 50%; top: 150px; width: 720px; height: 720px; margin: -360px 0 0 -360px; z-index: -1; pointer-events: none; opacity: 0;
+  background: repeating-conic-gradient(from 0deg, rgba(243,207,122,.18) 0deg 4deg, rgba(243,207,122,0) 4deg 15deg);
+  -webkit-mask: radial-gradient(circle, #000 0, rgba(0,0,0,.75) 22%, transparent 58%); mask: radial-gradient(circle, #000 0, rgba(0,0,0,.75) 22%, transparent 58%);
+  animation: rbrays 1.2s .9s ease-out forwards, rbspin 40s linear infinite; }
+@keyframes rbrays { to { opacity: 1; } }
+@keyframes rbspin { to { transform: rotate(360deg); } }
+.rb-sparks { position: absolute; inset: 0; z-index: -1; pointer-events: none; }
+.rb-sparks i { position: absolute; bottom: -6px; width: 3px; height: 3px; border-radius: 50%; background: #ffe2a0; box-shadow: 0 0 6px 2px rgba(255,196,90,.7); opacity: 0; animation: rbrise 4s linear infinite; }
+@keyframes rbrise { 0% { transform: translate(0, 0) scale(.5); opacity: 0; } 12% { opacity: 1; } 70% { opacity: .8; } 100% { transform: translate(14px, -420px) scale(1); opacity: 0; } }
+.rb-head { display: flex; justify-content: space-between; font-family: var(--f-led); font-size: 13px; letter-spacing: .22em; color: var(--gold); }
+.rb-stage { position: relative; height: 176px; display: grid; place-items: center; margin-top: 2px; }
+.rb-ghost { position: absolute; inset: 0; display: grid; place-items: center; font-family: var(--f-display); font-size: 176px; line-height: 1; letter-spacing: -.04em; color: transparent;
+  -webkit-text-stroke: 2px rgba(243,207,122,.7); text-shadow: 0 0 30px rgba(243,170,60,.45); opacity: .7; animation: rbghost 1.5s cubic-bezier(.2,.7,.2,1) both; }
+@keyframes rbghost { 0% { transform: scale(1.6); filter: blur(14px); opacity: 0; } 55% { opacity: .95; } 100% { transform: scale(1); filter: blur(0); opacity: .7; } }
+.rb-mag { position: relative; width: 96px; height: 96px; border-radius: 50%; display: grid; place-items: center; font-family: var(--f-display); font-size: 40px; color: var(--kt);
+  background: radial-gradient(circle at 34% 28%, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 46%), var(--k1);
+  box-shadow: inset 0 0 0 7px var(--k2), inset 0 0 0 8px rgba(0,0,0,.22), 0 6px 0 rgba(0,0,0,.4), 0 0 34px rgba(243,207,122,.55);
+  animation: rbsnap .6s 1.15s cubic-bezier(.3,1.7,.5,1) both; }
+@keyframes rbsnap { 0% { transform: translateY(-46px) scale(1.4); opacity: 0; } 100% { transform: none; opacity: 1; } }
+.rb-ring { position: absolute; left: 50%; top: 50%; width: 96px; height: 96px; margin: -48px 0 0 -48px; border-radius: 50%; border: 2px solid var(--gold); opacity: 0; animation: rbring 1s 1.5s ease-out both, rbring 2.4s 3.2s ease-out infinite; }
+@keyframes rbring { 0% { transform: scale(.85); opacity: .9; } 100% { transform: scale(2.7); opacity: 0; } }
+.rb-seal { position: absolute; right: calc(50% - 116px); top: 20px; width: 52px; height: 52px; display: grid; place-items: center; writing-mode: vertical-rl; letter-spacing: .08em;
+  font-family: var(--f-display); font-size: 17px; line-height: 1; color: #fff4e8; background: #c42a22; border-radius: 6px;
+  box-shadow: inset 0 0 0 3px #c42a22, inset 0 0 0 4.5px rgba(255,244,232,.9), 0 3px 10px rgba(0,0,0,.45); transform: rotate(-9deg); animation: rbstamp .42s 1.85s cubic-bezier(.2,1.5,.4,1) both; }
+@keyframes rbstamp { 0% { transform: rotate(-9deg) scale(2.6); opacity: 0; } 60% { opacity: 1; } 100% { transform: rotate(-9deg) scale(1); opacity: 1; } }
+.rb-epi { position: relative; margin-top: 4px; font-family: var(--f-chalk); font-size: 16px; color: var(--gold); animation: rbup .6s 2.05s both; }
+.reborn h2.rb-name { position: relative; margin: 4px 0 2px; font-family: var(--f-display); font-weight: 400; font-size: 31px; line-height: 1.2; letter-spacing: .05em; color: #fff;
+  text-shadow: 0 0 22px rgba(243,170,60,.45), 0 2px 0 rgba(0,0,0,.4); animation: rbname .8s 2.2s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes rbname { 0% { letter-spacing: .5em; opacity: 0; filter: blur(6px); } 100% { letter-spacing: .05em; opacity: 1; filter: blur(0); } }
+.rb-sub { position: relative; font-size: 12px; color: rgba(255,255,255,.74); animation: rbup .6s 2.4s both; }
+.rb-past { position: relative; margin: 14px 0 0; padding: 10px 12px 11px; border-radius: 12px; text-align: left; background: linear-gradient(180deg, rgba(243,207,122,.10), rgba(243,207,122,.03)); border: 1px solid rgba(243,207,122,.32); animation: rbup .6s 2.55s both; }
+.rb-past-h { display: flex; justify-content: space-between; font-family: var(--f-chalk); font-size: 12px; color: rgba(243,207,122,.85); }
+.rb-past b { display: block; margin-top: 2px; font-family: var(--f-display); font-weight: 400; font-size: 18px; color: var(--gold); letter-spacing: .03em; }
+.rb-past p { margin: 4px 0 0; font-size: 13px; line-height: 1.6; color: rgba(255,255,255,.9); }
+.rb-stats { position: relative; display: grid; grid-template-columns: 1fr 1fr 1.3fr; gap: 6px; margin-top: 10px; animation: rbup .6s 2.7s both; }
+.rb-stats div { padding: 7px 4px 6px; border-radius: 10px; background: rgba(255,255,255,.07); }
+.rb-stats small { display: block; font-size: 10px; font-weight: 700; color: rgba(255,255,255,.6); }
+.rb-stats b { font-family: var(--f-display); font-weight: 400; font-size: 20px; color: #fff; }
+.rb-stats b.rb-stars { font-family: var(--f-body); font-size: 15px; color: var(--gold); letter-spacing: .08em; }
+.rb-stats b.rb-trait { font-family: var(--f-body); font-weight: 700; font-size: 13px; line-height: 1.9; color: var(--gold); }
+.rb-note { position: relative; margin: 10px 0 0; font-size: 12px; color: rgba(255,255,255,.7); text-wrap: balance; animation: rbup .6s 2.8s both; }
+@keyframes rbup { from { transform: translateY(10px); opacity: 0; } to { transform: none; opacity: 1; } }
+/* handing over the number: only the stage plays again */
+.reborn.again .rb-ghost { animation-duration: 1s; }
+.reborn.again .rb-rays { animation: rbspin 40s linear infinite; opacity: 1; }
+.reborn.again .rb-mag { animation-delay: 0s; } .reborn.again .rb-ring { animation-delay: .3s, 2s; } .reborn.again .rb-seal { animation: none; }
+.reborn.again .rb-epi, .reborn.again h2.rb-name, .reborn.again .rb-sub, .reborn.again .rb-past, .reborn.again .rb-stats, .reborn.again .rb-note, .reborn.again::after { animation: none; }
+.btn.rb-go { flex-direction: column; gap: 0; line-height: 1.2; min-height: 56px; }
+.btn.rb-go small { font-size: 11px; font-weight: 500; opacity: .8; }
+.chip.rbchip { background: #c42a22; color: #fff4e8; font-weight: 700; }
+.rb-line { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; line-height: 1.6; padding: 10px 12px; border-radius: 12px; background: color-mix(in srgb, #c42a22 10%, transparent); border: 1px solid color-mix(in srgb, #c42a22 35%, transparent); }
+.rb-line .chip { flex: none; }
+@media (prefers-reduced-motion: reduce) { .reborn, .reborn *, .reborn::after { animation: none !important; opacity: 1; filter: none; } .reborn .rb-ghost { opacity: .7; } .reborn .rb-rays { opacity: 1; } }
 .preset { display: grid; gap: 6px; padding: 12px; }
 .preset-xi { color: var(--muted); line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .preset-act { display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr; gap: 6px; margin-top: 2px; }
@@ -1646,6 +1705,7 @@ function attendance(S, hid, aid) {
   const c = S.clubs[hid], o = S.clubs[aid];
   const t = table(S); const row = t.find(r => r.id === hid); const pos = t.indexOf(row) + 1;
   let f = 1 + (o.fan >= 4 ? 0.08 : 0) + (c.fac.stadium - 2) * 0.05 + (row && row.p > 3 ? (10 - pos) * 0.012 : 0) + (c.hype || 0);
+  if (hid === S.my && Object.values(S.players).some(p => p.reborn && p.club === hid)) f += 0.05;  // a reborn legend draws the fans
   f += R() * 0.12 - 0.06;
   return Math.round(clamp(FANBASE[c.fan] * f, 3000, c.cap * 0.97));
 }
@@ -1787,7 +1847,7 @@ function transferDay(S) {
   }
   // occasional unsolicited bids for my best players
   if (R() < 0.012) {
-    const top = squad(S, S.my).filter(p => !p.listed && !p.retire && available(p)).sort((a, b) => b.ovr - a.ovr).slice(0, 6);
+    const top = squad(S, S.my).filter(p => !p.listed && !p.retire && !p.reborn && available(p)).sort((a, b) => b.ovr - a.ovr).slice(0, 6);
     const p = pick(top); if (p && !S.inbox.some(x => x.type === 'offer' && x.pid === p.id && !x.done)) makeOffer(S, p, 1.05 + R() * 0.35);
   }
   // AI <-> AI moves
@@ -1809,6 +1869,7 @@ function acceptOffer(S, iid) {
   moveP(S, p, it.from, it.fee);
   it.done = true; it.result = 'accepted';
   news(S, `${p.name}が${S.clubs[it.from].name}へ完全移籍（移籍金 ${money(it.fee)}）。`, 'transfer');
+  if (p.reborn) { S.board = clamp(S.board - 10, 0, 100); news(S, `転生した${p.name}を手放したことに、サポーターから落胆の声が上がっている。`, 'warn'); }
   return { ok: true };
 }
 function rejectOffer(S, iid) { const it = S.inbox.find(x => x.id === iid); if (it) { it.done = true; it.result = 'rejected'; } }
@@ -1889,6 +1950,135 @@ function bid(S, pid, mult) {
   moveP(S, p, S.my, fee);
   news(S, `${p.name}（${fromName}）を獲得！ 移籍金 ${money(fee)}。`, 'transfer');
   return { ok: true, msg: `${p.name}を獲得しました` };
+}
+/* ---------- 転生選手: a legend of the club I manage comes back as a 16-year-old ----------
+   From my 2nd season at a club, at the start of each season: REBORN.base, more after a season that met the target
+   (met) and for each title (title), certain once `pity` draws in a row have missed. Each legend once per save.
+   Names are made up in the style of the real ones (中村俊輔 → 外町俊之輔); the pop-up tells who he was through the
+   number, the era and the epithet. Retired and living players only. num: the number he made his own (null if none). */
+const REBORN = { base: 0.25, met: 0.15, title: 0.2, pity: 2, ovr: [62, 66] };
+const LEGENDS = {
+  yokohamafm: [
+    { id: 'yfm1', name: '外町 俊之輔', pp: 'OMF', sty: 'tech', num: 25, era: '1997–2016', epi: 'ハマの左足', line: '左足ひとつで試合を変えた。フリーキックの名手にしてファンタジスタ。', pot: 90 },
+    { id: 'yfm2', name: '奥澤 佑仁', pp: 'CB', sty: 'phys', num: 22, era: '2002–2018', epi: '不屈のボンバー', line: '空中戦で負けない。長く最終ラインに立ち続けた柱。', pot: 87 },
+    { id: 'yfm3', name: '井野 正己', pp: 'CB', sty: '', num: 4, era: '1990–1999', epi: 'アジアの壁', line: '読みと統率で守備をまとめ上げたリベロ。', pot: 86 },
+  ],
+  kashima: [
+    { id: 'ksm1', name: '大笠原 満夫', pp: 'CMF', sty: 'tech', num: 40, era: '1998–2018', epi: '常勝の背番号40', line: '黙々とタイトルを積み上げた、中盤の主。', pot: 88 },
+    { id: 'ksm2', name: '春田 豊', pp: 'CB', sty: 'phys', num: 3, era: '1993–2003', epi: '空中戦の鬼', line: 'ヘディングで跳ね返し続けた闘将。', pot: 85 },
+    { id: 'ksm3', name: '桜沢 敦史', pp: 'ST', sty: 'speed', num: 13, era: '1996–2007', epi: '動き出しの天才', line: 'ひと呼吸早い動き出しで、何度も裏を取ったストライカー。', pot: 86 },
+  ],
+  urawa: [
+    { id: 'urw1', name: '福山 正弘', pp: 'CF', sty: '', num: 9, era: '1989–2002', epi: 'ミスターレッズ', line: '苦しい時代も赤いユニフォームでゴールを奪い続けた。', pot: 85 },
+    { id: 'urw2', name: '大野 伸三', pp: 'OMF', sty: 'tech', num: null, era: '1998–2007', epi: '天才ゲームメーカー', line: 'ボールが足に吸い付くようなタッチで観客を魅了した。', pot: 90 },
+  ],
+  kawasakif: [
+    { id: 'kwf1', name: '仲村 憲豪', pp: 'CMF', sty: 'tech', num: 14, era: '2003–2020', epi: '等々力のバンディエラ', line: 'クラブ一筋。パス一本で試合を動かした司令塔。', pot: 89 },
+    { id: 'kwf2', name: '小久保 嘉仁', pp: 'CF', sty: '', num: 13, era: '2013–2016', epi: '三年連続の得点王', line: 'ゴール前の嗅覚と強烈なシュートで、得点王を取り続けた。', pot: 88 },
+  ],
+  gosaka: [
+    { id: 'gos1', name: '近藤 保之', pp: 'DMF', sty: 'tech', num: 7, era: '2001–2020', epi: 'コロコロの司令塔', line: '慌てず、急がず。冷静なパスとPKで黄金期を支えた。', pot: 89 },
+    { id: 'gos2', name: '三川 孝弘', pp: 'OMF', sty: 'tech', num: 10, era: '1999–2016', epi: '魔法のスルーパス', line: '誰も見えていない道筋にパスを通した、ガンバの10番。', pot: 86 },
+  ],
+  hiroshima: [
+    { id: 'hir1', name: '加藤 寿仁', pp: 'CF', sty: '', num: 11, era: '2005–2016', epi: 'ゴールの匂いを嗅ぐ男', line: 'わずかなスキを逃さず、ゴールを積み重ねたストライカー。', pot: 87 },
+    { id: 'hir2', name: '林崎 和之', pp: 'DMF', sty: 'tech', num: 8, era: '1999–2018', epi: '紫の舵取り', line: 'クラブ一筋。中盤の底からタイトルへ導いた。', pot: 85 },
+  ],
+  kashiwa: [
+    { id: 'ksw1', name: '小谷 秀一', pp: 'DMF', sty: '', num: 7, era: '2003–2021', epi: '柏の主将', line: 'クラブ一筋。誰よりも走り、チームをまとめ続けた。', pot: 84 },
+    { id: 'ksw2', name: '南嶋 秀明', pp: 'CF', sty: 'phys', num: null, era: '1997–2010', epi: '日立台のストライカー', line: '体を張ってゴールに向かい、スタジアムを沸かせた。', pot: 83 },
+  ],
+  fctokyo: [
+    { id: 'fct1', name: '石山 直弘', pp: 'WG', sty: 'speed', num: 18, era: '2002–2017', epi: '青赤の快速ウイング', line: 'サイドを駆け上がる速さで、何度もスタジアムを揺らした。', pot: 86 },
+  ],
+  tokyov: [
+    { id: 'tkv1', name: 'ラミレス 瑠威', pp: 'OMF', sty: 'tech', num: 10, era: '1977–1998', epi: '緑のカリスマ', line: '技術と気迫でクラブを日本一に導いた司令塔。', pot: 89 },
+    { id: 'tkv2', name: '南澤 剛', pp: 'CMF', sty: 'phys', num: null, era: '1991–2002', epi: '中盤のダイナモ', line: '90分走り続け、ボールを奪い続けた。', pot: 84 },
+  ],
+  nagoya: [
+    { id: 'ngy1', name: '楢原 正豪', pp: 'GK', sty: '', num: 1, era: '1999–2018', epi: '鉄壁の守護神', line: '20年近くゴールマウスを守り、リーグ優勝をもたらした。', pot: 88 },
+    { id: 'ngy2', name: 'ドラゴ ストイコフ', pp: 'OMF', sty: 'tech', num: 10, era: '1994–2001', epi: '名古屋の妖精', line: '魔法のようなボールタッチで、見る者を魅了した。', pot: 90, nat: 'SRB' },
+  ],
+  cosaka: [
+    { id: 'cos1', name: '林島 寛明', pp: 'OMF', sty: '', num: 8, era: '1991–2008', epi: 'ミスターセレッソ', line: 'クラブ一筋。背番号8の系譜はここから始まった。', pot: 86 },
+    { id: 'cos2', name: '東澤 明則', pp: 'CF', sty: 'phys', num: null, era: '1995–2011', epi: '桜の大砲', line: '高さと強さで前線に君臨したストライカー。', pot: 84 },
+  ],
+  kobe: [
+    { id: 'kob1', name: 'アンドレア イニエスト', pp: 'OMF', sty: 'tech', num: 8, era: '2018–2023', epi: '魔法の8番', line: '世界の頂点を知る技術で、神戸に初タイトルをもたらした。', pot: 90, nat: 'ESP' },
+  ],
+  shimizu: [
+    { id: 'shm1', name: '澤上 正明', pp: 'OMF', sty: 'tech', num: 10, era: '1992–2005', epi: 'ミスターエスパルス', line: 'クラブ一筋。正確なキックでオレンジの攻撃を操った。', pot: 86 },
+  ],
+  chiba: [
+    { id: 'chb1', name: '巻 誠二郎', pp: 'CF', sty: 'phys', num: null, era: '2003–2010', epi: '泥臭きストライカー', line: '体を投げ出してゴールを奪う、ひたむきなフォワード。', pot: 84 },
+    { id: 'chb2', name: '加藤 勇斗', pp: 'DMF', sty: 'phys', num: null, era: '2000–2019', epi: 'ジェフの闘将', line: '中盤で戦い続け、苦しい時代のチームを支えた。', pot: 83 },
+  ],
+  fukuoka: [
+    { id: 'fuk1', name: '山上 芳樹', pp: 'CF', sty: 'speed', num: null, era: '1990年代', epi: '博多の点取り屋', line: 'クラブの草創期に、スピードでゴールを量産した。', pot: 84 },
+  ],
+  kyoto: [
+    { id: 'kyo1', name: '松山 大介', pp: 'SH', sty: 'tech', num: null, era: '2000–2004', epi: '古都の魔術師', line: '変幻自在のドリブルで、クラブに初のタイトルをもたらした。', pot: 87 },
+  ],
+  machida: [
+    { id: 'mcd1', name: '李 漢才', pp: 'CMF', sty: '', num: null, era: '2014–2020', epi: '町田の主将', line: 'キャプテンとしてチームをJ2へ押し上げた。', pot: 82 },
+  ],
+  mito: [
+    { id: 'mit1', name: '本宮 幸治', pp: 'GK', sty: '', num: null, era: '1999–2024', epi: '水戸の守護神', line: '26年ゴールを守り、J2最多出場を積み上げた。', pot: 84 },
+  ],
+  nagasaki: [
+    { id: 'ngs1', name: '前川 悠介', pp: 'DMF', sty: '', num: null, era: '2010年代', epi: 'クラブの心臓', line: '最古参として、地域リーグからJ1までの道のりを支えた。', pot: 82 },
+  ],
+  okayama: [
+    { id: 'oky1', name: '喜川 康太', pp: 'DMF', sty: '', num: null, era: '2010年代', epi: '岡山の背骨', line: '長く中盤に立ち、J2を戦い抜いた。', pot: 82 },
+  ],
+  iwata: [
+    { id: 'iwt1', name: '名浜 浩之', pp: 'OMF', sty: 'tech', num: 10, era: '1995–2008', epi: 'サックスブルーの司令塔', line: '左足のパスで黄金期の攻撃を組み立てた。', pot: 88 },
+    { id: 'iwt2', name: '中川 雅志', pp: 'CF', sty: '', num: 9, era: '1994–2009', epi: '炎のストライカー', line: '最後まで諦めない姿勢で、ゴールを奪い続けた。', pot: 86 },
+  ],
+  shonan: [
+    { id: 'shn1', name: '外田 英斗', pp: 'OMF', sty: 'tech', num: null, era: '1995–1998', epi: '湘南の天才', line: '10代で頭角を現し、世界へ羽ばたいた。', pot: 90 },
+  ],
+  oita: [
+    { id: 'oit1', name: '低松 大輝', pp: 'CF', sty: 'phys', num: null, era: '2000年代', epi: 'トリニータの大黒柱', line: '高さと強さで前線を支え続けた。', pot: 83 },
+  ],
+};
+function legendOf(id) { for (const ls of Object.values(LEGENDS)) { const l = ls.find(x => x.id === id); if (l) return l; } return null; }
+function rebornCheck(S, se) {
+  const st = S.reborn || (S.reborn = { used: [], wait: 0, club: S.my });
+  if (st.club !== S.my) { st.club = S.my; st.wait = 0; }
+  if (tenure(S) < 1) return null;  // the 2nd season at this club at the earliest
+  const pool = (LEGENDS[S.my] || []).filter(l => !st.used.includes(l.id));
+  if (!pool.length) return null;
+  const titles = se ? (se.verdict === 'champion' ? 1 : 0) + ['ec', 'lc'].filter(k => se.cups && se.cups[k] && se.cups[k].champ === S.my).length : 0;
+  let chance = REBORN.base + (se && (se.verdict === 'met' || se.verdict === 'champion') ? REBORN.met : 0) + titles * REBORN.title;
+  if (st.wait >= REBORN.pity) chance = 1;
+  if (R() >= chance) { st.wait++; return null; }
+  st.wait = 0;
+  return makeReborn(S, wpick(pool, l => l === pool[0] ? 2 : 1));
+}
+function makeReborn(S, L) {
+  const pos = DP_CAT[L.pp] || 'MF';
+  const p = genPlayer(S, S.my, { age: 16, foreign: !!L.nat, pos, pp: L.pp, ovr: ri(REBORN.ovr[0], REBORN.ovr[1]), pot: Math.min(GROW.potMax, L.pot), sty: L.sty });
+  const parts = L.name.split(' ');
+  p.name = L.name; p.short = L.nat ? parts[parts.length - 1] : parts[0]; p.nat = L.nat || 'JPN';
+  initAttrs(p);
+  p.reborn = L.id;
+  S.reborn.used.push(L.id);
+  if (L.num && !squad(S, S.my).some(q => q.id !== p.id && q.num === L.num)) p.num = L.num;
+  S.reborn.show = p.id;  // the pop-up is still to be seen
+  track(S, p);
+  news(S, `転生――「${L.epi}」の魂を継ぐ${L.name}（16歳・${L.pp}）がユースからトップ昇格。${L.num ? `伝説の背番号${L.num}を知る人は、その姿に息をのんだ。` : ''}`, 'big');
+  return p;
+}
+// hand him the legend's number (the player wearing it takes his)
+function rebornNum(S, pid) {
+  const p = S.players[pid]; const L = p && legendOf(p.reborn);
+  if (!p || !L || !L.num || p.club !== S.my || p.num === L.num) return { ok: false, msg: '背番号を変えられません' };
+  const q = squad(S, S.my).find(x => x.id !== p.id && x.num === L.num);
+  if (q) q.num = p.num;
+  p.num = L.num;
+  news(S, `${p.name}に背番号${L.num}を託した。${q ? `（${q.name}は${q.num}番へ）` : ''}`, 'info');
+  return { ok: true, msg: `${p.name}が背番号${L.num}を背負う` };
 }
 /* ---------- loans (期限付き移籍): a young player goes to a J2 club until the end of the season ----------
    He belongs to the loan club meanwhile (p.club = loan club, p.loan = {from, to, since, share, ovr0, pot0}), so he is off my
@@ -2047,7 +2237,7 @@ function rivalryInfo(S, a, b) {
   return null;
 }
 function rivalry(S, a, b) { const r = rivalryInfo(S, a, b); return r ? r.name : null; }
-function bigGame(p) { return hash(p.name + '|' + p.birth) % 9 === 0; } // 大舞台に強い（1割ほど）
+function bigGame(p) { return !!p.reborn || hash(p.name + '|' + p.birth) % 9 === 0; } // 大舞台に強い（1割ほど）
 function formerClubs(p) {
   const s = new Set((p.hist || []).map(h => h.c).filter(c => c && c !== p.club));
   if (p.prev && p.prev !== p.club) s.add(p.prev);
@@ -2465,6 +2655,8 @@ function rollover(S) {
       if (cid === S.my) { news(S, `ユースの逸材、${pr.name}（${age(pr, S.date)}歳・${pr.pos}）がトップ昇格。早くから注目されてきた才能だ。`, 'big'); track(S, pr); }
     }
   }
+  // 転生: a legend of my club may come back
+  if (!fireMe) rebornCheck(S, se);
   // trim oversized AI squads (release weakest veterans to free agency)
   for (const cid of S.order) {
     if (cid === S.my) continue;
@@ -2503,7 +2695,7 @@ const API = {
   createMatch, stepMatch, simulateFull, finishMatch, doSub, benchOptions, onPitch, setMentality, bestSubFor, setCounter, mentLabel,
   advance, nextDay, simAIToday, myFixtureToday, nextMyFixture, todaysFixtures, inWindow, windowEnd, nextWindowStart,
   acceptOffer, rejectOffer, bid, decideRetirements, shortlist, shortEntry, unshort, bidBlock,
-  BOARD, BOARD_LV, boardLv, tenure, CUPS, CUP_PRIZE, NATIONAL, fxLabel, cupResult, cupWinner, hypeMatch, HYPE, SUB_RATE, subRate, STYLE, GROW, shareFor, LOAN, GEM, myLoans, loanCan, loanOptions, loanOut, growthOutlook, weeksLeft, yearsTo, bigGame, rivalry, SCOUT, sendScout, playShare, marketList, ensureFreeAgents, upgrade, facCost, takeJob, rollover, endSeason, news, fire,
+  BOARD, BOARD_LV, boardLv, tenure, CUPS, CUP_PRIZE, NATIONAL, fxLabel, cupResult, cupWinner, hypeMatch, HYPE, SUB_RATE, subRate, STYLE, GROW, shareFor, LOAN, GEM, REBORN, LEGENDS, legendOf, rebornCheck, makeReborn, rebornNum, myLoans, loanCan, loanOptions, loanOut, growthOutlook, weeksLeft, yearsTo, bigGame, rivalry, SCOUT, sendScout, playShare, marketList, ensureFreeAgents, upgrade, facCost, takeJob, rollover, endSeason, news, fire,
 };
 if (typeof module !== 'undefined' && module.exports) module.exports = API; else root.Engine = API;
 })(typeof window !== 'undefined' ? window : globalThis);
@@ -3284,6 +3476,7 @@ function prow(p, ctx) {
   if (p.inj > 0) chips.push(`<span class="chip warn">負傷 ${p.inj}日</span>`);
   if (p.sus > 0) chips.push('<span class="chip warn">出場停止</span>');
   if (p.hot) chips.push('<span class="chip fire">燃えている</span>');
+  if (p.reborn) chips.push('<span class="chip rbchip">転生</span>');
   if (ctx === 'market' && E.shortEntry(S, p.id)) chips.push('<span class="chip acc">入札済み</span>');
   const lead = ctx === 'market' ? (S.clubs[p.club] ? kit(p.club) : '<span class="chip">FA</span>') : `<span class="no">${p.num}</span>`;
   const sub = ctx === 'market' ? `${S.clubs[p.club] ? esc(S.clubs[p.club].short) : 'フリー'}・${a}歳・${E.money(E.value(p, S.date))}` : `${a}歳`;
@@ -3346,6 +3539,7 @@ function devRow(p) {
   if (p.learn) chips.push(`<span class="chip ok">${p.learn.pos}習得中 ${Math.floor(E.apt(p, p.learn.pos))}</span>`);
   if (bloomed(p)) chips.push('<span class="chip ok">開花</span>');
   if (p.gem && a <= 19) chips.push('<span class="chip acc">逸材</span>');
+  if (p.reborn) chips.push('<span class="chip rbchip">転生</span>');
   if (p.inj > 0) chips.push(`<span class="chip warn">負傷</span>`);
   const d = p.ovr0 != null ? shownDiff(p.ovr, p.ovr0) : 0;
   return `<li><button class="prow" data-act="train" data-id="${p.id}"><span class="no">${p.num}</span>${posTag(p)}<span class="nm"><b>${esc(p.name)}</b><span>${chips.join('')}</span></span><span class="rt"><span class="ovr ${oc(p.ovr)}">${E.ovr(p)}</span>${dlt(d)}</span></button></li>`;
@@ -3412,6 +3606,8 @@ function sheetPlayer(id) {
   if (p.retire) status.push('<span class="chip">今季限りで引退</span>');
   if (lent) status.push('<span class="chip acc">期限付き移籍中（シーズン終了まで）</span>');
   if (p.gem && a <= 19) status.push('<span class="chip acc">ユースの逸材</span>');
+  const leg = p.reborn && E.legendOf(p.reborn);
+  if (leg) status.push(`<span class="chip rbchip">転生</span>`);
   if ((mine || lent) && bloomed(p)) status.push(`<span class="chip ok">開花（伸びしろ ${Math.round(p.pot0)}→${Math.round(p.pot)}）</span>`);
   if (p.hot) status.push(`<span class="chip fire">燃えている（${esc(p.hot.why)}）</span>`);
   if (E.bigGame(p)) status.push('<span class="chip">大舞台に強い</span>');
@@ -3440,6 +3636,7 @@ function sheetPlayer(id) {
     <h2>${esc(p.name)}</h2>
     ${status.length ? `<div class="row wrap">${status.join('')}</div>` : ''}
     <div class="bigovr"><span class="ovr ${oc(p.ovr)}">${E.ovr(p)}</span><dl class="kv" style="flex:1"><dt>伸びしろ</dt><dd><span class="stars">${potStars(p)}</span>${mine || lent ? `（最大 ${Math.round(p.pot)}）` : p.found ? `（見立て ${Math.round(p.pot) - 3}〜${Math.round(p.pot) + 3}）` : ''}</dd><dt>市場価値</dt><dd>${E.money(v)}</dd><dt>年俸</dt><dd>${E.money(E.wage(p))}</dd></dl></div>
+    ${leg ? `<div class="rb-line"><span class="chip rbchip">転生</span><span>「${esc(leg.epi)}」の魂を継ぐ。${leg.num ? `かつての背番号${leg.num}` : 'クラブのレジェンド'}（${esc(leg.era)}）。${esc(leg.line)}</span></div>` : ''}
     ${attrRows(p, mine || lent)}
     ${mine || lent ? growthBlock(p, lent) : ''}
     <div><div class="eyebrow" style="margin-bottom:6px">ポジション</div><div class="small" style="margin-bottom:8px">本職 <b>${dpOf(p)}</b>（${E.DP_JP[dpOf(p)]}）${p.learn ? `・<span class="muted">${p.learn.pos}を習得中</span>` : ''}</div>${p.pos === 'GK' ? '' : aptGrid(p, false)}
@@ -3912,6 +4109,41 @@ function sheetRetire(i) {
     `<button class="btn primary block" data-act="retNext" data-i="${i + 1}" style="min-height:54px">${left ? `次へ（あと${left}人）` : '次のシーズンへ'}</button>`);
   const b = sheetEl.querySelector('.sheet-body'); if (b) b.scrollTop = 0;
 }
+// 転生: a legend of the club comes back as a 16-year-old. His old number re-ignites, the magnet snaps on, the seal lands.
+const STY_JP = { tech: '技術型', phys: 'フィジカル型', speed: 'スピード型' };
+function sheetReborn(id, again) {
+  const p = S.players[id != null ? id : S.reborn && S.reborn.show]; const L = p && E.legendOf(p.reborn);
+  if (!p || !L) { if (S.reborn) delete S.reborn.show; return; }
+  sheetState = { type: 'reborn', id: p.id };
+  const c = S.clubs[S.my];
+  const kt = lum(c.c1) > 0.6 ? '#141414' : '#ffffff';
+  const ghost = L.num || p.num;
+  const holder = L.num && p.num !== L.num ? E.squad(S, S.my).find(q => q.id !== p.id && q.num === L.num) : null;
+  const sparks = Array.from({ length: 16 }, (_, i) => `<i style="left:${(i * 61 + 7) % 100}%;animation-delay:${((i * 37) % 40) / 10}s;animation-duration:${3.2 + (i % 5) * 0.5}s"></i>`).join('');
+  openSheet(`<div class="reborn${again ? ' again' : ''}" style="--k1:${c.c1};--k2:${c.c2};--kt:${kt}">
+      <div class="rb-rays" aria-hidden="true"></div><div class="rb-sparks" aria-hidden="true">${sparks}</div>
+      <div class="rb-head"><span>REBORN</span><span>${esc(E.seasonLabel(S.season))}</span></div>
+      <div class="rb-stage">
+        <div class="rb-ghost" aria-hidden="true">${ghost}</div>
+        <span class="rb-ring" aria-hidden="true"></span>
+        <div class="rb-mag" aria-label="背番号${p.num}">${p.num}</div>
+        <div class="rb-seal" aria-label="転生">転生</div>
+      </div>
+      <div class="rb-epi">「${esc(L.epi)}」の魂を継ぐ者</div>
+      <h2 class="rb-name">${esc(p.name)}</h2>
+      <div class="rb-sub">${E.age(p, S.date)}歳・${L.pp}${STY_JP[L.sty] ? '・' + STY_JP[L.sty] : ''}・${esc(c.short)} ユース</div>
+      <div class="rb-past">
+        <div class="rb-past-h"><span>かつて</span><span>${esc(L.era)}</span></div>
+        <b>${L.num ? `伝説の背番号${L.num}` : `${esc(c.short)}のレジェンド`}</b>
+        <p>${esc(L.line)}</p>
+      </div>
+      <div class="rb-stats"><div><small>総合力</small><b>${E.ovr(p)}</b></div><div><small>伸びしろ</small><b class="rb-stars">${potStars(p)}</b></div><div><small>特徴</small><b class="rb-trait">大舞台に強い</b></div></div>
+      <p class="rb-note">${holder ? `背番号${L.num}はいま${esc(holder.name)}が着けている。` : L.num && p.num === L.num ? `伝説の背番号${L.num}が、ふたたびピッチに帰ってくる。` : 'その魂を受け継ぐ少年が、ユースから現れた。'}</p>
+    </div>`,
+    holder ? `<button class="btn primary block rb-go" data-act="rebornNum" data-id="${p.id}">背番号${L.num}を託す<small>${esc(holder.short)}は${p.num}番へ</small></button><button class="btn ghost block" data-act="rebornDone">いまの番号で迎え入れる</button>`
+      : `<button class="btn primary block rb-go" data-act="rebornDone">チームに迎え入れる</button>`);
+  const b = sheetEl.querySelector('.sheet-body'); if (b) b.scrollTop = 0;
+}
 const MENT_OPTS = [['def', '守備的'], ['bal', 'バランス'], ['att', '攻撃的']];
 const MENT_DESC = {
   def: '引いて守る。失点は減るが得点も減る。格上が相手ほど効果が大きい。',
@@ -4031,6 +4263,7 @@ function refreshSheet() {
   if (!sheetState) return;
   const s = sheetState;
   if (s.type === 'presets') return sheetPresets();
+  if (s.type === 'reborn') return sheetReborn(s.id, true);
   if (s.type === 'loan') return S.players[s.id] && S.players[s.id].club === S.my ? sheetLoan(s.id) : sheetPlayer(s.id);
   if (s.type === 'player') sheetPlayer(s.id); else if (s.type === 'train') sheetTrain(s.id); else if (s.type === 'bench') sheetBench(s.id); else if (s.type === 'slot') sheetSlot(s.i); else if (s.type === 'pre') sheetPrematch(s.id); else if (s.type === 'msub') sheetMatchTactics();
 }
@@ -4258,7 +4491,7 @@ const ACT = {
     UI.tab = 'home'; closeSheet(); persist(true); render(); window.scrollTo(0, 0);
     toast(`${S.clubs[S.my].short}の監督に就任しました`);
   },
-  continue() { const st = pickSave(loadLocal(), Cloud.cand); if (!st) return toast('セーブデータが読み込めません'); S = E.migrate(st, DATA); UI.tab = 'home'; render(); if (Cloud.cand === st) saveLocal(); },
+  continue() { const st = pickSave(loadLocal(), Cloud.cand); if (!st) return toast('セーブデータが読み込めません'); S = E.migrate(st, DATA); UI.tab = 'home'; render(); if (Cloud.cand === st) saveLocal(); if (!S.fired && S.reborn && S.reborn.show) setTimeout(() => sheetReborn(), 320); },
   go() { go(); },
   tab(d) { UI.tab = d.tab; if (d.tab === 'league') UI.lg.round = null; render(); window.scrollTo(0, 0); },
   closeSheet() { closeSheet(); },
@@ -4331,6 +4564,8 @@ const ACT = {
   mkPos(d) { UI.mk.pos = d.k; render(); },
   mkFA() { UI.mk.fa = !UI.mk.fa; render(); },
   mkView(d) { UI.mk.view = d.k; render(); },
+  rebornNum(d) { const r = E.rebornNum(S, Number(d.id)); toast(r.msg); persist(false); if (r.ok) refreshSheet(); render(); },
+  rebornDone() { if (S.reborn) delete S.reborn.show; persist(false); closeSheet(); render(); },
   loanSheet(d) { sheetLoan(Number(d.id)); },
   loanGo(d) { const r = E.loanOut(S, Number(d.id), d.k); toast(r.msg); if (r.ok) { persist(true); sheetPlayer(Number(d.id)); render(); } else refreshSheet(); },
   youthDone(d) { const it = S.inbox.find(x => x.id === Number(d.id)); if (it) it.done = true; persist(false); render(); },
@@ -4352,7 +4587,7 @@ const ACT = {
     ACT.rollNow();
   },
   retNext(d) { const i = Number(d.i); const ret = S.seasonEnd.ret.filter(r => S.players[r.id]); if (i < ret.length) return sheetRetire(i); S.seasonEnd.retSeen = true; ACT.rollNow(); },
-  rollNow() { E.rollover(S); persist(true); closeSheet(); UI.tab = 'home'; UI.lg.round = null; render(); window.scrollTo(0, 0); if (S.fired) setTimeout(sheetFired, 260); else toast(`${E.seasonLabel(S.season)}シーズンへ`); },
+  rollNow() { E.rollover(S); persist(true); closeSheet(); UI.tab = 'home'; UI.lg.round = null; render(); window.scrollTo(0, 0); if (S.fired) setTimeout(sheetFired, 260); else if (S.reborn && S.reborn.show) setTimeout(() => sheetReborn(), 320); else toast(`${E.seasonLabel(S.season)}シーズンへ`); },
   job(d) { E.takeJob(S, d.id); persist(true); closeSheet(); UI.tab = 'home'; render(); toast(`${S.clubs[S.my].short}の監督に就任しました`); },
   askReset() { sheetReset(); },
   exportOpen() { sheetExport(); },

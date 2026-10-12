@@ -32,7 +32,7 @@ async def run(scheme):
         await ed.evaluate('''([a, b]) => { const k='touchline.j1.save'; const st = JSON.parse(LZString.decompressFromBase64(localStorage.getItem(k).slice(3)));
           for (const f of st.fixtures) { f.played = true; f.hg = 1; f.ag = 1; }
           // a veteran who is sure to retire (not in the data file, so the save keeps his birthday)
-          const v = JSON.parse(JSON.stringify(st.players[a])); Object.assign(v, { id: 990001, name: '外町 俊之輔', short: '外町', num: 99, birth: '1984-04-01', gen: true, nat: 'JPN',
+          const v = JSON.parse(JSON.stringify(st.players[a])); Object.assign(v, { id: 990001, name: '外山 俊太', short: '外山', num: 99, birth: '1984-04-01', gen: true, nat: 'JPN',
             st: { apps: 34, g: 21, a: 4, yc: 2, rc: 0, rt: 240, mins: 2800 }, hist: [{ s: '2025/26', c: 'kobe', ovr: 74, apps: 30, g: 12, a: 6 }] }); st.players[990001] = v;
           st.seasonEnd = { label: '2026/27', champ: 'kashima', myPos: 4, rel: ['mito', 'chiba', 'okayama'], scorers: [], verdict: 'met', prize: 3000, pts: 61, target: '5位以内' };
           localStorage.setItem(k, 'lz:' + LZString.compressToBase64(JSON.stringify(st))); }''', [OSAKO, SAKAI])
@@ -51,7 +51,7 @@ async def run(scheme):
             await page.click('#sheet [data-act="retNext"]'); await page.wait_for_timeout(450)
         st = await page.evaluate(LOAD)
         left = {q['name'] for q in st['players'].values() if q['club'] == 'kobe'}
-        print(scheme, 'farewells', names, '| last button', btn, '| season now', st['season'], '| farewell players gone', not any(n in left for n in names), '| veteran shown', '外町 俊之輔' in names)
+        print(scheme, 'farewells', names, '| last button', btn, '| season now', st['season'], '| farewell players gone', not any(n in left for n in names), '| veteran shown', '外山 俊太' in names)
         print('\n'.join(errs) or 'no errors')
         await b.close()
 asyncio.run(run('chalk')); asyncio.run(run('white'))  # board look: green chalkboard / whiteboard

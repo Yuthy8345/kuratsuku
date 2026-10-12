@@ -320,6 +320,7 @@ function prow(p, ctx) {
   if (p.inj > 0) chips.push(`<span class="chip warn">負傷 ${p.inj}日</span>`);
   if (p.sus > 0) chips.push('<span class="chip warn">出場停止</span>');
   if (p.hot) chips.push('<span class="chip fire">燃えている</span>');
+  if (p.reborn) chips.push('<span class="chip rbchip">転生</span>');
   if (ctx === 'market' && E.shortEntry(S, p.id)) chips.push('<span class="chip acc">入札済み</span>');
   const lead = ctx === 'market' ? (S.clubs[p.club] ? kit(p.club) : '<span class="chip">FA</span>') : `<span class="no">${p.num}</span>`;
   const sub = ctx === 'market' ? `${S.clubs[p.club] ? esc(S.clubs[p.club].short) : 'フリー'}・${a}歳・${E.money(E.value(p, S.date))}` : `${a}歳`;
@@ -382,6 +383,7 @@ function devRow(p) {
   if (p.learn) chips.push(`<span class="chip ok">${p.learn.pos}習得中 ${Math.floor(E.apt(p, p.learn.pos))}</span>`);
   if (bloomed(p)) chips.push('<span class="chip ok">開花</span>');
   if (p.gem && a <= 19) chips.push('<span class="chip acc">逸材</span>');
+  if (p.reborn) chips.push('<span class="chip rbchip">転生</span>');
   if (p.inj > 0) chips.push(`<span class="chip warn">負傷</span>`);
   const d = p.ovr0 != null ? shownDiff(p.ovr, p.ovr0) : 0;
   return `<li><button class="prow" data-act="train" data-id="${p.id}"><span class="no">${p.num}</span>${posTag(p)}<span class="nm"><b>${esc(p.name)}</b><span>${chips.join('')}</span></span><span class="rt"><span class="ovr ${oc(p.ovr)}">${E.ovr(p)}</span>${dlt(d)}</span></button></li>`;
@@ -448,6 +450,8 @@ function sheetPlayer(id) {
   if (p.retire) status.push('<span class="chip">今季限りで引退</span>');
   if (lent) status.push('<span class="chip acc">期限付き移籍中（シーズン終了まで）</span>');
   if (p.gem && a <= 19) status.push('<span class="chip acc">ユースの逸材</span>');
+  const leg = p.reborn && E.legendOf(p.reborn);
+  if (leg) status.push(`<span class="chip rbchip">転生</span>`);
   if ((mine || lent) && bloomed(p)) status.push(`<span class="chip ok">開花（伸びしろ ${Math.round(p.pot0)}→${Math.round(p.pot)}）</span>`);
   if (p.hot) status.push(`<span class="chip fire">燃えている（${esc(p.hot.why)}）</span>`);
   if (E.bigGame(p)) status.push('<span class="chip">大舞台に強い</span>');
@@ -476,6 +480,7 @@ function sheetPlayer(id) {
     <h2>${esc(p.name)}</h2>
     ${status.length ? `<div class="row wrap">${status.join('')}</div>` : ''}
     <div class="bigovr"><span class="ovr ${oc(p.ovr)}">${E.ovr(p)}</span><dl class="kv" style="flex:1"><dt>伸びしろ</dt><dd><span class="stars">${potStars(p)}</span>${mine || lent ? `（最大 ${Math.round(p.pot)}）` : p.found ? `（見立て ${Math.round(p.pot) - 3}〜${Math.round(p.pot) + 3}）` : ''}</dd><dt>市場価値</dt><dd>${E.money(v)}</dd><dt>年俸</dt><dd>${E.money(E.wage(p))}</dd></dl></div>
+    ${leg ? `<div class="rb-line"><span class="chip rbchip">転生</span><span>「${esc(leg.epi)}」の魂を継ぐ。${leg.num ? `かつての背番号${leg.num}` : 'クラブのレジェンド'}（${esc(leg.era)}）。${esc(leg.line)}</span></div>` : ''}
     ${attrRows(p, mine || lent)}
     ${mine || lent ? growthBlock(p, lent) : ''}
     <div><div class="eyebrow" style="margin-bottom:6px">ポジション</div><div class="small" style="margin-bottom:8px">本職 <b>${dpOf(p)}</b>（${E.DP_JP[dpOf(p)]}）${p.learn ? `・<span class="muted">${p.learn.pos}を習得中</span>` : ''}</div>${p.pos === 'GK' ? '' : aptGrid(p, false)}
@@ -948,6 +953,41 @@ function sheetRetire(i) {
     `<button class="btn primary block" data-act="retNext" data-i="${i + 1}" style="min-height:54px">${left ? `次へ（あと${left}人）` : '次のシーズンへ'}</button>`);
   const b = sheetEl.querySelector('.sheet-body'); if (b) b.scrollTop = 0;
 }
+// 転生: a legend of the club comes back as a 16-year-old. His old number re-ignites, the magnet snaps on, the seal lands.
+const STY_JP = { tech: '技術型', phys: 'フィジカル型', speed: 'スピード型' };
+function sheetReborn(id, again) {
+  const p = S.players[id != null ? id : S.reborn && S.reborn.show]; const L = p && E.legendOf(p.reborn);
+  if (!p || !L) { if (S.reborn) delete S.reborn.show; return; }
+  sheetState = { type: 'reborn', id: p.id };
+  const c = S.clubs[S.my];
+  const kt = lum(c.c1) > 0.6 ? '#141414' : '#ffffff';
+  const ghost = L.num || p.num;
+  const holder = L.num && p.num !== L.num ? E.squad(S, S.my).find(q => q.id !== p.id && q.num === L.num) : null;
+  const sparks = Array.from({ length: 16 }, (_, i) => `<i style="left:${(i * 61 + 7) % 100}%;animation-delay:${((i * 37) % 40) / 10}s;animation-duration:${3.2 + (i % 5) * 0.5}s"></i>`).join('');
+  openSheet(`<div class="reborn${again ? ' again' : ''}" style="--k1:${c.c1};--k2:${c.c2};--kt:${kt}">
+      <div class="rb-rays" aria-hidden="true"></div><div class="rb-sparks" aria-hidden="true">${sparks}</div>
+      <div class="rb-head"><span>REBORN</span><span>${esc(E.seasonLabel(S.season))}</span></div>
+      <div class="rb-stage">
+        <div class="rb-ghost" aria-hidden="true">${ghost}</div>
+        <span class="rb-ring" aria-hidden="true"></span>
+        <div class="rb-mag" aria-label="背番号${p.num}">${p.num}</div>
+        <div class="rb-seal" aria-label="転生">転生</div>
+      </div>
+      <div class="rb-epi">「${esc(L.epi)}」の魂を継ぐ者</div>
+      <h2 class="rb-name">${esc(p.name)}</h2>
+      <div class="rb-sub">${E.age(p, S.date)}歳・${L.pp}${STY_JP[L.sty] ? '・' + STY_JP[L.sty] : ''}・${esc(c.short)} ユース</div>
+      <div class="rb-past">
+        <div class="rb-past-h"><span>かつて</span><span>${esc(L.era)}</span></div>
+        <b>${L.num ? `伝説の背番号${L.num}` : `${esc(c.short)}のレジェンド`}</b>
+        <p>${esc(L.line)}</p>
+      </div>
+      <div class="rb-stats"><div><small>総合力</small><b>${E.ovr(p)}</b></div><div><small>伸びしろ</small><b class="rb-stars">${potStars(p)}</b></div><div><small>特徴</small><b class="rb-trait">大舞台に強い</b></div></div>
+      <p class="rb-note">${holder ? `背番号${L.num}はいま${esc(holder.name)}が着けている。` : L.num && p.num === L.num ? `伝説の背番号${L.num}が、ふたたびピッチに帰ってくる。` : 'その魂を受け継ぐ少年が、ユースから現れた。'}</p>
+    </div>`,
+    holder ? `<button class="btn primary block rb-go" data-act="rebornNum" data-id="${p.id}">背番号${L.num}を託す<small>${esc(holder.short)}は${p.num}番へ</small></button><button class="btn ghost block" data-act="rebornDone">いまの番号で迎え入れる</button>`
+      : `<button class="btn primary block rb-go" data-act="rebornDone">チームに迎え入れる</button>`);
+  const b = sheetEl.querySelector('.sheet-body'); if (b) b.scrollTop = 0;
+}
 const MENT_OPTS = [['def', '守備的'], ['bal', 'バランス'], ['att', '攻撃的']];
 const MENT_DESC = {
   def: '引いて守る。失点は減るが得点も減る。格上が相手ほど効果が大きい。',
@@ -1067,6 +1107,7 @@ function refreshSheet() {
   if (!sheetState) return;
   const s = sheetState;
   if (s.type === 'presets') return sheetPresets();
+  if (s.type === 'reborn') return sheetReborn(s.id, true);
   if (s.type === 'loan') return S.players[s.id] && S.players[s.id].club === S.my ? sheetLoan(s.id) : sheetPlayer(s.id);
   if (s.type === 'player') sheetPlayer(s.id); else if (s.type === 'train') sheetTrain(s.id); else if (s.type === 'bench') sheetBench(s.id); else if (s.type === 'slot') sheetSlot(s.i); else if (s.type === 'pre') sheetPrematch(s.id); else if (s.type === 'msub') sheetMatchTactics();
 }
@@ -1294,7 +1335,7 @@ const ACT = {
     UI.tab = 'home'; closeSheet(); persist(true); render(); window.scrollTo(0, 0);
     toast(`${S.clubs[S.my].short}の監督に就任しました`);
   },
-  continue() { const st = pickSave(loadLocal(), Cloud.cand); if (!st) return toast('セーブデータが読み込めません'); S = E.migrate(st, DATA); UI.tab = 'home'; render(); if (Cloud.cand === st) saveLocal(); },
+  continue() { const st = pickSave(loadLocal(), Cloud.cand); if (!st) return toast('セーブデータが読み込めません'); S = E.migrate(st, DATA); UI.tab = 'home'; render(); if (Cloud.cand === st) saveLocal(); if (!S.fired && S.reborn && S.reborn.show) setTimeout(() => sheetReborn(), 320); },
   go() { go(); },
   tab(d) { UI.tab = d.tab; if (d.tab === 'league') UI.lg.round = null; render(); window.scrollTo(0, 0); },
   closeSheet() { closeSheet(); },
@@ -1367,6 +1408,8 @@ const ACT = {
   mkPos(d) { UI.mk.pos = d.k; render(); },
   mkFA() { UI.mk.fa = !UI.mk.fa; render(); },
   mkView(d) { UI.mk.view = d.k; render(); },
+  rebornNum(d) { const r = E.rebornNum(S, Number(d.id)); toast(r.msg); persist(false); if (r.ok) refreshSheet(); render(); },
+  rebornDone() { if (S.reborn) delete S.reborn.show; persist(false); closeSheet(); render(); },
   loanSheet(d) { sheetLoan(Number(d.id)); },
   loanGo(d) { const r = E.loanOut(S, Number(d.id), d.k); toast(r.msg); if (r.ok) { persist(true); sheetPlayer(Number(d.id)); render(); } else refreshSheet(); },
   youthDone(d) { const it = S.inbox.find(x => x.id === Number(d.id)); if (it) it.done = true; persist(false); render(); },
@@ -1388,7 +1431,7 @@ const ACT = {
     ACT.rollNow();
   },
   retNext(d) { const i = Number(d.i); const ret = S.seasonEnd.ret.filter(r => S.players[r.id]); if (i < ret.length) return sheetRetire(i); S.seasonEnd.retSeen = true; ACT.rollNow(); },
-  rollNow() { E.rollover(S); persist(true); closeSheet(); UI.tab = 'home'; UI.lg.round = null; render(); window.scrollTo(0, 0); if (S.fired) setTimeout(sheetFired, 260); else toast(`${E.seasonLabel(S.season)}シーズンへ`); },
+  rollNow() { E.rollover(S); persist(true); closeSheet(); UI.tab = 'home'; UI.lg.round = null; render(); window.scrollTo(0, 0); if (S.fired) setTimeout(sheetFired, 260); else if (S.reborn && S.reborn.show) setTimeout(() => sheetReborn(), 320); else toast(`${E.seasonLabel(S.season)}シーズンへ`); },
   job(d) { E.takeJob(S, d.id); persist(true); closeSheet(); UI.tab = 'home'; render(); toast(`${S.clubs[S.my].short}の監督に就任しました`); },
   askReset() { sheetReset(); },
   exportOpen() { sheetExport(); },

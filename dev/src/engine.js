@@ -1147,6 +1147,7 @@ function attendance(S, hid, aid) {
   const c = S.clubs[hid], o = S.clubs[aid];
   const t = table(S); const row = t.find(r => r.id === hid); const pos = t.indexOf(row) + 1;
   let f = 1 + (o.fan >= 4 ? 0.08 : 0) + (c.fac.stadium - 2) * 0.05 + (row && row.p > 3 ? (10 - pos) * 0.012 : 0) + (c.hype || 0);
+  if (hid === S.my && Object.values(S.players).some(p => p.reborn && p.club === hid)) f += 0.05;  // a reborn legend draws the fans
   f += R() * 0.12 - 0.06;
   return Math.round(clamp(FANBASE[c.fan] * f, 3000, c.cap * 0.97));
 }
@@ -1288,7 +1289,7 @@ function transferDay(S) {
   }
   // occasional unsolicited bids for my best players
   if (R() < 0.012) {
-    const top = squad(S, S.my).filter(p => !p.listed && !p.retire && available(p)).sort((a, b) => b.ovr - a.ovr).slice(0, 6);
+    const top = squad(S, S.my).filter(p => !p.listed && !p.retire && !p.reborn && available(p)).sort((a, b) => b.ovr - a.ovr).slice(0, 6);
     const p = pick(top); if (p && !S.inbox.some(x => x.type === 'offer' && x.pid === p.id && !x.done)) makeOffer(S, p, 1.05 + R() * 0.35);
   }
   // AI <-> AI moves
@@ -1310,6 +1311,7 @@ function acceptOffer(S, iid) {
   moveP(S, p, it.from, it.fee);
   it.done = true; it.result = 'accepted';
   news(S, `${p.name}が${S.clubs[it.from].name}へ完全移籍（移籍金 ${money(it.fee)}）。`, 'transfer');
+  if (p.reborn) { S.board = clamp(S.board - 10, 0, 100); news(S, `転生した${p.name}を手放したことに、サポーターから落胆の声が上がっている。`, 'warn'); }
   return { ok: true };
 }
 function rejectOffer(S, iid) { const it = S.inbox.find(x => x.id === iid); if (it) { it.done = true; it.result = 'rejected'; } }
@@ -1390,6 +1392,135 @@ function bid(S, pid, mult) {
   moveP(S, p, S.my, fee);
   news(S, `${p.name}（${fromName}）を獲得！ 移籍金 ${money(fee)}。`, 'transfer');
   return { ok: true, msg: `${p.name}を獲得しました` };
+}
+/* ---------- 転生選手: a legend of the club I manage comes back as a 16-year-old ----------
+   From my 2nd season at a club, at the start of each season: REBORN.base, more after a season that met the target
+   (met) and for each title (title), certain once `pity` draws in a row have missed. Each legend once per save.
+   Names are made up in the style of the real ones (中村俊輔 → 外町俊之輔); the pop-up tells who he was through the
+   number, the era and the epithet. Retired and living players only. num: the number he made his own (null if none). */
+const REBORN = { base: 0.25, met: 0.15, title: 0.2, pity: 2, ovr: [62, 66] };
+const LEGENDS = {
+  yokohamafm: [
+    { id: 'yfm1', name: '外町 俊之輔', pp: 'OMF', sty: 'tech', num: 25, era: '1997–2016', epi: 'ハマの左足', line: '左足ひとつで試合を変えた。フリーキックの名手にしてファンタジスタ。', pot: 90 },
+    { id: 'yfm2', name: '奥澤 佑仁', pp: 'CB', sty: 'phys', num: 22, era: '2002–2018', epi: '不屈のボンバー', line: '空中戦で負けない。長く最終ラインに立ち続けた柱。', pot: 87 },
+    { id: 'yfm3', name: '井野 正己', pp: 'CB', sty: '', num: 4, era: '1990–1999', epi: 'アジアの壁', line: '読みと統率で守備をまとめ上げたリベロ。', pot: 86 },
+  ],
+  kashima: [
+    { id: 'ksm1', name: '大笠原 満夫', pp: 'CMF', sty: 'tech', num: 40, era: '1998–2018', epi: '常勝の背番号40', line: '黙々とタイトルを積み上げた、中盤の主。', pot: 88 },
+    { id: 'ksm2', name: '春田 豊', pp: 'CB', sty: 'phys', num: 3, era: '1993–2003', epi: '空中戦の鬼', line: 'ヘディングで跳ね返し続けた闘将。', pot: 85 },
+    { id: 'ksm3', name: '桜沢 敦史', pp: 'ST', sty: 'speed', num: 13, era: '1996–2007', epi: '動き出しの天才', line: 'ひと呼吸早い動き出しで、何度も裏を取ったストライカー。', pot: 86 },
+  ],
+  urawa: [
+    { id: 'urw1', name: '福山 正弘', pp: 'CF', sty: '', num: 9, era: '1989–2002', epi: 'ミスターレッズ', line: '苦しい時代も赤いユニフォームでゴールを奪い続けた。', pot: 85 },
+    { id: 'urw2', name: '大野 伸三', pp: 'OMF', sty: 'tech', num: null, era: '1998–2007', epi: '天才ゲームメーカー', line: 'ボールが足に吸い付くようなタッチで観客を魅了した。', pot: 90 },
+  ],
+  kawasakif: [
+    { id: 'kwf1', name: '仲村 憲豪', pp: 'CMF', sty: 'tech', num: 14, era: '2003–2020', epi: '等々力のバンディエラ', line: 'クラブ一筋。パス一本で試合を動かした司令塔。', pot: 89 },
+    { id: 'kwf2', name: '小久保 嘉仁', pp: 'CF', sty: '', num: 13, era: '2013–2016', epi: '三年連続の得点王', line: 'ゴール前の嗅覚と強烈なシュートで、得点王を取り続けた。', pot: 88 },
+  ],
+  gosaka: [
+    { id: 'gos1', name: '近藤 保之', pp: 'DMF', sty: 'tech', num: 7, era: '2001–2020', epi: 'コロコロの司令塔', line: '慌てず、急がず。冷静なパスとPKで黄金期を支えた。', pot: 89 },
+    { id: 'gos2', name: '三川 孝弘', pp: 'OMF', sty: 'tech', num: 10, era: '1999–2016', epi: '魔法のスルーパス', line: '誰も見えていない道筋にパスを通した、ガンバの10番。', pot: 86 },
+  ],
+  hiroshima: [
+    { id: 'hir1', name: '加藤 寿仁', pp: 'CF', sty: '', num: 11, era: '2005–2016', epi: 'ゴールの匂いを嗅ぐ男', line: 'わずかなスキを逃さず、ゴールを積み重ねたストライカー。', pot: 87 },
+    { id: 'hir2', name: '林崎 和之', pp: 'DMF', sty: 'tech', num: 8, era: '1999–2018', epi: '紫の舵取り', line: 'クラブ一筋。中盤の底からタイトルへ導いた。', pot: 85 },
+  ],
+  kashiwa: [
+    { id: 'ksw1', name: '小谷 秀一', pp: 'DMF', sty: '', num: 7, era: '2003–2021', epi: '柏の主将', line: 'クラブ一筋。誰よりも走り、チームをまとめ続けた。', pot: 84 },
+    { id: 'ksw2', name: '南嶋 秀明', pp: 'CF', sty: 'phys', num: null, era: '1997–2010', epi: '日立台のストライカー', line: '体を張ってゴールに向かい、スタジアムを沸かせた。', pot: 83 },
+  ],
+  fctokyo: [
+    { id: 'fct1', name: '石山 直弘', pp: 'WG', sty: 'speed', num: 18, era: '2002–2017', epi: '青赤の快速ウイング', line: 'サイドを駆け上がる速さで、何度もスタジアムを揺らした。', pot: 86 },
+  ],
+  tokyov: [
+    { id: 'tkv1', name: 'ラミレス 瑠威', pp: 'OMF', sty: 'tech', num: 10, era: '1977–1998', epi: '緑のカリスマ', line: '技術と気迫でクラブを日本一に導いた司令塔。', pot: 89 },
+    { id: 'tkv2', name: '南澤 剛', pp: 'CMF', sty: 'phys', num: null, era: '1991–2002', epi: '中盤のダイナモ', line: '90分走り続け、ボールを奪い続けた。', pot: 84 },
+  ],
+  nagoya: [
+    { id: 'ngy1', name: '楢原 正豪', pp: 'GK', sty: '', num: 1, era: '1999–2018', epi: '鉄壁の守護神', line: '20年近くゴールマウスを守り、リーグ優勝をもたらした。', pot: 88 },
+    { id: 'ngy2', name: 'ドラゴ ストイコフ', pp: 'OMF', sty: 'tech', num: 10, era: '1994–2001', epi: '名古屋の妖精', line: '魔法のようなボールタッチで、見る者を魅了した。', pot: 90, nat: 'SRB' },
+  ],
+  cosaka: [
+    { id: 'cos1', name: '林島 寛明', pp: 'OMF', sty: '', num: 8, era: '1991–2008', epi: 'ミスターセレッソ', line: 'クラブ一筋。背番号8の系譜はここから始まった。', pot: 86 },
+    { id: 'cos2', name: '東澤 明則', pp: 'CF', sty: 'phys', num: null, era: '1995–2011', epi: '桜の大砲', line: '高さと強さで前線に君臨したストライカー。', pot: 84 },
+  ],
+  kobe: [
+    { id: 'kob1', name: 'アンドレア イニエスト', pp: 'OMF', sty: 'tech', num: 8, era: '2018–2023', epi: '魔法の8番', line: '世界の頂点を知る技術で、神戸に初タイトルをもたらした。', pot: 90, nat: 'ESP' },
+  ],
+  shimizu: [
+    { id: 'shm1', name: '澤上 正明', pp: 'OMF', sty: 'tech', num: 10, era: '1992–2005', epi: 'ミスターエスパルス', line: 'クラブ一筋。正確なキックでオレンジの攻撃を操った。', pot: 86 },
+  ],
+  chiba: [
+    { id: 'chb1', name: '巻 誠二郎', pp: 'CF', sty: 'phys', num: null, era: '2003–2010', epi: '泥臭きストライカー', line: '体を投げ出してゴールを奪う、ひたむきなフォワード。', pot: 84 },
+    { id: 'chb2', name: '加藤 勇斗', pp: 'DMF', sty: 'phys', num: null, era: '2000–2019', epi: 'ジェフの闘将', line: '中盤で戦い続け、苦しい時代のチームを支えた。', pot: 83 },
+  ],
+  fukuoka: [
+    { id: 'fuk1', name: '山上 芳樹', pp: 'CF', sty: 'speed', num: null, era: '1990年代', epi: '博多の点取り屋', line: 'クラブの草創期に、スピードでゴールを量産した。', pot: 84 },
+  ],
+  kyoto: [
+    { id: 'kyo1', name: '松山 大介', pp: 'SH', sty: 'tech', num: null, era: '2000–2004', epi: '古都の魔術師', line: '変幻自在のドリブルで、クラブに初のタイトルをもたらした。', pot: 87 },
+  ],
+  machida: [
+    { id: 'mcd1', name: '李 漢才', pp: 'CMF', sty: '', num: null, era: '2014–2020', epi: '町田の主将', line: 'キャプテンとしてチームをJ2へ押し上げた。', pot: 82 },
+  ],
+  mito: [
+    { id: 'mit1', name: '本宮 幸治', pp: 'GK', sty: '', num: null, era: '1999–2024', epi: '水戸の守護神', line: '26年ゴールを守り、J2最多出場を積み上げた。', pot: 84 },
+  ],
+  nagasaki: [
+    { id: 'ngs1', name: '前川 悠介', pp: 'DMF', sty: '', num: null, era: '2010年代', epi: 'クラブの心臓', line: '最古参として、地域リーグからJ1までの道のりを支えた。', pot: 82 },
+  ],
+  okayama: [
+    { id: 'oky1', name: '喜川 康太', pp: 'DMF', sty: '', num: null, era: '2010年代', epi: '岡山の背骨', line: '長く中盤に立ち、J2を戦い抜いた。', pot: 82 },
+  ],
+  iwata: [
+    { id: 'iwt1', name: '名浜 浩之', pp: 'OMF', sty: 'tech', num: 10, era: '1995–2008', epi: 'サックスブルーの司令塔', line: '左足のパスで黄金期の攻撃を組み立てた。', pot: 88 },
+    { id: 'iwt2', name: '中川 雅志', pp: 'CF', sty: '', num: 9, era: '1994–2009', epi: '炎のストライカー', line: '最後まで諦めない姿勢で、ゴールを奪い続けた。', pot: 86 },
+  ],
+  shonan: [
+    { id: 'shn1', name: '外田 英斗', pp: 'OMF', sty: 'tech', num: null, era: '1995–1998', epi: '湘南の天才', line: '10代で頭角を現し、世界へ羽ばたいた。', pot: 90 },
+  ],
+  oita: [
+    { id: 'oit1', name: '低松 大輝', pp: 'CF', sty: 'phys', num: null, era: '2000年代', epi: 'トリニータの大黒柱', line: '高さと強さで前線を支え続けた。', pot: 83 },
+  ],
+};
+function legendOf(id) { for (const ls of Object.values(LEGENDS)) { const l = ls.find(x => x.id === id); if (l) return l; } return null; }
+function rebornCheck(S, se) {
+  const st = S.reborn || (S.reborn = { used: [], wait: 0, club: S.my });
+  if (st.club !== S.my) { st.club = S.my; st.wait = 0; }
+  if (tenure(S) < 1) return null;  // the 2nd season at this club at the earliest
+  const pool = (LEGENDS[S.my] || []).filter(l => !st.used.includes(l.id));
+  if (!pool.length) return null;
+  const titles = se ? (se.verdict === 'champion' ? 1 : 0) + ['ec', 'lc'].filter(k => se.cups && se.cups[k] && se.cups[k].champ === S.my).length : 0;
+  let chance = REBORN.base + (se && (se.verdict === 'met' || se.verdict === 'champion') ? REBORN.met : 0) + titles * REBORN.title;
+  if (st.wait >= REBORN.pity) chance = 1;
+  if (R() >= chance) { st.wait++; return null; }
+  st.wait = 0;
+  return makeReborn(S, wpick(pool, l => l === pool[0] ? 2 : 1));
+}
+function makeReborn(S, L) {
+  const pos = DP_CAT[L.pp] || 'MF';
+  const p = genPlayer(S, S.my, { age: 16, foreign: !!L.nat, pos, pp: L.pp, ovr: ri(REBORN.ovr[0], REBORN.ovr[1]), pot: Math.min(GROW.potMax, L.pot), sty: L.sty });
+  const parts = L.name.split(' ');
+  p.name = L.name; p.short = L.nat ? parts[parts.length - 1] : parts[0]; p.nat = L.nat || 'JPN';
+  initAttrs(p);
+  p.reborn = L.id;
+  S.reborn.used.push(L.id);
+  if (L.num && !squad(S, S.my).some(q => q.id !== p.id && q.num === L.num)) p.num = L.num;
+  S.reborn.show = p.id;  // the pop-up is still to be seen
+  track(S, p);
+  news(S, `転生――「${L.epi}」の魂を継ぐ${L.name}（16歳・${L.pp}）がユースからトップ昇格。${L.num ? `伝説の背番号${L.num}を知る人は、その姿に息をのんだ。` : ''}`, 'big');
+  return p;
+}
+// hand him the legend's number (the player wearing it takes his)
+function rebornNum(S, pid) {
+  const p = S.players[pid]; const L = p && legendOf(p.reborn);
+  if (!p || !L || !L.num || p.club !== S.my || p.num === L.num) return { ok: false, msg: '背番号を変えられません' };
+  const q = squad(S, S.my).find(x => x.id !== p.id && x.num === L.num);
+  if (q) q.num = p.num;
+  p.num = L.num;
+  news(S, `${p.name}に背番号${L.num}を託した。${q ? `（${q.name}は${q.num}番へ）` : ''}`, 'info');
+  return { ok: true, msg: `${p.name}が背番号${L.num}を背負う` };
 }
 /* ---------- loans (期限付き移籍): a young player goes to a J2 club until the end of the season ----------
    He belongs to the loan club meanwhile (p.club = loan club, p.loan = {from, to, since, share, ovr0, pot0}), so he is off my
@@ -1548,7 +1679,7 @@ function rivalryInfo(S, a, b) {
   return null;
 }
 function rivalry(S, a, b) { const r = rivalryInfo(S, a, b); return r ? r.name : null; }
-function bigGame(p) { return hash(p.name + '|' + p.birth) % 9 === 0; } // 大舞台に強い（1割ほど）
+function bigGame(p) { return !!p.reborn || hash(p.name + '|' + p.birth) % 9 === 0; } // 大舞台に強い（1割ほど）
 function formerClubs(p) {
   const s = new Set((p.hist || []).map(h => h.c).filter(c => c && c !== p.club));
   if (p.prev && p.prev !== p.club) s.add(p.prev);
@@ -1966,6 +2097,8 @@ function rollover(S) {
       if (cid === S.my) { news(S, `ユースの逸材、${pr.name}（${age(pr, S.date)}歳・${pr.pos}）がトップ昇格。早くから注目されてきた才能だ。`, 'big'); track(S, pr); }
     }
   }
+  // 転生: a legend of my club may come back
+  if (!fireMe) rebornCheck(S, se);
   // trim oversized AI squads (release weakest veterans to free agency)
   for (const cid of S.order) {
     if (cid === S.my) continue;
@@ -2004,7 +2137,7 @@ const API = {
   createMatch, stepMatch, simulateFull, finishMatch, doSub, benchOptions, onPitch, setMentality, bestSubFor, setCounter, mentLabel,
   advance, nextDay, simAIToday, myFixtureToday, nextMyFixture, todaysFixtures, inWindow, windowEnd, nextWindowStart,
   acceptOffer, rejectOffer, bid, decideRetirements, shortlist, shortEntry, unshort, bidBlock,
-  BOARD, BOARD_LV, boardLv, tenure, CUPS, CUP_PRIZE, NATIONAL, fxLabel, cupResult, cupWinner, hypeMatch, HYPE, SUB_RATE, subRate, STYLE, GROW, shareFor, LOAN, GEM, myLoans, loanCan, loanOptions, loanOut, growthOutlook, weeksLeft, yearsTo, bigGame, rivalry, SCOUT, sendScout, playShare, marketList, ensureFreeAgents, upgrade, facCost, takeJob, rollover, endSeason, news, fire,
+  BOARD, BOARD_LV, boardLv, tenure, CUPS, CUP_PRIZE, NATIONAL, fxLabel, cupResult, cupWinner, hypeMatch, HYPE, SUB_RATE, subRate, STYLE, GROW, shareFor, LOAN, GEM, REBORN, LEGENDS, legendOf, rebornCheck, makeReborn, rebornNum, myLoans, loanCan, loanOptions, loanOut, growthOutlook, weeksLeft, yearsTo, bigGame, rivalry, SCOUT, sendScout, playShare, marketList, ensureFreeAgents, upgrade, facCost, takeJob, rollover, endSeason, news, fire,
 };
 if (typeof module !== 'undefined' && module.exports) module.exports = API; else root.Engine = API;
 })(typeof window !== 'undefined' ? window : globalThis);
