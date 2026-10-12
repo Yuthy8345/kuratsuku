@@ -1290,7 +1290,7 @@ function transferDay(S) {
   // occasional unsolicited bids for my best players
   if (R() < 0.012) {
     const top = squad(S, S.my).filter(p => !p.listed && !p.retire && !p.reborn && available(p)).sort((a, b) => b.ovr - a.ovr).slice(0, 6);
-    const p = pick(top); if (p && !S.inbox.some(x => x.type === 'offer' && x.pid === p.id && !x.done)) makeOffer(S, p, 1.05 + R() * 0.35);
+    const p = pick(top); if (p && !p.keep && !S.inbox.some(x => x.type === 'offer' && x.pid === p.id && !x.done)) makeOffer(S, p, 1.05 + R() * 0.35);  // 放出不可: the club says no up front
   }
   // AI <-> AI moves
   if (R() < 0.05) aiTransfer(S);
@@ -1314,6 +1314,21 @@ function acceptOffer(S, iid) {
   if (p.reborn) { S.board = clamp(S.board - 10, 0, 100); news(S, `転生した${p.name}を手放したことに、サポーターから落胆の声が上がっている。`, 'warn'); }
   return { ok: true };
 }
+// 放出リスト (p.listed) and 放出不可 (p.keep) are exclusive. 放出不可 = no unsolicited bids, pending offers are declined.
+function setListed(S, pid, on) {
+  const p = S.players[pid]; if (!p || p.club !== S.my) return { ok: false };
+  const wasKeep = !!p.keep;
+  p.listed = !!on; if (on) delete p.keep;
+  return { ok: true, wasKeep: on && wasKeep };
+}
+function setKeep(S, pid, on) {
+  const p = S.players[pid]; if (!p || p.club !== S.my) return { ok: false, n: 0 };
+  const wasListed = !!p.listed; let n = 0;
+  if (!on) { delete p.keep; return { ok: true, n }; }
+  p.keep = true; p.listed = false;
+  for (const it of S.inbox) if (it.type === 'offer' && it.pid === pid && !it.done) { it.done = true; it.result = 'rejected'; n++; }
+  return { ok: true, n, wasListed };
+}
 function rejectOffer(S, iid) { const it = S.inbox.find(x => x.id === iid); if (it) { it.done = true; it.result = 'rejected'; } }
 function moveP(S, p, toCid, fee) {
   const from = S.clubs[p.club], to = S.clubs[toCid];
@@ -1321,7 +1336,7 @@ function moveP(S, p, toCid, fee) {
   if (to) { to.funds -= fee; to.fin.trans -= fee; }
   const oldClub = p.club;
   if (S.clubs[oldClub]) p.prev = oldClub; // for 古巣対決
-  p.club = toCid; p.listed = false; p.joined = S.date; p.cond = Math.min(p.cond, 90);
+  p.club = toCid; p.listed = false; delete p.keep; p.joined = S.date; p.cond = Math.min(p.cond, 90);
   if (toCid === S.my) { unshort(S, p.id); delete p.trk; track(S, p); }  // signed: off the shortlist, growth chart starts
   else if (oldClub === S.my) delete p.trk;
   // shirt number
@@ -1650,7 +1665,7 @@ function takeJob(S, cid) {
   const from = S.my;
   S.my = cid; S.fired = null; S.board = 55; S.boardWarn = 0;
   S.inbox = S.inbox.filter(x => x.done);
-  for (const p of Object.values(S.players)) { if (p.club === from) p.listed = false; if (p.club === from || (p.loan && p.loan.from === from)) delete p.trk; if (p.club === cid) track(S, p); }
+  for (const p of Object.values(S.players)) { if (p.club === from) { p.listed = false; delete p.keep; } if (p.club === from || (p.loan && p.loan.from === from)) delete p.trk; if (p.club === cid) track(S, p); }
   autoLineup(S, cid);
   if (S.clubs[from]) autoLineup(S, from);
   setExpectations(S);
@@ -2137,7 +2152,7 @@ const API = {
   autoLineup, autoBench, benchSwap, benchRemove, lineupIssues, BENCH_SIZE, PRESET_MAX, savePreset, loadPreset, presetStatus, renamePreset, deletePreset, clubRating, validateLineup, effective, posPenalty, available, teamRating,
   createMatch, stepMatch, simulateFull, finishMatch, doSub, benchOptions, onPitch, setMentality, bestSubFor, setCounter, mentLabel,
   advance, nextDay, simAIToday, myFixtureToday, nextMyFixture, todaysFixtures, inWindow, windowEnd, nextWindowStart,
-  acceptOffer, rejectOffer, bid, decideRetirements, shortlist, shortEntry, unshort, bidBlock,
+  acceptOffer, rejectOffer, setListed, setKeep, transferDay, bid, decideRetirements, shortlist, shortEntry, unshort, bidBlock,
   BOARD, BOARD_LV, boardLv, tenure, CUPS, CUP_PRIZE, NATIONAL, fxLabel, cupResult, cupWinner, hypeMatch, HYPE, SUB_RATE, subRate, STYLE, GROW, shareFor, LOAN, GEM, REBORN, LEGENDS, legendOf, rebornCheck, makeReborn, rebornNum, myLoans, loanCan, loanOptions, loanOut, growthOutlook, weeksLeft, yearsTo, bigGame, rivalry, SCOUT, sendScout, playShare, marketList, ensureFreeAgents, upgrade, facCost, takeJob, rollover, endSeason, news, fire,
 };
 if (typeof module !== 'undefined' && module.exports) module.exports = API; else root.Engine = API;

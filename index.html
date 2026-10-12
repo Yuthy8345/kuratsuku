@@ -1859,7 +1859,7 @@ function transferDay(S) {
   // occasional unsolicited bids for my best players
   if (R() < 0.012) {
     const top = squad(S, S.my).filter(p => !p.listed && !p.retire && !p.reborn && available(p)).sort((a, b) => b.ovr - a.ovr).slice(0, 6);
-    const p = pick(top); if (p && !S.inbox.some(x => x.type === 'offer' && x.pid === p.id && !x.done)) makeOffer(S, p, 1.05 + R() * 0.35);
+    const p = pick(top); if (p && !p.keep && !S.inbox.some(x => x.type === 'offer' && x.pid === p.id && !x.done)) makeOffer(S, p, 1.05 + R() * 0.35);  // 放出不可: the club says no up front
   }
   // AI <-> AI moves
   if (R() < 0.05) aiTransfer(S);
@@ -1883,6 +1883,21 @@ function acceptOffer(S, iid) {
   if (p.reborn) { S.board = clamp(S.board - 10, 0, 100); news(S, `転生した${p.name}を手放したことに、サポーターから落胆の声が上がっている。`, 'warn'); }
   return { ok: true };
 }
+// 放出リスト (p.listed) and 放出不可 (p.keep) are exclusive. 放出不可 = no unsolicited bids, pending offers are declined.
+function setListed(S, pid, on) {
+  const p = S.players[pid]; if (!p || p.club !== S.my) return { ok: false };
+  const wasKeep = !!p.keep;
+  p.listed = !!on; if (on) delete p.keep;
+  return { ok: true, wasKeep: on && wasKeep };
+}
+function setKeep(S, pid, on) {
+  const p = S.players[pid]; if (!p || p.club !== S.my) return { ok: false, n: 0 };
+  const wasListed = !!p.listed; let n = 0;
+  if (!on) { delete p.keep; return { ok: true, n }; }
+  p.keep = true; p.listed = false;
+  for (const it of S.inbox) if (it.type === 'offer' && it.pid === pid && !it.done) { it.done = true; it.result = 'rejected'; n++; }
+  return { ok: true, n, wasListed };
+}
 function rejectOffer(S, iid) { const it = S.inbox.find(x => x.id === iid); if (it) { it.done = true; it.result = 'rejected'; } }
 function moveP(S, p, toCid, fee) {
   const from = S.clubs[p.club], to = S.clubs[toCid];
@@ -1890,7 +1905,7 @@ function moveP(S, p, toCid, fee) {
   if (to) { to.funds -= fee; to.fin.trans -= fee; }
   const oldClub = p.club;
   if (S.clubs[oldClub]) p.prev = oldClub; // for 古巣対決
-  p.club = toCid; p.listed = false; p.joined = S.date; p.cond = Math.min(p.cond, 90);
+  p.club = toCid; p.listed = false; delete p.keep; p.joined = S.date; p.cond = Math.min(p.cond, 90);
   if (toCid === S.my) { unshort(S, p.id); delete p.trk; track(S, p); }  // signed: off the shortlist, growth chart starts
   else if (oldClub === S.my) delete p.trk;
   // shirt number
@@ -2219,7 +2234,7 @@ function takeJob(S, cid) {
   const from = S.my;
   S.my = cid; S.fired = null; S.board = 55; S.boardWarn = 0;
   S.inbox = S.inbox.filter(x => x.done);
-  for (const p of Object.values(S.players)) { if (p.club === from) p.listed = false; if (p.club === from || (p.loan && p.loan.from === from)) delete p.trk; if (p.club === cid) track(S, p); }
+  for (const p of Object.values(S.players)) { if (p.club === from) { p.listed = false; delete p.keep; } if (p.club === from || (p.loan && p.loan.from === from)) delete p.trk; if (p.club === cid) track(S, p); }
   autoLineup(S, cid);
   if (S.clubs[from]) autoLineup(S, from);
   setExpectations(S);
@@ -2706,7 +2721,7 @@ const API = {
   autoLineup, autoBench, benchSwap, benchRemove, lineupIssues, BENCH_SIZE, PRESET_MAX, savePreset, loadPreset, presetStatus, renamePreset, deletePreset, clubRating, validateLineup, effective, posPenalty, available, teamRating,
   createMatch, stepMatch, simulateFull, finishMatch, doSub, benchOptions, onPitch, setMentality, bestSubFor, setCounter, mentLabel,
   advance, nextDay, simAIToday, myFixtureToday, nextMyFixture, todaysFixtures, inWindow, windowEnd, nextWindowStart,
-  acceptOffer, rejectOffer, bid, decideRetirements, shortlist, shortEntry, unshort, bidBlock,
+  acceptOffer, rejectOffer, setListed, setKeep, transferDay, bid, decideRetirements, shortlist, shortEntry, unshort, bidBlock,
   BOARD, BOARD_LV, boardLv, tenure, CUPS, CUP_PRIZE, NATIONAL, fxLabel, cupResult, cupWinner, hypeMatch, HYPE, SUB_RATE, subRate, STYLE, GROW, shareFor, LOAN, GEM, REBORN, LEGENDS, legendOf, rebornCheck, makeReborn, rebornNum, myLoans, loanCan, loanOptions, loanOut, growthOutlook, weeksLeft, yearsTo, bigGame, rivalry, SCOUT, sendScout, playShare, marketList, ensureFreeAgents, upgrade, facCost, takeJob, rollover, endSeason, news, fire,
 };
 if (typeof module !== 'undefined' && module.exports) module.exports = API; else root.Engine = API;
@@ -3498,6 +3513,7 @@ function prow(p, ctx) {
   if (p.club === S.my) {
     if (c.tac.xi.includes(p.id)) chips.push('<span class="chip ok">先発</span>'); else if (c.tac.bench.includes(p.id)) chips.push('<span class="chip">ベンチ</span>');
     if (p.listed) chips.push('<span class="chip acc">放出リスト</span>');
+    if (p.keep) chips.push('<span class="chip ok">放出不可</span>');
   }
   const sp = subPos(p); if (sp.length) chips.push(`<span class="chip">+${sp.slice(0, 3).join('/')}</span>`);
   if (p.inj > 0) chips.push(`<span class="chip warn">負傷 ${p.inj}日</span>`);
@@ -3630,6 +3646,7 @@ function sheetPlayer(id) {
   if (p.inj > 0) status.push(`<span class="chip warn">負傷中（あと${p.inj}日）</span>`);
   if (p.sus > 0) status.push('<span class="chip warn">出場停止</span>');
   if (p.listed) status.push('<span class="chip acc">放出リスト登録中</span>');
+  if (p.keep && mine) status.push('<span class="chip ok">放出不可（オファーはすべて断る）</span>');
   if (p.retire) status.push('<span class="chip">今季限りで引退</span>');
   if (lent) status.push('<span class="chip acc">期限付き移籍中（シーズン終了まで）</span>');
   if (p.gem && a <= 19) status.push('<span class="chip acc">ユースの逸材</span>');
@@ -3646,7 +3663,9 @@ function sheetPlayer(id) {
   if (lent) {
     foot = `<div class="small muted">シーズンが終わると${esc(S.clubs[S.my].short)}に戻ってきます。</div><button class="btn ghost block" data-act="closeSheet">閉じる</button>`;
   } else if (mine) {
-    foot = `<button class="btn primary block" data-act="train" data-id="${p.id}">トレーニングを設定</button><div class="grid2">${p.retire ? '<button class="btn ghost" disabled>引退が決まっています</button>' : `<button class="btn ghost" data-act="toggleList" data-id="${p.id}">${p.listed ? '放出リストから外す' : '放出リストに載せる'}</button>`}<button class="btn ghost" data-act="closeSheet">閉じる</button></div>`;
+    foot = `<button class="btn primary block" data-act="train" data-id="${p.id}">トレーニングを設定</button>${p.retire
+      ? '<div class="grid2"><button class="btn ghost" disabled>引退が決まっています</button><button class="btn ghost" data-act="closeSheet">閉じる</button></div>'
+      : `<div class="grid2"><button class="btn ghost" data-act="toggleList" data-id="${p.id}">${p.listed ? '放出リストから外す' : '放出リストに載せる'}</button><button class="btn ghost" data-act="toggleKeep" data-id="${p.id}">${p.keep ? '放出不可を解除' : '放出不可にする'}</button></div><button class="btn ghost block" data-act="closeSheet">閉じる</button>`}`;
   } else if (p.club === 'FA') {
     const sign = Math.round(E.wage(p) * 0.5 / 10) * 10;
     foot = `${se ? `<div class="small muted">${shortStatus(se, p)}</div>` : ''}<button class="btn primary block" data-act="sign" data-id="${p.id}">契約する（契約金 ${E.money(sign)}）</button>${shortFoot(se, p)}`;
@@ -4600,7 +4619,8 @@ const ACT = {
   unshort(d) { const p = S.players[d.id]; E.unshort(S, Number(d.id)); persist(false); toast(`${p ? p.name : '選手'}をショートリストから外しました`); refreshSheet(); render(); },
   upgrade(d) { const r = E.upgrade(S, d.k); toast(r.msg); if (r.ok) { persist(true); render(); } },
   training(d) { S.training = d.k; persist(false); render(); },
-  toggleList(d) { const p = S.players[d.id]; p.listed = !p.listed; persist(false); toast(p.listed ? (E.inWindow(S.date) ? '放出リストに載せました。オファーを待ちます' : '放出リストに載せました。移籍期間に入るとオファーが届きます') : '放出リストから外しました'); refreshSheet(); render(); },
+  toggleList(d) { const p = S.players[d.id]; const r = E.setListed(S, p.id, !p.listed); if (!r.ok) return; persist(false); toast(p.listed ? `${r.wasKeep ? '放出不可を解除し、' : ''}${E.inWindow(S.date) ? '放出リストに載せました。オファーを待ちます' : '放出リストに載せました。移籍期間に入るとオファーが届きます'}` : '放出リストから外しました'); refreshSheet(); render(); },
+  toggleKeep(d) { const p = S.players[d.id]; const r = E.setKeep(S, p.id, !p.keep); if (!r.ok) return; persist(false); toast(p.keep ? `${r.wasListed ? '放出リストから外し、' : ''}放出不可にしました。他クラブのオファーは断ります${r.n ? '（届いていたオファーも断りました）' : ''}` : '放出不可を解除しました'); refreshSheet(); render(); },
   bid(d) { const r = E.bid(S, Number(d.id), Number(d.m)); toast(r.msg); if (r.ok) { persist(true); closeSheet(); render(); } else { persist(false); refreshSheet(); render(); } },
   sign(d) { const r = E.bid(S, Number(d.id), 1); toast(r.msg); if (r.ok) { persist(true); closeSheet(); render(); } else { persist(false); refreshSheet(); render(); } },
   offerYes(d) { const r = E.acceptOffer(S, Number(d.id)); toast(r.ok ? '移籍が成立しました' : r.msg); persist(true); render(); },

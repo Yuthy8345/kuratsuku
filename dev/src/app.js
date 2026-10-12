@@ -330,6 +330,7 @@ function prow(p, ctx) {
   if (p.club === S.my) {
     if (c.tac.xi.includes(p.id)) chips.push('<span class="chip ok">先発</span>'); else if (c.tac.bench.includes(p.id)) chips.push('<span class="chip">ベンチ</span>');
     if (p.listed) chips.push('<span class="chip acc">放出リスト</span>');
+    if (p.keep) chips.push('<span class="chip ok">放出不可</span>');
   }
   const sp = subPos(p); if (sp.length) chips.push(`<span class="chip">+${sp.slice(0, 3).join('/')}</span>`);
   if (p.inj > 0) chips.push(`<span class="chip warn">負傷 ${p.inj}日</span>`);
@@ -462,6 +463,7 @@ function sheetPlayer(id) {
   if (p.inj > 0) status.push(`<span class="chip warn">負傷中（あと${p.inj}日）</span>`);
   if (p.sus > 0) status.push('<span class="chip warn">出場停止</span>');
   if (p.listed) status.push('<span class="chip acc">放出リスト登録中</span>');
+  if (p.keep && mine) status.push('<span class="chip ok">放出不可（オファーはすべて断る）</span>');
   if (p.retire) status.push('<span class="chip">今季限りで引退</span>');
   if (lent) status.push('<span class="chip acc">期限付き移籍中（シーズン終了まで）</span>');
   if (p.gem && a <= 19) status.push('<span class="chip acc">ユースの逸材</span>');
@@ -478,7 +480,9 @@ function sheetPlayer(id) {
   if (lent) {
     foot = `<div class="small muted">シーズンが終わると${esc(S.clubs[S.my].short)}に戻ってきます。</div><button class="btn ghost block" data-act="closeSheet">閉じる</button>`;
   } else if (mine) {
-    foot = `<button class="btn primary block" data-act="train" data-id="${p.id}">トレーニングを設定</button><div class="grid2">${p.retire ? '<button class="btn ghost" disabled>引退が決まっています</button>' : `<button class="btn ghost" data-act="toggleList" data-id="${p.id}">${p.listed ? '放出リストから外す' : '放出リストに載せる'}</button>`}<button class="btn ghost" data-act="closeSheet">閉じる</button></div>`;
+    foot = `<button class="btn primary block" data-act="train" data-id="${p.id}">トレーニングを設定</button>${p.retire
+      ? '<div class="grid2"><button class="btn ghost" disabled>引退が決まっています</button><button class="btn ghost" data-act="closeSheet">閉じる</button></div>'
+      : `<div class="grid2"><button class="btn ghost" data-act="toggleList" data-id="${p.id}">${p.listed ? '放出リストから外す' : '放出リストに載せる'}</button><button class="btn ghost" data-act="toggleKeep" data-id="${p.id}">${p.keep ? '放出不可を解除' : '放出不可にする'}</button></div><button class="btn ghost block" data-act="closeSheet">閉じる</button>`}`;
   } else if (p.club === 'FA') {
     const sign = Math.round(E.wage(p) * 0.5 / 10) * 10;
     foot = `${se ? `<div class="small muted">${shortStatus(se, p)}</div>` : ''}<button class="btn primary block" data-act="sign" data-id="${p.id}">契約する（契約金 ${E.money(sign)}）</button>${shortFoot(se, p)}`;
@@ -1432,7 +1436,8 @@ const ACT = {
   unshort(d) { const p = S.players[d.id]; E.unshort(S, Number(d.id)); persist(false); toast(`${p ? p.name : '選手'}をショートリストから外しました`); refreshSheet(); render(); },
   upgrade(d) { const r = E.upgrade(S, d.k); toast(r.msg); if (r.ok) { persist(true); render(); } },
   training(d) { S.training = d.k; persist(false); render(); },
-  toggleList(d) { const p = S.players[d.id]; p.listed = !p.listed; persist(false); toast(p.listed ? (E.inWindow(S.date) ? '放出リストに載せました。オファーを待ちます' : '放出リストに載せました。移籍期間に入るとオファーが届きます') : '放出リストから外しました'); refreshSheet(); render(); },
+  toggleList(d) { const p = S.players[d.id]; const r = E.setListed(S, p.id, !p.listed); if (!r.ok) return; persist(false); toast(p.listed ? `${r.wasKeep ? '放出不可を解除し、' : ''}${E.inWindow(S.date) ? '放出リストに載せました。オファーを待ちます' : '放出リストに載せました。移籍期間に入るとオファーが届きます'}` : '放出リストから外しました'); refreshSheet(); render(); },
+  toggleKeep(d) { const p = S.players[d.id]; const r = E.setKeep(S, p.id, !p.keep); if (!r.ok) return; persist(false); toast(p.keep ? `${r.wasListed ? '放出リストから外し、' : ''}放出不可にしました。他クラブのオファーは断ります${r.n ? '（届いていたオファーも断りました）' : ''}` : '放出不可を解除しました'); refreshSheet(); render(); },
   bid(d) { const r = E.bid(S, Number(d.id), Number(d.m)); toast(r.msg); if (r.ok) { persist(true); closeSheet(); render(); } else { persist(false); refreshSheet(); render(); } },
   sign(d) { const r = E.bid(S, Number(d.id), 1); toast(r.msg); if (r.ok) { persist(true); closeSheet(); render(); } else { persist(false); refreshSheet(); render(); } },
   offerYes(d) { const r = E.acceptOffer(S, Number(d.id)); toast(r.ok ? '移籍が成立しました' : r.msg); persist(true); render(); },
