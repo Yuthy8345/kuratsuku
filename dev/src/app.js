@@ -977,7 +977,7 @@ function sheetReborn(id, again) {
       <h2 class="rb-name">${esc(p.name)}</h2>
       <div class="rb-sub">${E.age(p, S.date)}歳・${L.pp}${STY_JP[L.sty] ? '・' + STY_JP[L.sty] : ''}・${esc(c.short)} ユース</div>
       <div class="rb-past">
-        <div class="rb-past-h"><span>かつて</span><span>${esc(L.era)}</span></div>
+        <div class="rb-past-h"><span>${esc(L.era)}</span></div>
         <b>${L.num ? `伝説の背番号${L.num}` : `${esc(c.short)}のレジェンド`}</b>
         <p>${esc(L.line)}</p>
       </div>
