@@ -16,7 +16,7 @@ async def main():
         await pg.route('https://**/*', route)
         await pg.goto('file://' + str(ROOT/'test/page.html')); await pg.wait_for_timeout(300)
         await pg.click('text=新しく始める'); await pg.click('[data-id="kashiwa"]'); await pg.wait_for_timeout(300)
-        await pg.click('[data-act="startClub"]'); await pg.wait_for_timeout(300)
+        await pg.click('[data-act="nameClub"]'); await pg.wait_for_timeout(250); await pg.click('#sheet [data-act="startClub"]'); await pg.wait_for_timeout(300)
         await pg.click('[data-tab="tactics"]'); await pg.wait_for_timeout(200)
         bench0 = await pg.evaluate("[...document.querySelectorAll('[data-act=benchPick]')].map(e => e.dataset.id)")
         # swap the 3rd bench player for the first reserve

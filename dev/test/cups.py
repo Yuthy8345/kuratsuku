@@ -20,7 +20,7 @@ async def main():
         await page.route('https://**/*', route)
         await page.goto('file://' + str(ROOT/'test/page.html')); await page.wait_for_timeout(300)
         await page.click('text=新しく始める'); await page.click('[data-id="mito"]'); await page.wait_for_timeout(350)
-        await page.click('[data-act="startClub"]'); await page.wait_for_timeout(400)
+        await page.click('[data-act="nameClub"]'); await page.wait_for_timeout(250); await page.click('#sheet [data-act="startClub"]'); await page.wait_for_timeout(400)
         # cup view
         await page.click('[data-tab="league"]'); await page.click('[data-act="lgView"][data-k="cups"]'); await page.wait_for_timeout(250)
         await page.screenshot(path=str(OUT/'c-ec.png'))

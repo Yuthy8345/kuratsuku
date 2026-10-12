@@ -15,7 +15,7 @@ async def main():
         await page.route('https://**/*', route)
         await page.goto('file://' + str(ROOT/'test/page.html')); await page.wait_for_timeout(300)
         await page.click('text=新しく始める'); await page.click('[data-id="okayama"]'); await page.wait_for_timeout(350)
-        await page.click('[data-act="startClub"]'); await page.wait_for_timeout(350)
+        await page.click('[data-act="nameClub"]'); await page.wait_for_timeout(250); await page.click('#sheet [data-act="startClub"]'); await page.wait_for_timeout(350)
         # sell attempt: list a player
         await page.click('[data-tab="squad"]'); await page.click('.prow >> nth=5'); await page.wait_for_timeout(350)
         await page.click('#sheet [data-act="toggleList"]'); await page.wait_for_timeout(200)

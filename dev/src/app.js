@@ -207,9 +207,26 @@ function sheetClub(id) {
   openSheet(`<div class="row"><span class="kit lg" style="--c1:${c.c1};--c2:${c.c2}"></span><div><div class="eyebrow">${esc(c.area)}</div><h2>${esc(c.name)}</h2></div></div>
     <dl class="kv"><dt>ホーム</dt><dd>${esc(c.stadium)}</dd><dt>収容</dt><dd>${c.cap.toLocaleString('ja-JP')}人</dd><dt>資金</dt><dd>${E.money(c.funds)}</dd><dt>スポンサー収入</dt><dd>月 ${E.money(c.spon)}</dd><dt>チーム力</dt><dd><span class="stars">${stars(c.pred)}</span>（${c.pred}番手）</dd><dt>クラブの格</dt><dd>${presBadge(c)} ${E.presLabel(c.pres)}</dd><dt>クラブの目標</dt><dd>${esc(c.target.jp)}</dd></dl>
     <p class="fine" style="margin:-6px 0 0">${titlesText(c)}${c.o10 ? '・Jリーグ創設メンバー' : ''}</p>
-    <div><div class="eyebrow" style="margin-bottom:6px">主力選手</div><ul class="list">${top.map(p => `<li><div class="prow" style="grid-template-columns:30px 1fr auto">${posTag(p)}<span class="nm"><b>${esc(p.name)}</b><span>${E.age(p, P.date)}歳 ${natChip(p)}</span></span><span class="ovr ${oc(p.ovr)}">${E.ovr(p)}</span></div></li>`).join('')}</ul></div>
-    <label class="ctlrow"><span class="small muted">監督名（任意）</span><input class="input" id="mgr-name" maxlength="12" placeholder="あなた" autocomplete="off"></label>`,
-    `<button class="btn primary block" data-act="startClub" data-id="${id}">${esc(c.short)}で始める</button><button class="btn ghost block" data-act="closeSheet">ほかのクラブを見る</button>`);
+    <div><div class="eyebrow" style="margin-bottom:6px">主力選手</div><ul class="list">${top.map(p => `<li><div class="prow" style="grid-template-columns:30px 1fr auto">${posTag(p)}<span class="nm"><b>${esc(p.name)}</b><span>${E.age(p, P.date)}歳 ${natChip(p)}</span></span><span class="ovr ${oc(p.ovr)}">${E.ovr(p)}</span></div></li>`).join('')}</ul></div>`,
+    `<button class="btn primary block" data-act="nameClub" data-id="${id}">${esc(c.short)}で始める</button><button class="btn ghost block" data-act="closeSheet">ほかのクラブを見る</button>`);
+}
+// after picking a club: the manager's name, on a nameplate under the club's magnet (empty = 「あなた」)
+function sheetName(id, keep) {
+  const c = PREVIEW.clubs[id];
+  sheetState = { type: 'name', id };
+  const kt = lum(c.c1) > 0.6 ? '#141414' : '#ffffff';
+  openSheet(`<div class="mgr-card" style="--k1:${c.c1};--k2:${c.c2};--kt:${kt}">
+      <div class="eyebrow">新監督の就任</div>
+      <div class="mgr-club"><span class="kit lg" style="--c1:${c.c1};--c2:${c.c2}" aria-hidden="true"></span><b>${esc(c.name)}</b></div>
+      <label class="mgr-plate" for="mgr-name"><span class="mgr-plate-k">監督</span><input id="mgr-name" maxlength="12" placeholder="あなた" autocomplete="off" enterkeyhint="go" value="${esc(keep || '')}" aria-label="監督名"></label>
+      <p class="fine" style="margin:0">あなたの名前を入れてください（12文字まで）。空欄のままなら「あなた」で始まります。</p>
+    </div>`,
+    `<button class="btn primary block" data-act="startClub" data-id="${id}">${esc(c.short)}の監督に就任する</button><button class="btn ghost block" data-act="pickClub" data-id="${id}">戻る</button>`);
+  const inp = document.getElementById('mgr-name');
+  if (inp) {
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); ACT.startClub({ id }); } });
+    try { inp.focus({ preventScroll: true }); } catch (e) { /* no focus */ }
+  }
 }
 
 /* ---------- main shell ---------- */
@@ -1329,6 +1346,7 @@ const ACT = {
   board(d) { setBoard(d.k); render(); },
   toTitle() { UI.screen = 'title'; render(); },
   pickClub(d) { sheetClub(d.id); },
+  nameClub(d) { sheetName(d.id); },
   startClub(d) {
     const nm = (document.getElementById('mgr-name') || {}).value || '';
     S = E.newGame(DATA, d.id, nm.trim() || 'あなた', TODAY);

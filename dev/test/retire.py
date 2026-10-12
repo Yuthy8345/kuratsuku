@@ -25,7 +25,7 @@ async def run(scheme):
         await page.goto('file://' + str(ROOT/'test/page.html')); await page.wait_for_timeout(300)
         if scheme == 'white': await page.evaluate("localStorage.setItem('kuratsuku.board', 'white')"); await page.reload(); await page.wait_for_timeout(300)
         await page.click('text=新しく始める'); await page.click('[data-id="kobe"]'); await page.wait_for_timeout(350)
-        await page.click('[data-act="startClub"]'); await page.wait_for_timeout(400)
+        await page.click('[data-act="nameClub"]'); await page.wait_for_timeout(250); await page.click('#sheet [data-act="startClub"]'); await page.wait_for_timeout(400)
         # jump to the end of the season: mark every fixture played and open the season-end state (an old-style save: no retirements decided yet)
         await page.goto('about:blank')
         ed = await ctx.new_page(); await ed.route('https://**/*', route); await ed.goto('file://' + str(ROOT/'test/blank.html')); await ed.add_script_tag(content=LZ)

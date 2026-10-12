@@ -18,7 +18,7 @@ async def main():
         await page.route('https://**/*', route)
         await page.goto('file://' + str(ROOT/'test/page.html')); await page.wait_for_timeout(300)
         await page.click('text=新しく始める'); await page.click('[data-id="kashima"]'); await page.wait_for_timeout(350)
-        await page.click('[data-act="startClub"]'); await page.wait_for_timeout(400)
+        await page.click('[data-act="nameClub"]'); await page.wait_for_timeout(250); await page.click('#sheet [data-act="startClub"]'); await page.wait_for_timeout(400)
         # --- scroll lock check on the slot sheet
         await page.click('[data-tab="tactics"]'); await page.wait_for_timeout(200)
         await page.evaluate('window.scrollTo(0, 120)'); await page.wait_for_timeout(100)

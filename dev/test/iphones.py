@@ -55,7 +55,7 @@ async def main():
                 await page.goto('http://127.0.0.1:8766/index.html'); await page.wait_for_timeout(300)
                 if save:
                     await page.click('text=新しく始める'); await page.click('[data-id="yokohamafm"]'); await page.wait_for_timeout(300)
-                    await page.click('[data-act="startClub"]'); await page.wait_for_timeout(300)
+                    await page.click('[data-act="nameClub"]'); await page.wait_for_timeout(250); await page.click('#sheet [data-act="startClub"]'); await page.wait_for_timeout(300)
                     await page.goto('http://127.0.0.1:8766/index.html')
                 await page.wait_for_timeout(600 if css else 250)
                 m = await page.evaluate('''() => { const r = s => document.querySelector(s).getBoundingClientRect();

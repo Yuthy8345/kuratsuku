@@ -16,7 +16,7 @@ async def main():
         await pg.route('https://**/*', route)
         await pg.goto('file://' + str(ROOT/'test/page.html')); await pg.wait_for_timeout(300)
         await pg.click('text=新しく始める'); await pg.click('[data-id="yokohamafm"]'); await pg.wait_for_timeout(300)
-        await pg.click('[data-act="startClub"]'); await pg.wait_for_timeout(300)
+        await pg.click('[data-act="nameClub"]'); await pg.wait_for_timeout(250); await pg.click('#sheet [data-act="startClub"]'); await pg.wait_for_timeout(300)
         await pg.click('[data-act="go"]'); await pg.wait_for_timeout(300)
         await pg.click('#sheet [data-act="kickoff"]'); await pg.wait_for_timeout(300)
         cv = pg.locator('#cv')

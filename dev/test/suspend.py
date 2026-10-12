@@ -22,7 +22,7 @@ async def main():
         async def state(): return await page.evaluate(LOAD)
         await page.goto('file://' + str(ROOT/'test/page.html')); await page.wait_for_timeout(300)
         await page.click('text=新しく始める'); await page.click('[data-id="kashima"]'); await page.wait_for_timeout(350)
-        await page.click('[data-act="startClub"]'); await page.wait_for_timeout(400)
+        await page.click('[data-act="nameClub"]'); await page.wait_for_timeout(250); await page.click('#sheet [data-act="startClub"]'); await page.wait_for_timeout(400)
         st = await state(); c = st['clubs']['kashima']
         SUS, INJ = c['tac']['xi'][2], c['tac']['bench'][3]
         print('suspend', st['players'][str(SUS)]['name'], '| injure bench', st['players'][str(INJ)]['name'])

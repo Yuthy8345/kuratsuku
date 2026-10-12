@@ -26,7 +26,7 @@ async def main():
         await page.screenshot(path=str(OUT/f'{scheme}-02-select.png'))
         await page.click('[data-id="mito"]'); await page.wait_for_timeout(400)
         await page.screenshot(path=str(OUT/f'{scheme}-03-clubsheet.png'))
-        await page.click('[data-act="startClub"]'); await page.wait_for_timeout(500)
+        await page.click('[data-act="nameClub"]'); await page.wait_for_timeout(250); await page.click('#sheet [data-act="startClub"]'); await page.wait_for_timeout(500)
         await page.screenshot(path=str(OUT/f'{scheme}-04-home.png'))
         await page.click('[data-act="go"]'); await page.wait_for_timeout(500)
         await page.screenshot(path=str(OUT/f'{scheme}-05-prematch.png'))

@@ -24,7 +24,7 @@ async def main():
         await page.goto('file://' + str(ROOT/'test/page.html')); await page.wait_for_timeout(300)
         await page.click('text=新しく始める'); await page.click('[data-id="kashima"]'); await page.wait_for_timeout(350)
         await page.screenshot(path=str(OUT/'p-club.png'))
-        await page.click('[data-act="startClub"]'); await page.wait_for_timeout(400)
+        await page.click('[data-act="nameClub"]'); await page.wait_for_timeout(250); await page.click('#sheet [data-act="startClub"]'); await page.wait_for_timeout(400)
         await page.click('[data-tab="squad"]'); await page.wait_for_timeout(200)
         await page.screenshot(path=str(OUT/'p-squad.png'))
         print('badges', await page.evaluate('[...document.querySelectorAll(".prow .pos")].slice(0,14).map(e=>e.textContent).join(" ")'))

@@ -21,7 +21,7 @@ async def main():
         await page.route('https://**/*', route)
         await page.goto('file://' + str(ROOT/'test/page.html')); await page.wait_for_timeout(400)
         await page.click('text=新しく始める'); await page.click('[data-id="yokohamafm"]'); await page.wait_for_timeout(350)
-        await page.click('[data-act="startClub"]'); await page.wait_for_timeout(500)
+        await page.click('[data-act="nameClub"]'); await page.wait_for_timeout(250); await page.click('#sheet [data-act="startClub"]'); await page.wait_for_timeout(500)
         async def club():
             await page.click('[data-tab="club"]'); await page.wait_for_timeout(150)
             await page.click('[data-act="clView"][data-k="main"]'); await page.wait_for_timeout(200)

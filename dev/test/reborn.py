@@ -39,7 +39,7 @@ async def main():
             await page.goto('file://' + str(ROOT/'test/page.html')); await page.wait_for_timeout(400)
         await page.goto('file://' + str(ROOT/'test/page.html')); await page.wait_for_timeout(400)
         await page.click('text=新しく始める'); await page.click('[data-id="yokohamafm"]'); await page.wait_for_timeout(350)
-        await page.click('[data-act="startClub"]'); await page.wait_for_timeout(400)
+        await page.click('[data-act="nameClub"]'); await page.wait_for_timeout(250); await page.click('#sheet [data-act="startClub"]'); await page.wait_for_timeout(400)
         # the end of my first season at the club, with the guarantee due
         await edit('''for (const f of st.fixtures) { f.played = true; f.hg = 1; f.ag = 1; }
           st.seasonEnd = { label: '2026/27', champ: 'kashima', myPos: 5, rel: ['mito', 'chiba', 'okayama'], scorers: [], verdict: 'met', prize: 3000, pts: 60, target: '7位以内', ret: [], retSeen: true };
