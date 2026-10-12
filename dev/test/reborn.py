@@ -1,7 +1,7 @@
 # 転生選手: at the start of the 2nd season a legend of my club arrives (forced here with wait = pity), the pop-up plays,
 # the legend's number can be handed over, the pop-up does not come back after closing, and the player carries the
 # 転生 chip. (Chances, guarantee, traits: test/reborn.js)
-import asyncio, pathlib, os, re
+import asyncio, pathlib, os, re, json  # RB_USED=yfm1,yfm2 to choose who comes
 from playwright.async_api import async_playwright
 ROOT = pathlib.Path('/home/claude/kuratsuku/dev'); OUT = ROOT/'test'/'shots'
 FONTS = pathlib.Path(os.environ.get('KTK_FONTS', '/nonexistent'))
@@ -44,7 +44,7 @@ async def main():
         await edit('''for (const f of st.fixtures) { f.played = true; f.hg = 1; f.ag = 1; }
           st.seasonEnd = { label: '2026/27', champ: 'kashima', myPos: 5, rel: ['mito', 'chiba', 'okayama'], scorers: [], verdict: 'met', prize: 3000, pts: 60, target: '7位以内', ret: [], retSeen: true };
           st.history.unshift({ season: '2026/27', club: st.my, pos: 5, pts: 60, champ: 'kashima', verdict: 'met' });
-          st.reborn = { used: [], wait: 2, club: st.my }; st.board = 70;''')
+          st.reborn = { used: USED, wait: 2, club: st.my }; st.board = 70;'''.replace('USED', json.dumps([x for x in os.environ.get('RB_USED', '').split(',') if x])))
         await page.click('[data-act="continue"]'); await page.wait_for_timeout(300)
         await page.click('[data-act="go"]'); await page.wait_for_timeout(400)
         await page.click('#sheet [data-act="nextSeason"]'); await page.wait_for_timeout(500)

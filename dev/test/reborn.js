@@ -42,7 +42,7 @@ ok(got.length === E.LEGENDS.yokohamafm.length && new Set(got).size === got.lengt
 S = fresh(); S.reborn = { used: [], wait: 5, club: 'kashima' }; S.history = [{ club: 'kashima' }];
 ok(E.rebornCheck(S, { verdict: 'met' }) === null && S.reborn.wait === 0 && S.reborn.club === S.my, 'moving to another club resets the guarantee');
 // the legend's number: handed over, the wearer takes the old one
-S = fresh(); S.reborn = { used: ['yfm2', 'yfm3'], wait: 9, club: S.my };
+S = fresh(); S.reborn = { used: ['yfm2', 'yfm3', 'yfm4'], wait: 9, club: S.my };
 p = E.rebornCheck(S, seasonDone(S, 'met'));  // only 外町 left: number 25
 const holder = E.squad(S, S.my).find(q => q.id !== p.id && q.num === 25);
 const mine = p.num; const r = E.rebornNum(S, p.id);
