@@ -4338,8 +4338,8 @@ function viewTactics() {
 function planCard(c) {
   const t = c.tac, x = E.tacLabel(t);
   const subs = S.settings.autoSubs ? `おまかせ（${(E.SUB_RATE[S.settings.subRate] || E.SUB_RATE.mid).jp}）` : '自分で選ぶ';
-  return `<button class="plancard" data-act="plan" aria-label="戦術を変える">
-    <span class="pc-head"><span class="eyebrow">戦術</span><span class="pc-edit">変える<span aria-hidden="true">›</span></span></span>
+  return `<button class="plancard" data-act="plan" aria-label="戦術を変更">
+    <span class="pc-head"><span class="eyebrow">戦術</span><span class="pc-edit">変更<span aria-hidden="true">›</span></span></span>
     <dl class="pc-kv"><dt>攻撃の姿勢</dt><dd>${esc(E.mentLabel(t))}</dd><dt>プレス</dt><dd>${esc((E.PRESS[t.press] || E.PRESS.mid).jp)}</dd><dt>詳しい指示</dt><dd>${x ? esc(x) : '標準'}</dd><dt>交代</dt><dd>${subs}</dd></dl>
   </button>`;
 }
