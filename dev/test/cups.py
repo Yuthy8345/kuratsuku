@@ -29,11 +29,13 @@ async def main():
         await page.screenshot(path=str(OUT/'c-lc.png'))
         # counter tactics
         await page.click('[data-tab="tactics"]'); await page.wait_for_timeout(200)
-        await page.click('[data-act="ment"][data-k="def"]'); await page.wait_for_timeout(200)
-        await page.click('[data-act="ctr"]'); await page.wait_for_timeout(200)
-        print('posture:', await page.locator('.ctlrow:has([data-act="ment"]) .fine').inner_text(), '| counter on:', await page.locator('[data-act="ctr"]').get_attribute('aria-checked'))
-        await page.evaluate('document.querySelector(\'[data-act="ment"]\').scrollIntoView({block:"center"})'); await page.wait_for_timeout(150)
+        await page.click('.plancard'); await page.wait_for_timeout(400)  # the 戦術 sheet
+        await page.click('#sheet [data-act="ment"][data-k="def"]'); await page.wait_for_timeout(200)
+        await page.click('#sheet [data-act="ctr"]'); await page.wait_for_timeout(200)
+        print('posture:', await page.locator('#sheet .ctlrow:has([data-act="ment"]) .fine').inner_text(), '| counter on:', await page.locator('#sheet [data-act="ctr"]').get_attribute('aria-checked'))
         await page.screenshot(path=str(OUT/'c-tactics.png'))
+        await page.keyboard.press('Escape'); await page.wait_for_timeout(300)
+        print('summary plate:', (await page.locator('.plancard').inner_text()).replace('\n', ' ')[:40])
         # scouting
         await page.click('[data-tab="club"]'); await page.wait_for_timeout(200)
         await page.click('[data-act="scout"][data-k="dom"]'); await page.wait_for_timeout(200)

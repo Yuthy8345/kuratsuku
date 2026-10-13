@@ -519,6 +519,15 @@ button.tside:active { background: var(--surface2); }
 .btn.ce-go { min-height: 56px; font-size: 17px; }
 @media (prefers-reduced-motion: reduce) { .cele, .cele *, .cele::after { animation: none !important; opacity: 1; filter: none; } .cele .ce-rays { opacity: 1; } .cele .ce-conf { display: none; } }
 
+/* 戦術: the summary plate on the tactics screen (the controls are in the 戦術 sheet) */
+.plancard { display: grid; gap: 8px; width: 100%; padding: 12px 14px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); text-align: left; color: var(--ink); box-shadow: var(--mag-shadow); }
+.plancard:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0,0,0,.3); }
+.pc-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.pc-edit { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 8px; background: var(--accent-bg); color: var(--on-accent); font-size: 12px; font-weight: 900; }
+.pc-edit span { font-size: 15px; line-height: 1; }
+.pc-kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; margin: 0; font-size: 13px; }
+.pc-kv dt { color: var(--muted); }
+.pc-kv dd { margin: 0; font-weight: 700; text-align: right; min-width: 0; }
 /* bench: magnets on the board, three to a row */
 .bgrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .btile { position: relative; display: grid; justify-items: center; align-content: start; gap: 4px; min-width: 0; padding: 12px 6px 10px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); text-align: center; color: var(--ink); }
