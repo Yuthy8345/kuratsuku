@@ -20,7 +20,7 @@ SAFARI = [('SE Safari', 375, 548), ('16 Safari', 393, 659), ('Pro Max Safari', 4
 def serve():
     class Quiet(http.server.SimpleHTTPRequestHandler):
         def log_message(self, *a): pass
-    h = functools.partial(Quiet, directory=str(REPO))
+    h = functools.partial(Quiet, directory=os.environ.get('KTK_SITE', str(REPO)))  # KTK_SITE: serve another build
     srv = http.server.ThreadingHTTPServer(('127.0.0.1', 8766), h); threading.Thread(target=srv.serve_forever, daemon=True).start(); return srv
 def font_css():
     if not FONTS.exists(): return None
@@ -94,18 +94,55 @@ async def main():
                         print(f"   {name} settle: viewport {cur} flips {flips} {f}"); bad.append(f'{tag} settle')
                     vh = cur
                 if save:  # the club screens too: header below the notch, dock on the home bar, no sideways scroll
+                    # launch: after every screen change iOS is asked again (page taller than the viewport → full height,
+                    # else short). Every screen — short ones, an open sheet, the match — must keep the full screen
+                    # (2026-10-13: a short screen used to drop back and lift the dock by the status bar, 画像①②③).
+                    async def again(where):
+                        nonlocal vh
+                        if mode != 'launch': return
+                        flips = 0
+                        for _ in range(8):
+                            sh_ = await page.evaluate('document.scrollingElement.scrollHeight')
+                            nxt = h if sh_ > vh else h - top
+                            if nxt == vh: break
+                            flips += 1; vh = nxt; await page.set_viewport_size({'width': w, 'height': vh}); await page.wait_for_timeout(120)
+                        if vh != h or flips: print(f"   {name} {where}: viewport {vh} (screen {h}) after {flips} change(s)"); bad.append(f'{tag} {where} viewport')
+                    async def bottom_of(sel, where):
+                        await again(where)
+                        b_ = await page.evaluate(f"document.querySelector('{sel}').getBoundingClientRect().bottom")
+                        if abs(b_ - h) > 1: print(f"   {name} {where}: {sel} bottom {b_:.0f}, screen {h}"); bad.append(f'{tag} {where}')
                     await page.click('[data-act="continue"]'); await page.wait_for_timeout(400)
                     for tab in ('home', 'squad', 'tactics', 'league', 'club'):
                         await page.locator(f'[data-tab="{tab}"]').dispatch_event('click'); await page.wait_for_timeout(150)  # launch: the dock is below the short viewport
+                        await again(tab)
                         g = await page.evaluate('''() => { const hd = document.querySelector('.hdr').getBoundingClientRect(), dk = document.querySelector('.dock').getBoundingClientRect();
                           return { hdrTop: hd.top, dockBottom: dk.bottom, sw: document.scrollingElement.scrollWidth, iw: innerWidth }; }''')
                         q = []
                         if g['hdrTop'] < top - 0.5: q.append(f"header under notch {g['hdrTop']:.0f}")
-                        if abs(g['dockBottom'] - vh) > 1: q.append(f"dock bottom {g['dockBottom']:.0f} (viewport {vh})")
+                        if abs(g['dockBottom'] - h) > 1: q.append(f"dock bottom {g['dockBottom']:.0f} (screen {h})")
                         if g['sw'] > g['iw'] + 1: q.append('horizontal scroll')
                         if q: print(f"   {name} {tab}: {' / '.join(q)}"); bad.append(f'{tag} {tab}')
+                    # a short screen: club → 移籍市場 → ショートリスト (empty)
+                    await page.locator('[data-act="clView"][data-k="market"]').dispatch_event('click'); await page.wait_for_timeout(150)
+                    await page.locator('[data-act="mkView"][data-k="short"]').dispatch_event('click'); await page.wait_for_timeout(150)
+                    await bottom_of('.dock', 'shortlist')
+                    if w == 393: await page.screenshot(path=str(OUT/f"ip-short-{mode}-{w}x{h}.png"))
+                    await page.locator('[data-act="clView"][data-k="main"]').dispatch_event('click'); await page.wait_for_timeout(100)
+                    # an open sheet (the page is pinned while it is open)
+                    await page.locator('[data-tab="squad"]').dispatch_event('click'); await page.wait_for_timeout(150)
+                    await page.locator('[data-act="player"]').first.dispatch_event('click'); await page.wait_for_timeout(350)
+                    await bottom_of('#sheet', 'sheet')
+                    await page.locator('#sheet [data-act="closeSheet"]').last.dispatch_event('click'); await page.wait_for_timeout(300)
                     await page.locator('[data-tab="home"]').dispatch_event('click'); await page.wait_for_timeout(150)
+                    await again('home again')
                     await page.screenshot(path=str(OUT/f"ip-home-{mode}-{w}x{h}.png"))
+                    # the match: the controls sit on the home bar
+                    await page.locator('[data-act="go"]').dispatch_event('click'); await page.wait_for_timeout(300)
+                    await page.locator('#sheet [data-act="kickoff"]').dispatch_event('click'); await page.wait_for_timeout(500)
+                    await bottom_of('#mlayer', 'match')
+                    mb = await page.evaluate("document.querySelector('#mctl').getBoundingClientRect().bottom")
+                    if abs(mb - h) > 1: print(f"   {name} match: controls bottom {mb:.0f}, screen {h}"); bad.append(f'{tag} match controls')
+                    if w == 393: await page.screenshot(path=str(OUT/f"ip-match-{mode}-{w}x{h}.png"))
                 await ctx.close()
         await b.close()
     srv.shutdown()

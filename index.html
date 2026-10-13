@@ -553,8 +553,11 @@ button.tside:active { background: var(--surface2); }
 .btile.addrow .bt-name { font-size: 12px; color: var(--ink); }
 
 /* toast */
-.toast { position: fixed; left: 50%; bottom: calc(var(--dock-h) + 16px + env(safe-area-inset-bottom, 0px)); transform: translate(-50%, 20px); z-index: 90; background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 12px; font-size: 13px; font-weight: 700; max-width: calc(100% - 32px); opacity: 0; transition: opacity .2s, transform .2s; pointer-events: none; text-align: center; }
-.toast.on { opacity: 1; transform: translate(-50%, 0); }
+/* toast: centred with left/right + auto margins, not left:50% — that capped it at half the screen, so short messages
+   broke mid-word (「スタメン」を読み込みま／した). Lines only break between phrases (after 、。 and around brackets);
+   a phrase longer than the line still breaks rather than overflowing. */
+.toast { position: fixed; left: 16px; right: 16px; margin: 0 auto; width: fit-content; max-width: 488px; bottom: calc(var(--dock-h) + 16px + env(safe-area-inset-bottom, 0px)); transform: translateY(20px); z-index: 90; background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 12px; font-size: 13px; font-weight: 700; opacity: 0; transition: opacity .2s, transform .2s; pointer-events: none; text-align: center; word-break: keep-all; overflow-wrap: anywhere; line-break: strict; text-wrap: balance; }
+.toast.on { opacity: 1; transform: translateY(0); }
 
 /* title: the tactics board itself (always the green chalkboard in its aluminium frame) */
 /* exactly one screen, pinned with position:fixed. No vh/dvh: in an iOS home-screen app with viewport-fit=cover they come out
@@ -565,6 +568,10 @@ button.tside:active { background: var(--surface2); }
    bug 301994) and draws nothing below it, but uses the right height whenever the page is taller than the screen. So
    there the title always sits in the page at the real screen height + 1px (--apph) instead of being fixed. */
 html.ios-app .tb-wrap { position: absolute; inset: 0 0 auto 0; height: calc(var(--apph) + 1px); overflow: hidden; }
+/* the same for every other screen: the page itself is never shorter than the screen + 1px, so a short screen (an empty
+   list, the match, any open sheet — the page is pinned then) no longer drops iOS back to the short viewport, which left
+   the dock and the match controls a status bar's height above the bottom with nothing drawn below them */
+html.ios-app { min-height: calc(var(--apph) + 1px); }
 .tboard { position: relative; flex: 1; width: 100%; max-width: 520px; min-height: 440px; margin: 0 auto; border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; color: #F4F1E6;
   background-color: #1E4A39; background-image: radial-gradient(ellipse at 30% 20%, rgba(255,255,255,.07) 0%, rgba(255,255,255,0) 40%), radial-gradient(ellipse at 75% 70%, rgba(255,255,255,.05) 0%, rgba(255,255,255,0) 45%), radial-gradient(circle, rgba(255,255,255,.035) 0 1px, rgba(0,0,0,0) 1.4px); background-size: auto, auto, 4px 4px;
   box-shadow: inset 0 0 0 2px #163A2C, inset 0 0 60px rgba(0,0,0,.45); }
@@ -954,11 +961,11 @@ const DP_BIAS = {
 const FOCUS = {
   auto:  { jp: 'おまかせ', sub: 'ポジションに合わせて満遍なく', v: null },
   shoot: { jp: 'シュート', sub: 'シュート・ドリブル', v: { 0: 0.7, 2: 0.3 } },
-  pass:  { jp: 'パス', sub: 'パス・判断力', v: { 1: 0.7, 7: 0.3 } },
+  pass:  { jp: 'パス', sub: 'パス・ドリブル', v: { 1: 0.7, 2: 0.3 }, gksub: 'パス（キック）に集中', gkv: { 1: 1 } },  // passing drills sharpen the touch too (a keeper: his kicking only)
   drib:  { jp: 'ドリブル', sub: 'ドリブル・スピード', v: { 2: 0.65, 4: 0.35 } },
   def:   { jp: '守備', sub: '守備・判断力', v: { 3: 0.7, 7: 0.3 } },
   phys:  { jp: 'フィジカル', sub: 'パワー・スタミナ・スピード', v: { 5: 0.4, 6: 0.35, 4: 0.25 } },
-  mind:  { jp: '判断力', sub: '判断力・パス', v: { 7: 0.65, 1: 0.35 } },
+  mind:  { jp: '判断力', sub: '判断力に集中', v: { 7: 1 } },                 // video and tactics work: only the reading of the game (pass no longer shares it)
   gk:    { jp: 'セービング', sub: 'セービング・判断力', v: { 8: 0.75, 7: 0.25 }, gk: true },
 };
 const INTENS = {
@@ -1139,6 +1146,13 @@ function migrate(S, DATA) {
     const n = addAbroad(S, DATA);
     if (n && !S.fired) news(S, `移籍市場に海外でプレーする日本人選手（${n}人）が加わった。「クラブ → 移籍市場 → 海外組」から。`, 'transfer');
   }
+  // a league that had shrunk to an odd number of clubs drew one club against itself each round (2026-10-13 fix): those
+  // fixtures are dropped, played or not (a club cannot win or lose against itself). J1 is back to 20 at the next rollover.
+  if (S.fixtures && S.fixtures.some(f => f.h === f.a)) {
+    const mine = S.fixtures.some(f => f.h === f.a && f.h === S.my);
+    S.fixtures = S.fixtures.filter(f => f.h !== f.a);
+    if (mine && !S.fired) news(S, `日程の不具合を修正し、自クラブ同士の試合を取り消した（すでに行われた分も成績から外した）。${S.order.length < LEAGUE_N ? `来季からJ1は${LEAGUE_N}クラブに戻る。` : ''}`, 'info');
+  }
   S.v = Math.max(S.v || 1, 9);
   return S;
 }
@@ -1187,7 +1201,7 @@ function devWeek(S, p, dry) {
       if (room > 0) { const x = Math.min(add, room); p.pot += x; p.bloom = (p.bloom || 0) + x; }
     }
   }
-  const w = AW[p.pos]; const f = FOCUS[tf] && FOCUS[tf].v;
+  const w = AW[p.pos]; const F = FOCUS[tf]; const f = F && ((p.pos === 'GK' && F.gkv) || F.v);
   const d = w.map((wi, i) => f ? 0.4 * wi + 0.6 * (f[i] || 0) : wi);
   const T = g / AW_SQ[p.pos];
   const aMax = attrMax(p);
@@ -1364,6 +1378,7 @@ function setExpectations(S, opts) {
 }
 
 /* ---------- fixtures ---------- */
+const LEAGUE_N = 20;  // J1 clubs: relegated clubs are always replaced, so the league stays at 20
 const H2_OFFSETS = [0, 7, 14, 21, 28, 35, 49, 56, 63, 71, 75, 79, 84, 91, 98, 105, 109, 113];
 function seasonDates(sy) {
   // first half: 20 Saturdays from the Saturday on/after Aug 7
@@ -1374,11 +1389,14 @@ function seasonDates(sy) {
   return first.concat(second);
 }
 function genFixtures(order, round1, sy) {
-  const n = order.length; const arr = new Array(n);
-  if (round1 && round1.length === n / 2 && round1.every(p => order.includes(p[0]) && order.includes(p[1]))) {
+  // a club is never drawn against itself: with an odd number of clubs the middle pairing of the circle method used to
+  // be club v club (J1 had shrunk to 19 by then), so an odd league gets a rest slot (null) instead
+  const clubs = [...new Set(order)]; if (clubs.length % 2) clubs.push(null);
+  const n = clubs.length; const arr = new Array(n);
+  if (round1 && round1.length === n / 2 && round1.every(p => p[0] !== p[1] && clubs.includes(p[0]) && clubs.includes(p[1])) && new Set(round1.flat()).size === n) {
     round1.forEach((p, k) => { arr[k] = p[0]; arr[n - 1 - k] = p[1]; });
   } else {
-    const sh = [...order].sort(() => R() - 0.5); sh.forEach((c, i) => arr[i] = c);
+    const sh = [...clubs].sort(() => R() - 0.5); sh.forEach((c, i) => arr[i] = c);
   }
   const fixed = arr[0]; let rot = arr.slice(1);
   const rounds = [];
@@ -1396,7 +1414,8 @@ function genFixtures(order, round1, sy) {
   const dates = seasonDates(sy);
   const fx = []; let id = 1;
   all.forEach((ms, r) => ms.forEach(([h, a]) => {
-    let date = dates[r];
+    if (!h || !a || h === a) return;  // the rest slot
+    let date = dates[r] || D.add(dates[dates.length - 1], 7 * (r - dates.length + 1));
     if (r === 0 && round1 && h === round1[0][0] && a === round1[0][1] && sy === 2026) date = '2026-08-07';
     fx.push({ id: id++, r: r + 1, date, h, a, hg: null, ag: null, played: false });
   }));
@@ -3053,10 +3072,18 @@ function rollover(S) {
   for (const p of back) if (S.players[p.id] && p.loan) loanReturn(S, p);
   // relegation / promotion
   const promoted = [];
+  // everyone below J1 can go up: the J2 clubs and the clubs relegated in earlier seasons (this season's go down for at
+  // least a year; the overseas clubs never). Before, a relegated original J1 club could never come back, so after about
+  // ten seasons the J2 pool ran dry, J1 shrank to 19 and the odd club out was drawn against itself.
   const pool = J2.filter(c => !S.clubs[c.id] || !S.order.includes(c.id));
+  for (const id of Object.keys(S.clubs)) {
+    const c = S.clubs[id];
+    if (c.ab || S.order.includes(id) || se.rel.includes(id) || pool.some(x => x.id === id)) continue;
+    pool.push({ id: c.id, name: c.name, short: c.short, abbr: c.abbr, c1: c.c1, c2: c.c2, tier: c.tier });
+  }
   // relegated clubs drop out of the league but keep their players (they play in J2 and can come back or enter the 天皇杯)
   for (const rid of se.rel) S.order = S.order.filter(c => c !== rid);
-  while (promoted.length < se.rel.length && pool.length) {
+  while (S.order.length < LEAGUE_N && pool.length) {
     const c = pool.splice(Math.floor(R() * pool.length), 1)[0];
     promoted.push(c.id);
     if (!S.clubs[c.id]) addClub(S, { ...c, coach: '' });
@@ -4245,7 +4272,7 @@ function sheetTrain(id) {
     ${top.length ? `<p class="fine" style="margin:-4px 0 0">このメニューだと1か月で ${top.map(x => `${E.ATTR[x.i]} ${x.d > 0 ? '+' : ''}${x.d}`).join('、')} ほど。</p>` : pv && pv.dAt.some(d => d >= 0.15) ? '<p class="fine" style="margin:-4px 0 0">1か月では目に見える変化は小さく、少しずつ伸びていきます。</p>' : ''}
     ${note ? `<p class="fine" style="margin:-4px 0 0">${note}</p>` : ''}
     <p class="fine" style="margin:-4px 0 0">出場機会はクラブの試合時間のうち出ていた割合。試合に出るほど成長が速く、23歳以下は特に伸びます。</p>
-    <div class="ctlrow"><label>個別メニュー</label><div class="menu">${menus.map(([k, f]) => `<button data-act="setTf" data-id="${p.id}" data-k="${k}" aria-pressed="${tf === k}"><b>${f.jp}</b><span>${f.sub}</span></button>`).join('')}</div></div>
+    <div class="ctlrow"><label>個別メニュー</label><div class="menu">${menus.map(([k, f]) => `<button data-act="setTf" data-id="${p.id}" data-k="${k}" aria-pressed="${tf === k}"><b>${f.jp}</b><span>${(p.pos === 'GK' && f.gksub) || f.sub}</span></button>`).join('')}</div></div>
     <div class="ctlrow"><label>強度</label><div class="seg">${Object.entries(E.INTENS).map(([k, t]) => `<button data-act="setTi" data-id="${p.id}" data-k="${k}" aria-pressed="${ti === k}">${t.jp}</button>`).join('')}</div>
       <span class="fine">${{ light: '成長はゆっくり。疲れが早く抜けるので連戦向き。', norm: '標準の負荷。', hard: '成長が速い。疲れが抜けにくく、練習中のケガも起きやすい。' }[ti]}</span></div>
     ${p.pos !== 'GK' ? `<div class="ctlrow"><label>ポジション習得　<span class="muted" style="font-weight:400">本職 ${dpOf(p)}</span></label>
@@ -4854,7 +4881,8 @@ function lockScroll() {
   if (lockCount++) return;
   lockY = window.scrollY || 0;
   const b = document.body.style;
-  b.position = 'fixed'; b.top = -lockY + 'px'; b.left = '0'; b.right = '0'; b.width = '100%'; b.overflow = 'hidden';
+  b.position = 'fixed'; b.top = -lockY + 'px'; b.left = '0'; b.right = '0'; b.width = '100%';
+  if (!IOS_APP) b.overflow = 'hidden';  // home-screen app: the page must stay taller than the screen (see html.ios-app)
 }
 function unlockScroll() {
   if (!lockCount || --lockCount) return;
@@ -4902,7 +4930,8 @@ function refreshSheet() {
   if (s.type === 'player') sheetPlayer(s.id, s.back); else if (s.type === 'train') sheetTrain(s.id); else if (s.type === 'bench') sheetBench(s.id); else if (s.type === 'slot') sheetSlot(s.i); else if (s.type === 'pre') sheetPrematch(s.id); else if (s.type === 'msub') sheetMatchTactics();
 }
 let toastT = null;
-function toast(msg) { toastEl.textContent = msg; toastEl.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => toastEl.classList.remove('on'), 2600); }
+// spaces become no-break spaces so a name (山田 太郎) stays on one line
+function toast(msg) { toastEl.textContent = String(msg).replace(/(\S) (?=\S)/g, '$1\u00a0'); toastEl.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => toastEl.classList.remove('on'), 2600); }
 
 /* ---------- match ---------- */
 const SPEEDS = { 1: 430, 2: 170, 4: 50 };   // real ms per match minute

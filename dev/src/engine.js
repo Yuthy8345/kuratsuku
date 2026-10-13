@@ -270,11 +270,11 @@ const DP_BIAS = {
 const FOCUS = {
   auto:  { jp: 'おまかせ', sub: 'ポジションに合わせて満遍なく', v: null },
   shoot: { jp: 'シュート', sub: 'シュート・ドリブル', v: { 0: 0.7, 2: 0.3 } },
-  pass:  { jp: 'パス', sub: 'パス・判断力', v: { 1: 0.7, 7: 0.3 } },
+  pass:  { jp: 'パス', sub: 'パス・ドリブル', v: { 1: 0.7, 2: 0.3 }, gksub: 'パス（キック）に集中', gkv: { 1: 1 } },  // passing drills sharpen the touch too (a keeper: his kicking only)
   drib:  { jp: 'ドリブル', sub: 'ドリブル・スピード', v: { 2: 0.65, 4: 0.35 } },
   def:   { jp: '守備', sub: '守備・判断力', v: { 3: 0.7, 7: 0.3 } },
   phys:  { jp: 'フィジカル', sub: 'パワー・スタミナ・スピード', v: { 5: 0.4, 6: 0.35, 4: 0.25 } },
-  mind:  { jp: '判断力', sub: '判断力・パス', v: { 7: 0.65, 1: 0.35 } },
+  mind:  { jp: '判断力', sub: '判断力に集中', v: { 7: 1 } },                 // video and tactics work: only the reading of the game (pass no longer shares it)
   gk:    { jp: 'セービング', sub: 'セービング・判断力', v: { 8: 0.75, 7: 0.25 }, gk: true },
 };
 const INTENS = {
@@ -455,6 +455,13 @@ function migrate(S, DATA) {
     const n = addAbroad(S, DATA);
     if (n && !S.fired) news(S, `移籍市場に海外でプレーする日本人選手（${n}人）が加わった。「クラブ → 移籍市場 → 海外組」から。`, 'transfer');
   }
+  // a league that had shrunk to an odd number of clubs drew one club against itself each round (2026-10-13 fix): those
+  // fixtures are dropped, played or not (a club cannot win or lose against itself). J1 is back to 20 at the next rollover.
+  if (S.fixtures && S.fixtures.some(f => f.h === f.a)) {
+    const mine = S.fixtures.some(f => f.h === f.a && f.h === S.my);
+    S.fixtures = S.fixtures.filter(f => f.h !== f.a);
+    if (mine && !S.fired) news(S, `日程の不具合を修正し、自クラブ同士の試合を取り消した（すでに行われた分も成績から外した）。${S.order.length < LEAGUE_N ? `来季からJ1は${LEAGUE_N}クラブに戻る。` : ''}`, 'info');
+  }
   S.v = Math.max(S.v || 1, 9);
   return S;
 }
@@ -503,7 +510,7 @@ function devWeek(S, p, dry) {
       if (room > 0) { const x = Math.min(add, room); p.pot += x; p.bloom = (p.bloom || 0) + x; }
     }
   }
-  const w = AW[p.pos]; const f = FOCUS[tf] && FOCUS[tf].v;
+  const w = AW[p.pos]; const F = FOCUS[tf]; const f = F && ((p.pos === 'GK' && F.gkv) || F.v);
   const d = w.map((wi, i) => f ? 0.4 * wi + 0.6 * (f[i] || 0) : wi);
   const T = g / AW_SQ[p.pos];
   const aMax = attrMax(p);
@@ -680,6 +687,7 @@ function setExpectations(S, opts) {
 }
 
 /* ---------- fixtures ---------- */
+const LEAGUE_N = 20;  // J1 clubs: relegated clubs are always replaced, so the league stays at 20
 const H2_OFFSETS = [0, 7, 14, 21, 28, 35, 49, 56, 63, 71, 75, 79, 84, 91, 98, 105, 109, 113];
 function seasonDates(sy) {
   // first half: 20 Saturdays from the Saturday on/after Aug 7
@@ -690,11 +698,14 @@ function seasonDates(sy) {
   return first.concat(second);
 }
 function genFixtures(order, round1, sy) {
-  const n = order.length; const arr = new Array(n);
-  if (round1 && round1.length === n / 2 && round1.every(p => order.includes(p[0]) && order.includes(p[1]))) {
+  // a club is never drawn against itself: with an odd number of clubs the middle pairing of the circle method used to
+  // be club v club (J1 had shrunk to 19 by then), so an odd league gets a rest slot (null) instead
+  const clubs = [...new Set(order)]; if (clubs.length % 2) clubs.push(null);
+  const n = clubs.length; const arr = new Array(n);
+  if (round1 && round1.length === n / 2 && round1.every(p => p[0] !== p[1] && clubs.includes(p[0]) && clubs.includes(p[1])) && new Set(round1.flat()).size === n) {
     round1.forEach((p, k) => { arr[k] = p[0]; arr[n - 1 - k] = p[1]; });
   } else {
-    const sh = [...order].sort(() => R() - 0.5); sh.forEach((c, i) => arr[i] = c);
+    const sh = [...clubs].sort(() => R() - 0.5); sh.forEach((c, i) => arr[i] = c);
   }
   const fixed = arr[0]; let rot = arr.slice(1);
   const rounds = [];
@@ -712,7 +723,8 @@ function genFixtures(order, round1, sy) {
   const dates = seasonDates(sy);
   const fx = []; let id = 1;
   all.forEach((ms, r) => ms.forEach(([h, a]) => {
-    let date = dates[r];
+    if (!h || !a || h === a) return;  // the rest slot
+    let date = dates[r] || D.add(dates[dates.length - 1], 7 * (r - dates.length + 1));
     if (r === 0 && round1 && h === round1[0][0] && a === round1[0][1] && sy === 2026) date = '2026-08-07';
     fx.push({ id: id++, r: r + 1, date, h, a, hg: null, ag: null, played: false });
   }));
@@ -2369,10 +2381,18 @@ function rollover(S) {
   for (const p of back) if (S.players[p.id] && p.loan) loanReturn(S, p);
   // relegation / promotion
   const promoted = [];
+  // everyone below J1 can go up: the J2 clubs and the clubs relegated in earlier seasons (this season's go down for at
+  // least a year; the overseas clubs never). Before, a relegated original J1 club could never come back, so after about
+  // ten seasons the J2 pool ran dry, J1 shrank to 19 and the odd club out was drawn against itself.
   const pool = J2.filter(c => !S.clubs[c.id] || !S.order.includes(c.id));
+  for (const id of Object.keys(S.clubs)) {
+    const c = S.clubs[id];
+    if (c.ab || S.order.includes(id) || se.rel.includes(id) || pool.some(x => x.id === id)) continue;
+    pool.push({ id: c.id, name: c.name, short: c.short, abbr: c.abbr, c1: c.c1, c2: c.c2, tier: c.tier });
+  }
   // relegated clubs drop out of the league but keep their players (they play in J2 and can come back or enter the 天皇杯)
   for (const rid of se.rel) S.order = S.order.filter(c => c !== rid);
-  while (promoted.length < se.rel.length && pool.length) {
+  while (S.order.length < LEAGUE_N && pool.length) {
     const c = pool.splice(Math.floor(R() * pool.length), 1)[0];
     promoted.push(c.id);
     if (!S.clubs[c.id]) addClub(S, { ...c, coach: '' });
