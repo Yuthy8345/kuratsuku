@@ -49,7 +49,7 @@ const clone = o => JSON.parse(JSON.stringify(o));
   ok(E.tacLabel(t) === 'ライン低・ロングボール・サイド攻撃・マンマーク・時間を使う', 'label: ' + E.tacLabel(t));
   E.savePreset(S, null, 'テスト'); Object.assign(t, { line: 'high', build: 'short', width: 'center', mark: false, kill: false });
   E.loadPreset(S, 0); ok(t.line === 'low' && t.build === 'long' && t.width === 'wide' && t.mark && t.kill && t.form === '5-3-2', 'preset keeps the instructions');
-  const pr = clone(S.clubs[S.my].presets[0]); delete pr.line; delete pr.build; delete pr.width; delete pr.mark; delete pr.kill; S.clubs[S.my].presets.push(pr);
+  const pr = clone(S.presets[0]); delete pr.line; delete pr.build; delete pr.width; delete pr.mark; delete pr.kill; S.presets.push(pr);
   E.loadPreset(S, 1); ok(t.line === 'mid' && t.build === 'mix' && !t.mark, 'an old preset loads the standard instructions');
   // AI plans are valid
   let bad = 0; const seen = { line: {}, build: {}, width: {} };
@@ -148,7 +148,7 @@ const D0 = '2027-05-20', D1 = '2027-05-21';
   const O = clone(U); for (const id of abIds) delete O.players[id]; for (const c of Object.keys(O.clubs)) if (O.clubs[c].ab) delete O.clubs[c]; O.v = 8;
   E.migrate(O, DATA); const n1 = Object.values(O.players).filter(p => E.abroadOf(O, p)).length;
   E.migrate(O, DATA); const n2 = Object.values(O.players).filter(p => E.abroadOf(O, p)).length;
-  ok(n1 === abIds.size && n2 === n1 && O.v === 9 && O.news.some(x => x.text.includes('海外でプレーする日本人選手')), `old save: ${n1} added once, news`);
+  ok(n1 === abIds.size && n2 === n1 && O.v >= 9 && O.news.some(x => x.text.includes('海外でプレーする日本人選手')), `old save: ${n1} added once, news`);
   // seasons roll over: they age, veterans retire, nothing breaks
   const V = E.newGame(DATA, 'mito', 't', '2026-10-13');
   for (let s = 0; s < 2; s++) { for (let g = 0; g < 3000; g++) { const st = E.advance(V); if (st.stop === 'match') { const f = V.fixtures.find(x => x.id === st.fid); const M = E.createMatch(V, f); E.simulateFull(V, M); E.finishMatch(V, M); } else if (st.stop === 'inbox') V.inbox.forEach(x => { x.seen = true; if (x.type === 'offer') E.rejectOffer(V, x.id); }); else if (st.stop === 'seasonEnd') break; else if (st.stop === 'fired') E.takeJob(V, V.fired.offers[0]); } E.rollover(V); if (V.fired) E.takeJob(V, V.fired.offers[0]); }

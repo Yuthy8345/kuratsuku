@@ -385,6 +385,9 @@ button.apc:not(:disabled):active { transform: scale(.97); }
 .preset-act { display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr; gap: 6px; margin-top: 2px; }
 .preset-act .btn { min-height: 40px; padding: 0 6px; font-size: 13px; white-space: nowrap; }
 .preset-act .btn.danger { border-color: var(--loss); color: var(--loss); }
+.pr-when { white-space: nowrap; }
+.pr-club { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; margin-top: -2px; }
+.pr-club small { font-weight: 400; color: var(--muted); font-size: 12px; margin-left: -4px; }
 .statgrid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; text-align: center; }
 .statgrid div { background: var(--surface2); border-radius: 10px; padding: 6px 2px; }
 .statgrid small { display: block; font-size: 10px; color: var(--muted); font-weight: 700; }
@@ -424,9 +427,14 @@ button.apc:not(:disabled):active { transform: scale(.97); }
 .input { width: 100%; min-height: 46px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface2); color: var(--ink); font: inherit; font-size: 16px; box-shadow: inset 0 1px 3px rgba(0,0,0,.2); }
 
 /* formations: a grid of chalk plates (12 shapes) */
-.formgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-.formgrid button { min-height: 40px; padding: 0 2px; border-radius: 10px; background: var(--surface2); font-family: var(--f-display); font-weight: 400; font-size: clamp(12px, 3.5vw, 14px); letter-spacing: -.01em; color: var(--muted); white-space: nowrap; }
-.formgrid button[aria-pressed="true"] { background: var(--ink); color: var(--bg); box-shadow: var(--mag-shadow); }
+/* formation: the current one on a plate, a native pull-down laid invisibly over it (16px so iOS doesn't zoom) */
+.formsel { position: relative; display: grid; gap: 4px; padding: 12px 14px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); color: var(--ink); box-shadow: var(--mag-shadow); cursor: pointer; }
+.formsel:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0,0,0,.3); }
+.formsel:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.formsel select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; font-size: 16px; cursor: pointer; -webkit-appearance: none; appearance: none; border: 0; }
+.fs-now { display: flex; align-items: baseline; gap: 10px; }
+.fs-now b { font-family: var(--f-display); font-weight: 400; font-size: 28px; line-height: 1.1; letter-spacing: .01em; }
+.fs-now small { font-size: 12px; color: var(--muted); }
 /* 詳しい指示 */
 .card.tacx { display: grid; gap: 12px; }
 .card.tacx .toggle { background: var(--surface2); border-color: transparent; }

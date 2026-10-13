@@ -72,6 +72,12 @@ function saveLocalNow() { if (!S) return; S.savedAt = Date.now(); try { localSto
 function saveLocal() { clearTimeout(saveT); saveT = setTimeout(saveLocalNow, 60); }
 window.addEventListener('pagehide', () => { if (saveT) { clearTimeout(saveT); saveLocalNow(); } });
 function loadLocal() { try { return deserialize(localStorage.getItem(LS_KEY)); } catch (e) { return null; } }
+/* saved tactics go into a new game (2026-10-14): from the game being replaced, or, after the save was deleted, from the
+   copy kept on this device when it was deleted */
+const TAC_KEY = 'kuratsuku.tactics';
+function tacLibSave(list) { try { localStorage.setItem(TAC_KEY, JSON.stringify(list || [])); } catch (e) { /* storage blocked */ } }
+function tacLibLoad() { try { const v = JSON.parse(localStorage.getItem(TAC_KEY) || 'null'); return Array.isArray(v) ? v : []; } catch (e) { return []; } }
+function carryPresets() { const src = S || pickSave(loadLocal(), Cloud.cand); return src ? E.presetsOf(src) : tacLibLoad(); }
 function persist(cloud) { if (cloud) { clearTimeout(saveT); saveLocalNow(); setTimeout(cloudSave, 200); } else saveLocal(); }
 
 const Cloud = { db: null, uid: null, busy: false, pending: false, status: 'checking', meta: null, cand: null, last: 0 };
@@ -220,6 +226,7 @@ function sheetName(id, keep) {
       <div class="mgr-club"><span class="kit lg" style="--c1:${c.c1};--c2:${c.c2}" aria-hidden="true"></span><b>${esc(c.name)}</b></div>
       <label class="mgr-plate" for="mgr-name"><span class="mgr-plate-k">監督</span><input id="mgr-name" maxlength="12" placeholder="あなた" autocomplete="off" enterkeyhint="done" value="${esc(keep || '')}" aria-label="監督名"></label>
       <p class="fine" style="margin:0">あなたの名前を入れてください（12文字まで）。空欄のままなら「あなた」で始まります。</p>
+      ${(() => { const n = carryPresets().length; return n ? `<p class="fine" style="margin:0">保存した戦術（${n}件）は新しいゲームでも使えます。</p>` : ''; })()}
     </div>`,
     `<button class="btn primary block" data-act="startClub" data-id="${id}">${esc(c.short)}の監督に就任する</button><button class="btn ghost block" data-act="pickClub" data-id="${id}">戻る</button>`);
   // the keyboard's done key only closes the keyboard (starting is the button's job)
@@ -364,8 +371,12 @@ const outText = p => p.inj > 0 ? `負傷（あと${p.inj}日）` : `出場停止
 const outShort = p => p.inj > 0 ? '負傷' : '出場停止';
 function issueLines(iss) {
   const c = S.clubs[S.my]; const F = E.FORMATIONS[c.tac.form];
-  return iss.xi.map(x => x.pid ? `${E.ROLE[F[x.i][0]].jp}：${S.players[x.pid].name}が${outText(S.players[x.pid])}` : `${E.ROLE[F[x.i][0]].jp}が空いています`)
-    .concat(iss.bench.map(x => `ベンチ：${S.players[x.pid].name}が${outText(S.players[x.pid])}`));
+  const emp = iss.xi.filter(x => !x.pid).map(x => E.ROLE[F[x.i][0]].jp);
+  const lines = iss.xi.filter(x => x.pid).map(x => `${E.ROLE[F[x.i][0]].jp}：${S.players[x.pid].name}が${outText(S.players[x.pid])}`);
+  // several empty places (e.g. tactics saved at another club) make one line
+  if (emp.length === 1) lines.unshift(`${emp[0]}が空いています`);
+  else if (emp.length > 1) lines.unshift(`先発の${emp.length}枠が空いています（${emp.join('・')}）`);
+  return lines.concat(iss.bench.map(x => `ベンチ：${S.players[x.pid].name}が${outText(S.players[x.pid])}`));
 }
 const dpOf = p => p.pp || (p.at ? E.ppOf(p) : p.pos);
 const DP_ORD = p => { const i = E.DPOS.indexOf(dpOf(p)); return i < 0 ? 0 : i; };
@@ -685,19 +696,31 @@ function viewTactics() {
   }).join('');
   const seg = (act, cur, opts) => `<div class="seg">${opts.map(([k, l]) => `<button data-act="${act}" data-k="${k}" aria-pressed="${cur === k}">${l}</button>`).join('')}</div>`;
   const iss = E.lineupIssues(S, S.my);
-  const banner = iss.block ? `<div class="card alert"><div class="eyebrow">試合の前に入れ替えが必要です</div><ul>${issueLines(iss).map(t => `<li>${esc(t)}</li>`).join('')}</ul><p class="fine" style="margin:6px 0 0">選手やベンチの行をタップして入れ替えてください。自動では入れ替わりません。</p></div>` : '';
+  const empty = iss.spare && iss.xi.some(x => x.why === 'empty');
+  const banner = iss.block ? `<div class="card alert"><div class="eyebrow">試合の前に入れ替えが必要です</div><ul>${issueLines(iss).map(t => `<li>${esc(t)}</li>`).join('')}</ul><p class="fine" style="margin:6px 0 0">選手やベンチの行をタップして入れ替えてください。自動では入れ替わりません。${empty ? '空いた枠だけなら、下のボタンでおまかせで埋められます。' : ''}</p>${empty ? '<button class="btn block" data-act="fillEmpty" style="margin-top:8px">空いた枠をおまかせで埋める</button>' : ''}</div>` : '';
   return `${banner}<div class="trate"><div><small>攻撃</small><b>${Math.round(r.att)}</b></div><div><small>中盤</small><b>${Math.round(r.mid)}</b></div><div><small>守備</small><b>${Math.round(r.def)}</b></div></div>
-    <div class="formgrid" role="group" aria-label="フォーメーション">${Object.keys(E.FORMATIONS).map(f => `<button data-act="form" data-k="${f}" aria-pressed="${c.tac.form === f}">${f}</button>`).join('')}</div>
+    ${formSelect(c)}
     <p class="fine" style="margin:-6px 0 0">${esc(E.FORM_DESC[c.tac.form] || '')}</p>
     <div class="pitch">${PITCH_SVG}${toks}</div>
     <p class="fine" style="margin:-4px 0 0">選手をタップすると入れ替えられます。「!」は適性が低いポジションか疲れている選手、「×」はケガや出場停止で出られない選手です。</p>
     ${planCard(c)}
-    <button class="btn ghost block" data-act="presets">戦術の保存・読み込み<span class="small muted">　${(c.presets || []).length}/${E.PRESET_MAX}</span></button>
+    <button class="btn ghost block" data-act="presets">戦術の保存・読み込み<span class="small muted">　${(S.presets || []).length}/${E.PRESET_MAX}</span></button>
     <h3 class="sec-h">ベンチ（${c.tac.bench.length}/${E.BENCH_SIZE}人）<small>自動では入れ替わりません</small></h3>
     <p class="fine" style="margin:-6px 0 0">選手をタップすると、ベンチ外の選手と入れ替えられます。</p>
     <div class="bgrid" role="list" aria-label="ベンチ">${c.tac.bench.map(id => benchTile(S.players[id], c)).join('')}${Array.from({ length: Math.max(0, E.BENCH_SIZE - c.tac.bench.length) }, () => `<button class="btile addrow" role="listitem" data-act="benchPick" data-id="0" aria-label="ベンチに加える"><span class="bt-mag">+</span><b class="bt-name">ベンチに加える</b><span class="bt-meta">空き枠</span></button>`).join('')}</div>
     <button class="btn ghost block" data-act="benchAuto">ベンチをおまかせで組み直す</button>
     <div class="subnav"><button class="btn primary block" data-act="autoXI">おまかせでベストメンバーを組む</button></div>`;
+}
+// formation: the current one on a plate; the others in a pull-down (a native select over the plate), 3-back → 4-back →
+// 5-back and in number order within each
+const FORM_GROUPS = [3, 4, 5].map(n => [`${n}バック`, Object.keys(E.FORMATIONS).filter(f => f[0] === String(n)).sort()]).filter(g => g[1].length);
+function formSelect(c) {
+  const f = c.tac.form, grp = (FORM_GROUPS.find(g => g[1].includes(f)) || [''])[0];
+  return `<label class="formsel">
+    <span class="pc-head"><span class="eyebrow">フォーメーション</span><span class="pc-edit">変更<span aria-hidden="true">▾</span></span></span>
+    <span class="fs-now"><b>${f}</b><small>${grp}</small></span>
+    <select data-chg="form" aria-label="フォーメーション（今は${f}）">${FORM_GROUPS.map(([g, fs]) => `<optgroup label="${g}">${fs.map(k => `<option value="${k}"${k === f ? ' selected' : ''}>${k}</option>`).join('')}</optgroup>`).join('')}</select>
+  </label>`;
 }
 // 戦術 (posture, counter, press, the extra instructions, substitutions): a summary plate on the tactics screen; the
 // controls live in their own sheet so the board and the bench come one after the other
@@ -1211,19 +1234,23 @@ function nextOpp() {
   return best ? `次の${c.short}なら${best.name}` : '';
 }
 // saved tactics: load / overwrite / rename / delete, and save the current one
+// the real date a tactic was saved (older ones only know the date in the game)
+function realDate(ms) { const d = new Date(ms); return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`; }
 function sheetPresets() {
-  const c = S.clubs[S.my]; const list = c.presets || [];
+  const c = S.clubs[S.my]; const list = S.presets || (S.presets = []);
   sheetState = { type: 'presets' };
   const ui = UI.preset || (UI.preset = {});
   const row = (pr, i) => {
     const st = E.presetStatus(S, pr);
     const sus = st.out.filter(id => S.players[id].inj <= 0).length, inj = st.out.length - sus;
-    const chips = [sus ? `<span class="chip warn">出場停止 ${sus}</span>` : '', inj ? `<span class="chip warn">負傷 ${inj}</span>` : '', st.gone.length ? `<span class="chip">移籍・退団 ${st.gone.length}</span>` : ''].join('');
+    const chips = [sus ? `<span class="chip warn">出場停止 ${sus}</span>` : '', inj ? `<span class="chip warn">負傷 ${inj}</span>` : '', st.gone.length ? `<span class="chip">いない選手 ${st.gone.length}</span>` : ''].join('');
+    const when = pr.at ? `${realDate(pr.at)} 保存` : `ゲーム内 ${E.D.y(pr.d)}/${jd(pr.d)} 保存`;
     const head = ui.edit === i
       ? `<div class="row" style="gap:8px"><input class="input" id="pr-name" maxlength="16" value="${esc(pr.name)}" autocomplete="off" style="flex:1"><button class="btn" data-act="presetRename" data-i="${i}">決定</button></div>`
-      : `<div class="row"><b>${esc(pr.name)}</b><span class="spacer"></span><span class="small muted">${jd(pr.d)}保存</span></div>`;
-    return `<li><div class="preset">${head}
-      <div class="small muted">${pr.form}・${esc(E.mentLabel(pr))}・プレス${esc(E.PRESS[pr.press].jp)}${E.tacLabel(pr) ? '・' + esc(E.tacLabel(pr)) : ''}</div>
+      : `<div class="row"><b>${esc(pr.name)}</b><span class="spacer"></span><span class="small muted pr-when">${when}</span></div>`;
+    const club = pr.cn ? `<div class="pr-club"><span class="kit sm" style="--c1:${pr.k1};--c2:${pr.k2}" aria-hidden="true"></span><span>${esc(pr.cn)}</span>${st.other ? '<small>（ほかのクラブ）</small>' : ''}</div>` : '';
+    return `<li><div class="preset">${head}${club}
+      <div class="small muted">${pr.form}・${esc(E.mentLabel(pr))}・プレス${esc((E.PRESS[pr.press] || E.PRESS.mid).jp)}${E.tacLabel(pr) ? '・' + esc(E.tacLabel(pr)) : ''}</div>
       ${chips ? `<div class="row wrap">${chips}</div>` : ''}
       <div class="preset-act"><button class="btn primary" data-act="presetLoad" data-i="${i}">読み込む</button><button class="btn ghost" data-act="presetSave" data-i="${i}">上書き</button><button class="btn ghost" data-act="presetEdit" data-i="${i}">名前</button><button class="btn ghost ${ui.del === i ? 'danger' : ''}" data-act="presetDel" data-i="${i}">${ui.del === i ? '本当に削除' : '削除'}</button></div>
     </div></li>`;
@@ -1235,7 +1262,8 @@ function sheetPresets() {
       <div class="small muted">${c.tac.form}・${esc(E.mentLabel(c.tac))}・プレス${esc(E.PRESS[c.tac.press].jp)}${E.tacLabel(c.tac) ? '・' + esc(E.tacLabel(c.tac)) : ''}・先発とベンチ ${c.tac.xi.filter(Boolean).length + c.tac.bench.length}人</div>
       ${full ? '<p class="fine" style="margin:0">保存枠がいっぱいです。上の「上書き」で入れ替えてください。</p>' : `<div class="row" style="gap:8px"><input class="input" id="pr-new" maxlength="16" placeholder="名前（例：格上用カウンター）" autocomplete="off" style="flex:1"><button class="btn primary" data-act="presetSave">保存</button></div>`}
     </section>
-    <p class="fine">読み込むと、保存したときのフォーメーション・進め方・プレス・先発・ベンチをそのまま反映します。ケガや出場停止の選手もそのまま入るので、試合の前に自分で入れ替えてください。移籍した選手の枠は空きになります。</p>`,
+    <p class="fine">読み込むと、保存したときのフォーメーション・進め方・プレス・先発・ベンチをそのまま反映します。ケガや出場停止の選手もそのまま入るので、試合の前に自分で入れ替えてください。チームにいない選手（移籍した選手や、ほかのクラブ・前のゲームで保存したときの選手）の枠は空きになります。</p>
+    <p class="fine" style="margin-top:-6px">保存した戦術は、クラブを移っても、新しくゲームを始めても引き継がれます。</p>`,
     '<button class="btn ghost block" data-act="closeSheet">閉じる</button>');
 }
 function sheetFired() {
@@ -1274,7 +1302,8 @@ function sheetImport() {
 }
 function sheetReset() {
   sheetState = { type: 'reset' };
-  openSheet('<h2>セーブデータを消しますか？</h2><p class="fine">この端末とクラウドのセーブを消して、タイトル画面に戻ります。元には戻せません。</p>',
+  const n = (S && S.presets || []).length;
+  openSheet(`<h2>セーブデータを消しますか？</h2><p class="fine">この端末とクラウドのセーブを消して、タイトル画面に戻ります。元には戻せません。${n ? `保存した戦術（${n}件）はこの端末に残り、次に始めるゲームでも使えます。` : ''}</p>`,
     '<button class="btn danger block" data-act="doReset">消して最初から</button><button class="btn ghost block" data-act="closeSheet">やめる</button>');
 }
 
@@ -1560,7 +1589,9 @@ const ACT = {
   nameClub(d) { sheetName(d.id); },
   startClub(d) {
     const nm = (document.getElementById('mgr-name') || {}).value || '';
+    const carry = carryPresets();
     S = E.newGame(DATA, d.id, nm.trim() || 'あなた', TODAY);
+    S.presets = carry;
     UI.tab = 'home'; closeSheet(); persist(true); render(); window.scrollTo(0, 0);
     toast(`${S.clubs[S.my].short}の監督に就任しました`);
   },
@@ -1615,21 +1646,25 @@ const ACT = {
     const r = E.savePreset(S, i, name);
     if (r < 0) return toast('保存枠がいっぱいです');
     UI.preset = {}; persist(false); refreshSheet(); render();
-    toast(i == null ? `「${S.clubs[S.my].presets[r].name}」を保存しました` : `「${S.clubs[S.my].presets[r].name}」を今の戦術で上書きしました`);
+    toast(i == null ? `「${S.presets[r].name}」を保存しました` : `「${S.presets[r].name}」を今の戦術で上書きしました`);
   },
   presetLoad(d) {
-    const i = Number(d.i); const pr = S.clubs[S.my].presets[i];
+    const i = Number(d.i); const pr = S.presets[i];
     const st = E.loadPreset(S, i); if (!st) return;
     persist(false); closeSheet(); UI.tab = 'tactics'; render(); window.scrollTo(0, 0);
-    const notes = [st.out.length ? `出場できない選手が${st.out.length}人います` : '', st.gone.length ? `移籍した${st.gone.length}人の枠は空きです` : ''].filter(Boolean);
+    const notes = [st.out.length ? `出場できない選手が${st.out.length}人います` : '', st.empty ? `先発の${st.empty}枠が空いています` : st.gone.length ? `いない選手${st.gone.length}人の枠は空きです` : ''].filter(Boolean);
     toast(`「${pr.name}」を読み込みました` + (notes.length ? `。${notes.join('、')}` : ''));
+  },
+  fillEmpty() {
+    const r = E.fillEmpty(S); persist(false); render();
+    toast(r.xi || r.bench ? `空いた枠を埋めました（先発${r.xi}人・ベンチ${r.bench}人）` : '入れられる選手がいません');
   },
   presetEdit(d) { UI.preset = { edit: Number(d.i) }; refreshSheet(); const el = document.getElementById('pr-name'); if (el) el.focus(); },
   presetRename(d) { E.renamePreset(S, Number(d.i), (document.getElementById('pr-name') || {}).value || ''); UI.preset = {}; persist(false); refreshSheet(); },
   presetDel(d) {
     const i = Number(d.i);
     if (!UI.preset || UI.preset.del !== i) { UI.preset = { del: i }; return refreshSheet(); }
-    const nm = S.clubs[S.my].presets[i].name; E.deletePreset(S, i); UI.preset = {}; persist(false); refreshSheet(); render(); toast(`「${nm}」を削除しました`);
+    const nm = S.presets[i].name; E.deletePreset(S, i); UI.preset = {}; persist(false); refreshSheet(); render(); toast(`「${nm}」を削除しました`);
   },
   scout(d) { const r = E.sendScout(S, d.k); toast(r.msg); if (r.ok) { persist(false); render(); } },
   round(d) { UI.lg.round = Math.max(1, Math.min(38, (UI.lg.round || curRound()) + Number(d.d))); render(); },
@@ -1691,7 +1726,7 @@ const ACT = {
     S = E.migrate(st, DATA); persist(true); closeSheet(); UI.tab = 'home'; UI.screen = 'title'; render(); window.scrollTo(0, 0);
     toast(`${S.clubs[S.my].short}（${fmtDate(S.date)}）のセーブを復元しました`);
   },
-  doReset() { try { localStorage.removeItem(LS_KEY); } catch (e) { /* ignore */ } cloudWipe(); Cloud.cand = null; S = null; UI.screen = 'title'; closeSheet(); render(); },
+  doReset() { tacLibSave(carryPresets()); try { localStorage.removeItem(LS_KEY); } catch (e) { /* ignore */ } cloudWipe(); Cloud.cand = null; S = null; UI.screen = 'title'; closeSheet(); render(); },
   // match
   mSpeed() { MATCH.speed = MATCH.speed === 1 ? 2 : MATCH.speed === 2 ? 4 : 1; S.settings.speed = MATCH.speed; renderMatchCtl(); tickLoop(); },
   mPause() { MATCH.paused = !MATCH.paused; renderMatchCtl(); tickLoop(); },
@@ -1719,6 +1754,12 @@ document.addEventListener('click', e => {
   try { fn(el.dataset, el); } catch (err) { console.error(err); toast('エラーが発生しました: ' + (err && err.message)); }
 });
 scrimEl.addEventListener('click', () => closeSheet());
+// pull-downs (native selects): data-chg names the action, the chosen value comes as k
+document.addEventListener('change', e => {
+  const el = e.target; if (!el || !el.dataset || !el.dataset.chg) return;
+  const fn = ACT[el.dataset.chg]; if (!fn) return;
+  try { fn({ k: el.value }, el); } catch (err) { console.error(err); toast('エラーが発生しました: ' + (err && err.message)); }
+});
 document.addEventListener('input', e => {
   if (e.target && e.target.id === 'mk-q') { UI.mk.q = e.target.value; const l = document.getElementById('mk-list'); if (l) l.innerHTML = marketRows(); }
 });

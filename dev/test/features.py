@@ -83,9 +83,14 @@ async def main(vw=390, vh=844, tag=''):
 
         # ---------- ⑤ shapes and instructions ----------
         await page.click('[data-tab="tactics"]'); await page.wait_for_timeout(250)
-        nf = await page.locator('.formgrid button').count(); print('shapes', nf); bad += [] if nf == 12 else ['12 shapes']
-        bb = await page.locator('.formgrid').bounding_box(); bad += [] if bb and bb['width'] <= vw else ['formgrid width']
-        await page.click('.formgrid [data-k="5-3-2"]'); await page.wait_for_timeout(250)
+        sel = page.locator('select[data-chg="form"]')
+        opts = await sel.locator('option').all_inner_texts(); grps = await sel.locator('optgroup').evaluate_all('a => a.map(g => g.label + ":" + g.children.length)')
+        print('shapes', len(opts), grps, opts); bad += [] if len(opts) == 12 and grps == ['3バック:4', '4バック:6', '5バック:2'] and opts == sorted(opts) else ['12 shapes, 3 → 4 → 5 backs']
+        bb = await page.locator('.formsel').bounding_box(); sb = await sel.bounding_box()
+        bad += [] if bb and bb['width'] <= vw and sb and abs(sb['width'] - bb['width']) < 4 and abs(sb['height'] - bb['height']) < 4 else ['formation plate / select size']
+        await sel.select_option('5-3-2'); await page.wait_for_timeout(250)
+        now = await page.locator('.formsel .fs-now').inner_text(); print('plate now:', now.replace('\n', ' '))
+        bad += [] if '5-3-2' in now and '5バック' in now else ['plate shows the new shape']
         await shot('tactics')
         await page.click('.plancard'); await page.wait_for_timeout(400)  # the 戦術 sheet
         await page.locator('#sheet [data-act="tacx"][data-key="line"][data-k="low"]').click(); await page.wait_for_timeout(150)

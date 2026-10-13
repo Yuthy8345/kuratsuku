@@ -462,7 +462,10 @@ function migrate(S, DATA) {
     S.fixtures = S.fixtures.filter(f => f.h !== f.a);
     if (mine && !S.fired) news(S, `日程の不具合を修正し、自クラブ同士の試合を取り消した（すでに行われた分も成績から外した）。${S.order.length < LEAGUE_N ? `来季からJ1は${LEAGUE_N}クラブに戻る。` : ''}`, 'info');
   }
-  S.v = Math.max(S.v || 1, 9);
+  // v10 (2026-10-14): saved tactics belong to the manager (S.presets), so they go with him to another club and into a new game
+  if (!Array.isArray(S.presets)) S.presets = presetsOf(S);
+  for (const c of Object.values(S.clubs)) if (c.presets) delete c.presets;
+  S.v = Math.max(S.v || 1, 10);
   return S;
 }
 // how good the player is in each detailed position (rested, form left out)
@@ -623,7 +626,7 @@ function newGame(DATA, clubId, managerName, todayISO) {
     initAttrs(S.players[p.id]);
   }
   addAbroad(S, DATA);
-  S.v = 9; S.presV = 4;
+  S.v = 10; S.presV = 4; S.presets = [];
   for (const p of squad(S, clubId)) track(S, p);
   for (const id of S.order) autoLineup(S, id);
   S.fixtures = genFixtures(S.order, DATA.round1, sy);
@@ -759,6 +762,9 @@ function effective(p, role, cond) {
   const fit = p.at ? clamp((roleScore(p, role) - p.ovr) * 0.4, -2.5, 2.5) : 0;
   return p.ovr + posPenalty(p, role) + fit - Math.max(0, 100 - c) * 0.12 + formAdj + (p.hot ? p.hot.b : 0);
 }
+// the order slots are filled in: GK, ST/W, CB/FB, MF
+const SLOT_PRI = { GK: 0, ST: 1, SS: 1, LW: 2, RW: 2, CB: 3, LB: 4, RB: 4, DWB: 4, DM: 5, AM: 6, LAM: 6, RAM: 6, WAM: 6, WB: 7, CM: 8, LM: 9, RM: 9 };
+function slotOrder(slots) { const pr = r => SLOT_PRI[slots[r][0]] ?? 9; return slots.map((s, i) => i).sort((a, b) => pr(a) - pr(b)); }
 function autoLineup(S, cid, opts) {
   const c = S.clubs[cid];
   const slots = FORMATIONS[c.tac.form];
@@ -766,12 +772,7 @@ function autoLineup(S, cid, opts) {
   const pool = squad(S, cid).filter(p => available(p) && !(opp && p.loan && p.loan.from === opp));  // loanees sit out against their parent club
   const used = new Set(); const xi = new Array(11).fill(null);
   const restCond = opts && opts.rotate ? 82 : 72;
-  // order: GK, ST/W, CB/FB, MF
-  const orderIdx = slots.map((s, i) => i).sort((a, b) => {
-    const pr = r => ({ GK: 0, ST: 1, SS: 1, LW: 2, RW: 2, CB: 3, LB: 4, RB: 4, DWB: 4, DM: 5, AM: 6, LAM: 6, RAM: 6, WAM: 6, WB: 7, CM: 8, LM: 9, RM: 9 })[slots[r][0]] ?? 9;
-    return pr(a) - pr(b);
-  });
-  for (const i of orderIdx) {
+  for (const i of slotOrder(slots)) {
     const role = slots[i][0];
     let best = null, bv = -1e9;
     for (const p of pool) {
@@ -851,7 +852,7 @@ function lineupIssues(S, cid) {
   // an empty slot only blocks kickoff while someone fit is left to put there
   const spare = squad(S, cid).some(p => available(p) && !c.tac.xi.includes(p.id));
   const block = xi.some(x => x.why !== 'empty' || spare) || bench.length > 0;
-  return { xi, bench, block };
+  return { xi, bench, block, spare };
 }
 // AI clubs: drop anyone who can't play and fill the gaps. The manager's own club is never changed behind his back:
 // only players who left the club are taken out; injured / suspended players stay where he put them until he swaps them.
@@ -883,42 +884,94 @@ function validateLineup(S, cid, opts) {
   if (cid !== S.my) autoBench(S, cid);
   return changed;
 }
-// saved tactics (formation, game plan, XI and bench), up to PRESET_MAX per club
+// saved tactics (formation, game plan, XI and bench), up to PRESET_MAX. They belong to the manager (S.presets), not to
+// a club (2026-10-14): they go with him to another club and into a new game. Each keeps the players' names next to their
+// ids (players made in-game get their ids again in a new game), the club it was saved at and the real date (at, ms).
 const PRESET_MAX = 5;
-function savePreset(S, idx, name) {
-  const c = S.clubs[S.my]; c.presets = c.presets || [];
+const presetNames = (S, ids) => ids.map(id => !id ? null : S.players[id] ? S.players[id].name : '?');
+function savePreset(S, idx, name, at) {
+  const c = S.clubs[S.my]; const list = S.presets || (S.presets = []);
   const ment = MENTALITY[c.tac.ment] ? c.tac.ment : 'bal';
-  const pr = Object.assign({ name: (name || '').trim().slice(0, 16) || `${c.tac.form}・${mentLabel({ ment, ctr: c.tac.ctr })}`, form: c.tac.form, ment, ctr: !!c.tac.ctr, press: c.tac.press }, tacX(c.tac), { xi: c.tac.xi.slice(), bench: c.tac.bench.slice(), d: S.date });
-  if (idx != null && c.presets[idx]) { if (!(name || '').trim()) pr.name = c.presets[idx].name; c.presets[idx] = pr; return idx; }
-  if (c.presets.length >= PRESET_MAX) return -1;
-  c.presets.push(pr); return c.presets.length - 1;
+  const xi = c.tac.xi.slice(), bench = c.tac.bench.slice();
+  const pr = Object.assign({ name: (name || '').trim().slice(0, 16) || `${c.tac.form}・${mentLabel({ ment, ctr: c.tac.ctr })}`, form: c.tac.form, ment, ctr: !!c.tac.ctr, press: c.tac.press }, tacX(c.tac),
+    { xi, bench, xn: presetNames(S, xi), bn: presetNames(S, bench), club: S.my, cn: c.short, k1: c.c1, k2: c.c2, at: at || Date.now(), d: S.date });
+  if (idx != null && list[idx]) { if (!(name || '').trim()) pr.name = list[idx].name; list[idx] = pr; return idx; }
+  if (list.length >= PRESET_MAX) return -1;
+  list.push(pr); return list.length - 1;
+}
+// the saved player at place i of the XI / bench, if that very player is at my club now (same id and same name)
+function presetHas(S, pr, k, i) {
+  const id = (pr[k] || [])[i]; const p = id && S.players[id];
+  if (!p || p.club !== S.my) return null;
+  const nm = pr[k === 'xi' ? 'xn' : 'bn'];
+  return nm && nm[i] && nm[i] !== p.name ? null : id;
 }
 // load exactly what was saved: injured / suspended players stay in the team (the manager swaps them himself);
-// only players who have left the club leave an empty place
+// players who aren't at the club (sold, retired, or tactics from another club / another game) leave an empty place
 function loadPreset(S, idx) {
-  const c = S.clubs[S.my]; const pr = c.presets && c.presets[idx]; if (!pr) return null;
-  const inClub = id => id && S.players[id] && S.players[id].club === S.my;
+  const c = S.clubs[S.my]; const pr = S.presets && S.presets[idx]; if (!pr) return null;
   c.tac.form = FORMATIONS[pr.form] ? pr.form : c.tac.form;
   c.tac.ment = MENTALITY[pr.ment] ? pr.ment : pr.ment === 'ctr' ? 'def' : 'bal';
   c.tac.ctr = !!pr.ctr || pr.ment === 'ctr';
   c.tac.press = PRESS[pr.press] ? pr.press : 'mid';
   Object.assign(c.tac, tacX(pr));  // presets saved before the extra instructions load the defaults
-  c.tac.xi = FORMATIONS[c.tac.form].map((s0, i) => inClub(pr.xi[i]) ? pr.xi[i] : null);
-  c.tac.bench = pr.bench.filter((id, k, a) => inClub(id) && !c.tac.xi.includes(id) && a.indexOf(id) === k);
+  c.tac.xi = FORMATIONS[c.tac.form].map((s0, i) => FORMATIONS[pr.form] ? presetHas(S, pr, 'xi', i) : null);
+  c.tac.bench = (pr.bench || []).map((id, i) => presetHas(S, pr, 'bench', i)).filter((id, k, a) => id && !c.tac.xi.includes(id) && a.indexOf(id) === k);
   c.tac.benchManual = true;
   validateLineup(S, S.my);
-  return presetStatus(S, pr);
+  const st = presetStatus(S, pr);
+  st.empty = c.tac.xi.filter(id => !id).length;
+  return st;
 }
+// out: saved players at the club who can't play now / gone: saved players who aren't at the club / other: saved at another club
 function presetStatus(S, pr) {
   const out = [], gone = [];
-  for (const id of pr.xi.concat(pr.bench)) {
-    if (!id) continue; const p = S.players[id];
-    if (!p || p.club !== S.my) gone.push(id); else if (!available(p)) out.push(id);
-  }
-  return { out, gone };
+  for (const k of ['xi', 'bench']) (pr[k] || []).forEach((id, i) => {
+    if (!id) return; const have = presetHas(S, pr, k, i);
+    if (!have) gone.push(id); else if (!available(S.players[have])) out.push(have);
+  });
+  return { out, gone, other: !!pr.club && pr.club !== S.my };
 }
-function renamePreset(S, idx, name) { const c = S.clubs[S.my]; if (c.presets && c.presets[idx] && (name || '').trim()) c.presets[idx].name = name.trim().slice(0, 16); }
-function deletePreset(S, idx) { const c = S.clubs[S.my]; if (c.presets) c.presets.splice(idx, 1); }
+function renamePreset(S, idx, name) { const list = S.presets || []; if (list[idx] && (name || '').trim()) list[idx].name = name.trim().slice(0, 16); }
+function deletePreset(S, idx) { if (S.presets) S.presets.splice(idx, 1); }
+// the saved tactics of any save (old ones kept them per club): a copy to carry into a new game, players' names filled in
+function presetsOf(st) {
+  if (!st || !st.clubs) return [];
+  const fix = (pr, cid) => {
+    const o = JSON.parse(JSON.stringify(pr)), c = st.clubs[cid], pl = st.players || {};
+    o.xi = o.xi || []; o.bench = o.bench || [];
+    const nm = ids => ids.map(id => !id ? null : pl[id] ? pl[id].name : '?');
+    if (!o.xn) o.xn = nm(o.xi);
+    if (!o.bn) o.bn = nm(o.bench);
+    if (c) { o.club = o.club || cid; o.cn = o.cn || c.short; o.k1 = o.k1 || c.c1; o.k2 = o.k2 || c.c2; }
+    return o;
+  };
+  if (Array.isArray(st.presets)) return st.presets.map(pr => fix(pr, pr.club));
+  const out = (st.clubs[st.my] && st.clubs[st.my].presets || []).map(pr => fix(pr, st.my));
+  // tactics left at earlier clubs (before they moved with the manager) fill the free places
+  for (const [cid, c] of Object.entries(st.clubs)) if (cid !== st.my) for (const pr of c.presets || []) if (out.length < PRESET_MAX) out.push(fix(pr, cid));
+  return out;
+}
+// the manager asks to fill the empty places only (e.g. after loading tactics saved at another club): the best fit for
+// each empty slot (bench players can move up), then the bench topped up. Everyone already placed stays, fit or not.
+function fillEmpty(S) {
+  const c = S.clubs[S.my]; const slots = FORMATIONS[c.tac.form];
+  validateLineup(S, S.my);
+  const xi = c.tac.xi; let nx = 0, nb = 0;
+  const pool = squad(S, S.my).filter(p => available(p) && !xi.includes(p.id));
+  for (const i of slotOrder(slots)) {
+    if (xi[i]) continue;
+    let best = null, bv = -1e9;
+    for (const p of pool) { if (xi.includes(p.id)) continue; const v = effective(p, slots[i][0]) - Math.max(0, 72 - p.cond) * 0.4; if (v > bv) { bv = v; best = p; } }
+    if (best) { xi[i] = best.id; nx++; }
+  }
+  const bench = c.tac.bench.filter(id => !xi.includes(id));
+  const rest = pool.filter(p => !xi.includes(p.id) && !bench.includes(p.id)).sort((a, b) => b.ovr - a.ovr);
+  if (bench.length < BENCH_SIZE && !bench.some(id => S.players[id] && S.players[id].pos === 'GK')) { const gk = rest.find(p => p.pos === 'GK'); if (gk) { bench.push(gk.id); nb++; } }
+  for (const p of rest) { if (bench.length >= BENCH_SIZE) break; if (p.pos === 'GK' || bench.includes(p.id)) continue; bench.push(p.id); nb++; }
+  c.tac.bench = bench; c.tac.benchManual = true;
+  return { xi: nx, bench: nb };
+}
 // manager takes a player off the bench without a replacement
 function benchRemove(S, pid) {
   const c = S.clubs[S.my]; if (!c.tac.bench.includes(pid)) return false;
@@ -2455,7 +2508,7 @@ const API = {
   D, jdate, FORMATIONS, ROLE, DPOS, DP_CAT, DP_JP, LEARN_MAX, PLAY_MAX, ppOf, apt, roleApt, posValues, learnRate, learnWeeks, MENTALITY, PRESS, TRAINING, FACILITY, ATTR, ATTR_SHOW, FOCUS, INTENS,
   calcOvr, roleScore, bestRoles, devPreview, migrate, weekly, power, presStars, presLabel,
   newGame, seasonForDate, seasonLabel, squad, strength, table, position, age, ovr, value, wage, money, attrs,
-  autoLineup, autoBench, benchSwap, benchRemove, lineupIssues, BENCH_SIZE, PRESET_MAX, savePreset, loadPreset, presetStatus, renamePreset, deletePreset, clubRating, validateLineup, effective, posPenalty, available, teamRating,
+  autoLineup, autoBench, benchSwap, benchRemove, lineupIssues, BENCH_SIZE, PRESET_MAX, savePreset, loadPreset, presetStatus, renamePreset, deletePreset, presetsOf, fillEmpty, clubRating, validateLineup, effective, posPenalty, available, teamRating,
   createMatch, stepMatch, simulateFull, finishMatch, doSub, benchOptions, onPitch, setMentality, bestSubFor, setCounter, mentLabel,
   advance, nextDay, simAIToday, myFixtureToday, nextMyFixture, todaysFixtures, inWindow, windowEnd, nextWindowStart,
   acceptOffer, rejectOffer, setListed, setKeep, transferDay, bid, decideRetirements, shortlist, shortEntry, unshort, bidBlock,
