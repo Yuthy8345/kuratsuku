@@ -31,7 +31,7 @@ async def main():
         print('saved A', A['name'], A['form'], A['ment'], 'ctr', A.get('ctr'), len([x for x in A['xi'] if x]), 'bench', len(A['bench']))
         await page.click('#sheet [data-act="closeSheet"]'); await page.wait_for_timeout(300)
         # preset B: another shape and best XI, attacking
-        await page.click('.formrow [data-k="3-4-2-1"]'); await page.wait_for_timeout(200)
+        await page.click('.formgrid [data-k="3-4-2-1"]'); await page.wait_for_timeout(200)
         await page.click('[data-act="autoXI"]'); await page.wait_for_timeout(200)
         await page.click('[data-act="ment"][data-k="att"]'); await page.wait_for_timeout(150)
         await page.click('[data-act="presets"]'); await page.wait_for_timeout(350)

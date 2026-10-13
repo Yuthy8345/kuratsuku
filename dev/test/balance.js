@@ -88,7 +88,7 @@ ok(big[0].pot === 90 && big[0].pot0 === 90, `旧セーブ: 伸びしろ96 → 90
 ok(big[1].pot === 93 && big[1].ovr === 92.4, `旧セーブ: すでに92.4の選手は下げない（最大 ${big[1].pot}）`);
 ok(OR.pot === E.legendOf(OR.reborn).pot && E.potCap(OR) === OR.pot && OR.pot0 === OR.pot, `旧セーブ: 転生 ${OR.name} 88 → ${OR.pot}（開花扱いにしない）`);
 ok(vet.pot === vd.pot && vet.ovr === vo && vet.pot > vo + 2, `旧セーブ: 実在 ${vet.name} 伸びしろ ${Math.round(vo)} → ${vet.pot}、能力はそのまま`);
-ok(Object.values(O.clubs).every(c => c.base > 60) && O.v === 8, `旧セーブ: クラブのユース水準（鹿島 ${O.clubs.kashima.base}）`);
+ok(Object.values(O.clubs).every(c => c.base > 60) && O.v >= 8, `旧セーブ: クラブのユース水準（鹿島 ${O.clubs.kashima.base}）`);
 const om = Object.values(O.players).find(p => p.name.startsWith('三井寺'));
 ok(E.potCap(om) === 93, '旧セーブ: 三井寺の上限 93');
 console.log(fails ? `${fails} FAILED` : 'ALL OK'); process.exit(fails ? 1 : 0);

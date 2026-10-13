@@ -110,11 +110,13 @@ function openness(V, p) { const o = nearest(teamOf(V, other(p.side), true), p); 
 /* ---------- targets ---------- */
 function shapeTarget(V, p, inPoss) {
   const b = V.ball; const bxf = frameX(p.side, b.x); const byf = p.side === 'h' ? b.y : PH - b.y;
-  const ment = V.M[p.side].ment; const ms = (ment === 'att' ? 5 : ment === 'def' ? -5 : 0) + (V.M[p.side].ctr ? -3 : 0);
+  const sd = V.M[p.side]; const ment = sd.ment;
+  const ms = (ment === 'att' ? 5 : ment === 'def' ? -5 : 0) + (sd.ctr ? -3 : 0) + (sd.line === 'high' ? 3 : sd.line === 'low' ? -3 : 0);
+  const wide = sd.width === 'wide' ? 1.24 : sd.width === 'center' ? 1.0 : 1.12;  // how wide the side spreads with the ball
   let along, across;
   if (inPoss) {
     along = p.bA + 9 + (bxf - CX) * 0.42 + ms;
-    across = CY + (p.bY - CY) * 1.12 + (byf - CY) * 0.14;
+    across = CY + (p.bY - CY) * wide + (byf - CY) * 0.14;
   } else {
     along = p.bA - 5 + (bxf - CX) * 0.5 + ms * 0.6;
     across = CY + (p.bY - CY) * 0.74 + (byf - CY) * 0.32;
@@ -155,7 +157,7 @@ function updateTargets(V, dt) {
     p.run.t -= dt;
     if (p.run.t <= 0) {
       const fwd = p.role === 'ST' || p.role === 'SS' || p.role === 'LW' || p.role === 'RW' || p.role === 'AM' || p.role === 'LAM' || p.role === 'RAM' || p.role === 'WAM';
-      const mid = p.role === 'CM' || p.role === 'DM' || p.role === 'LM' || p.role === 'RM' || p.role === 'WB';
+      const mid = p.role === 'CM' || p.role === 'DM' || p.role === 'LM' || p.role === 'RM' || p.role === 'WB' || p.role === 'DWB';
       p.run = { a: fwd ? rnd(-2, 12) : mid ? rnd(-4, 7) : rnd(-3, 3), y: fwd ? rnd(-7, 7) : rnd(-4, 4), t: rnd(1.2, 3.2) };
     }
     const base = shapeTarget(V, p, true);

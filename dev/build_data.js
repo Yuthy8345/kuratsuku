@@ -350,7 +350,31 @@ console.log('positions', ppStat);
 const round1 = [['yokohamafm', 'kashima'], ['kashiwa', 'mito'], ['fctokyo', 'machida'], ['tokyov', 'kawasakif'], ['nagoya', 'shimizu'], ['gosaka', 'urawa'], ['cosaka', 'okayama'], ['hiroshima', 'chiba'], ['fukuoka', 'kobe'], ['nagasaki', 'kyoto']];
 
 const j2 = Object.fromEntries(Object.entries(HISTORY_J2).map(([id, h]) => [id, { pres: presFrom(h), titles: { j1: h.j1, lc: h.lc, ec: h.ec + h.ecOld, acl: h.acl } }]));
-const out = { season: '2026/27', start: '2026-08-07', round1, clubs, players, j2, presV: 4, rev: DATA_REV };
+
+// ---------- 海外組 (2026-10-13): Japanese players at clubs in Europe and the USA, see abroad.js ----------
+// ids from 5001 (the J1 players are 1〜800, generated players 100000+). Shirt numbers aren't known for most of them:
+// one is picked per player (stable), and he can change it once he joins.
+const AB = require('./abroad.js');
+const inJ1 = new Set(players.map(p => p.name.replace(/\s/g, '')));
+const abroad = { clubs: Object.entries(AB.CLUBS).map(([id, [name, short, cc, lg, lv, c1, c2]]) => ({ id, name, short, abbr: id.toUpperCase().slice(0, 3), cc, lg, lv, c1, c2, area: cc })), players: [] };
+{
+  let id = 5001; const usedNum = {};
+  for (const [club, name, birth, pos, pp, ovr, pot, ap, short] of AB.PLAYERS) {
+    if (!AB.CLUBS[club]) throw new Error('abroad: no club ' + club);
+    if (inJ1.has(name.replace(/\s/g, ''))) { console.warn('abroad: already in J1 data, skipped', name); continue; }
+    if (DP_CAT[pp] !== pos) throw new Error('abroad: pp outside the registered category ' + name);
+    const used = usedNum[club] || (usedNum[club] = new Set());
+    let num = 2 + hash('num' + name) % 40; while (used.has(num)) num++; used.add(num);
+    // the same room to grow as the J1 players get (data revision 3), unless the given ceiling is higher
+    const a = ageAt(birth.replace(/-/g, '/')), r = rnd(hash('rev3' + club + name.replace(/\s/g, '')))();
+    const room = Math.min(90, Math.round(ovr + room3(a, r) + (ovr >= 76 ? 1 : 0)));
+    const p = { id: id++, club, pos, num, name, short: short || name.split(' ')[0], birth, nat: 'JPN', ovr, pot: Math.min(90, Math.max(pot, ovr, room)), pp };
+    if (ap) p.ap = ap;
+    abroad.players.push(p);
+  }
+}
+console.log('abroad clubs', abroad.clubs.length, 'players', abroad.players.length);
+const out = { season: '2026/27', start: '2026-08-07', round1, clubs, players, j2, abroad, presV: 4, rev: DATA_REV };
 fs.writeFileSync(path.join(__dirname, 'data.json'), JSON.stringify(out));
 console.log('clubs', clubs.length, 'players', players.length, 'bytes', JSON.stringify(out).length);
 const avg = {};

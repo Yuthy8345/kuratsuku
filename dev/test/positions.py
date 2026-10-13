@@ -56,7 +56,7 @@ async def main():
         # tactics: slot labels + slot sheet shows aptitude
         await page.click('[data-tab="tactics"]'); await page.wait_for_timeout(200)
         print('slots', await page.evaluate('[...document.querySelectorAll(".tok .ov")].map(e=>e.textContent).join(" ")'))
-        await page.click('.formrow [data-k="3-4-2-1"]'); await page.wait_for_timeout(250)
+        await page.click('.formgrid [data-k="3-4-2-1"]'); await page.wait_for_timeout(250)
         print('3-4-2-1', await page.evaluate('[...document.querySelectorAll(".tok .ov")].map(e=>e.textContent).join(" ")'))
         await page.screenshot(path=str(OUT/'p-tactics.png'))
         await page.click('.tok >> nth=4'); await page.wait_for_timeout(400)

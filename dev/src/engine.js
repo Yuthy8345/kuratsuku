@@ -38,6 +38,29 @@ const FORMATIONS = {
   '4-2-3-1': [['GK',50,7],['LB',13,27],['CB',37,22],['CB',63,22],['RB',87,27],['DM',35,42],['DM',65,42],['LAM',15,66],['AM',50,63],['RAM',85,66],['ST',50,84]],
   '3-4-2-1': [['GK',50,7],['CB',25,24],['CB',50,20],['CB',75,24],['WB',10,50],['CM',37,46],['CM',63,46],['WB',90,50],['AM',32,68],['AM',68,68],['ST',50,84]],
   '3-5-2':   [['GK',50,7],['CB',25,24],['CB',50,20],['CB',75,24],['WB',10,52],['CM',30,52],['DM',50,41],['CM',70,52],['WB',90,52],['ST',37,80],['SS',63,80]],
+  // 2026-10-13: seven more shapes (the back five use DWB, a deeper wing-back)
+  '4-1-4-1': [['GK',50,7],['LB',13,27],['CB',37,22],['CB',63,22],['RB',87,27],['DM',50,38],['LM',13,58],['CM',36,53],['CM',64,53],['RM',87,58],['ST',50,83]],
+  '4-4-1-1': [['GK',50,7],['LB',13,27],['CB',37,22],['CB',63,22],['RB',87,27],['LM',13,52],['CM',37,47],['CM',63,47],['RM',87,52],['AM',50,68],['ST',50,84]],
+  '4-1-2-1-2': [['GK',50,7],['LB',13,27],['CB',37,22],['CB',63,22],['RB',87,27],['DM',50,38],['CM',29,51],['CM',71,51],['AM',50,63],['ST',37,82],['SS',63,82]],
+  '3-4-3':   [['GK',50,7],['CB',25,24],['CB',50,20],['CB',75,24],['WB',10,50],['CM',37,46],['CM',63,46],['WB',90,50],['LW',17,76],['ST',50,84],['RW',83,76]],
+  '3-1-4-2': [['GK',50,7],['CB',25,24],['CB',50,20],['CB',75,24],['DM',50,37],['WB',10,55],['CM',35,53],['CM',65,53],['WB',90,55],['ST',37,82],['SS',63,82]],
+  '5-3-2':   [['GK',50,7],['DWB',9,31],['CB',30,22],['CB',50,19],['CB',70,22],['DWB',91,31],['CM',30,50],['DM',50,42],['CM',70,50],['ST',37,80],['SS',63,80]],
+  '5-4-1':   [['GK',50,7],['DWB',9,30],['CB',30,22],['CB',50,19],['CB',70,22],['DWB',91,30],['LM',14,52],['CM',38,48],['CM',62,48],['RM',86,52],['ST',50,82]],
+};
+// one line on each shape for the tactics screen
+const FORM_DESC = {
+  '4-4-2': '2列の4人でバランスよく守る基本形。2トップで前から追える。',
+  '4-3-3': '3トップで幅を取り、高い位置から攻める。',
+  '4-2-3-1': 'ボランチ2枚で守りを固め、2列目の3人で崩す。',
+  '3-4-2-1': 'ウイングバックで幅を取り、シャドー2枚が前線に飛び出す。',
+  '3-5-2': '中盤に5人。中央を厚くして主導権を握る。',
+  '4-1-4-1': 'アンカーの前に4人が並ぶ。中盤のスペースを埋めやすい。',
+  '4-4-1-1': '1トップの下にトップ下を置く。守備は4-4-2に近く、中盤とつながりやすい。',
+  '4-1-2-1-2': '中盤ダイヤモンド。中央で数的優位を作るが、サイドは手薄。',
+  '3-4-3': '3トップとウイングバックで前に人数をかける攻撃型。',
+  '3-1-4-2': 'アンカーを置いた3バック。2トップと中盤4人で押し込む。',
+  '5-3-2': '5バックで最終ラインを固め、2トップで速く攻める。カウンター向き。',
+  '5-4-1': 'ゴール前に9人の壁。失点は減るが、攻撃は1トップ頼み。',
 };
 // slot roles. a/m/d: weight in attack / midfield / defence. dp: the detailed position the slot asks for, dp2: a near one that also works
 const ROLE = {
@@ -46,6 +69,7 @@ const ROLE = {
   LB:  { cat: 'DF', a: 0.2,  m: 0.25, d: 0.8,  jp: 'LSB', dp: 'SB' },
   RB:  { cat: 'DF', a: 0.2,  m: 0.25, d: 0.8,  jp: 'RSB', dp: 'SB' },
   WB:  { cat: 'MF', a: 0.35, m: 0.35, d: 0.55, jp: 'WB',  dp: 'SB',  dp2: 'SH' },
+  DWB: { cat: 'DF', a: 0.22, m: 0.25, d: 0.85, jp: 'WB',  dp: 'SB',  dp2: 'SH' },  // wing-back in a back five
   DM:  { cat: 'MF', a: 0.15, m: 0.8,  d: 0.5,  jp: 'DMF', dp: 'DMF', dp2: 'CMF' },
   CM:  { cat: 'MF', a: 0.35, m: 1.0,  d: 0.3,  jp: 'CMF', dp: 'CMF', dp2: 'DMF' },
   LM:  { cat: 'MF', a: 0.55, m: 0.7,  d: 0.25, jp: 'LSH', dp: 'SH',  dp2: 'WG' },
@@ -88,6 +112,38 @@ const MENTALITY = {
   att: { own: 1.14, opp: 1.1, jp: '攻撃的', sub: '押し込む。打ち合いになりやすい' },
 };
 const PRESS = { low: { mid: -1.5, drain: -3, jp: '低' }, mid: { mid: 0, drain: 0, jp: '中' }, high: { mid: 1.8, drain: 5, jp: '高' } };
+/* 2026-10-13: more team instructions. Each one trades something away (the AI uses them too, see aiPlan).
+   LINE  守備ライン: high squeezes the space (the other side gets fewer chances, my midfield gains) but leaves room behind
+         (their chances are better, more so on the counter); low gives up the ball but their shots come from further out.
+   BUILD 組み立て: short keeps the ball (midfield +) with fewer, better chances; long goes forward quickly (more, poorer chances,
+         better with a strong centre forward) and takes the sting out of a high press.
+   WIDTH 攻め方: wide = more crosses (more chances, a bit poorer; wide players and strong headers shoot more), centre = fewer,
+         better chances through the middle. The other side's shape matters: few wide defenders invite the wide game,
+         a crowded middle (a back three / five with an anchor) blunts the central one.
+   mark  マンマーク: one man shadows their most dangerous attacker (he shoots less and worse) — a midfielder is tied up.
+   kill  時間を使う: leading from the 70th minute, slow the game down (both sides get fewer chances, mine much fewer). */
+const LINE = {
+  low: { jp: '低い', sub: 'ゴール前を固める。押し込まれるが、相手のシュートは遠目から。カウンターが効きやすい。', mid: -1.0, oppRate: 1.06, oppQ: 0.92, ctrQ: 1.04, drain: 0 },
+  mid: { jp: '標準', sub: '標準の高さ。', mid: 0, oppRate: 1, oppQ: 1, drain: 0 },
+  high: { jp: '高い', sub: 'コンパクトに保って相手のチャンスを減らす。裏を取られると危険で、カウンターに弱い。', mid: 0.8, oppRate: 0.92, oppQ: 1.08, oppQctr: 1.15, drain: 1 },
+};
+const BUILD = {
+  long: { jp: 'ロングボール', sub: '素早く前線へ。チャンスは増えるが粗くなる。強いCFがいると効く。相手のハイプレスをかわせる。', mid: -1.5, rate: 1.07, q: 0.92, drain: 0 },
+  mix: { jp: '標準', sub: '状況に応じてつなぐ。', mid: 0, rate: 1, q: 1, drain: 0 },
+  short: { jp: 'ポゼッション', sub: 'パスをつないで主導権を握る。チャンスは減るが質が上がる。疲れやすい。', mid: 1.5, rate: 0.95, q: 1.05, drain: 1.5 },
+};
+const WIDTH = {
+  wide: { jp: 'サイド', sub: 'サイドからクロス。チャンスは増えるが質はやや落ちる。サイドの選手と空中戦に強い選手が活きる。サイドが手薄な相手に。', rate: 1.04, q: 0.96 },
+  mix: { jp: '標準', sub: 'サイドと中央を使い分ける。', rate: 1, q: 1 },
+  center: { jp: '中央', sub: '中央を崩す。チャンスは減るが決まりやすい。中央を固めた相手（3バック・5バック＋アンカー）には通りにくい。', rate: 0.96, q: 1.05 },
+};
+const MARK = { shot: 0.65, q: 0.92, mid: -1.4 };
+const KILL = { from: 70, own: 0.7, opp: 0.92 };
+const TAC_DEF = { line: 'mid', build: 'mix', width: 'mix', mark: false, kill: false };
+// the extra instructions of a side (old saves / AI clubs that never set them: the defaults)
+function tacX(t) { return { line: LINE[t && t.line] ? t.line : 'mid', build: BUILD[t && t.build] ? t.build : 'mix', width: WIDTH[t && t.width] ? t.width : 'mix', mark: !!(t && t.mark), kill: !!(t && t.kill) }; }
+// how a few clubs like to play (the 2026/27 coaches): kept unless the match calls for something else
+const CLUB_STYLE = { machida: { build: 'long', press: 'high' }, kashiwa: { build: 'short' }, nagoya: { build: 'short' }, kobe: { press: 'high' }, yokohamafm: { line: 'high', build: 'short' } };
 const TRAINING = {
   bal: { jp: 'バランス', grow: 1.0, rec: 0 },
   hard: { jp: 'ハード', grow: 1.35, rec: -2 },
@@ -182,6 +238,7 @@ const RW = {
   CB: [0, 0.1, 0, 0.35, 0.1, 0.25, 0, 0.2, 0],
   LB: [0, 0.15, 0.1, 0.25, 0.2, 0, 0.15, 0.15, 0], RB: [0, 0.15, 0.1, 0.25, 0.2, 0, 0.15, 0.15, 0],
   WB: [0, 0.15, 0.15, 0.15, 0.2, 0, 0.2, 0.15, 0],
+  DWB: [0, 0.15, 0.1, 0.25, 0.2, 0, 0.15, 0.15, 0],
   DM: [0, 0.25, 0, 0.3, 0, 0.1, 0.1, 0.25, 0],
   CM: [0.1, 0.3, 0.1, 0.1, 0, 0, 0.15, 0.25, 0],
   LM: [0.1, 0.2, 0.2, 0.05, 0.2, 0, 0.15, 0.1, 0], RM: [0.1, 0.2, 0.2, 0.05, 0.2, 0, 0.15, 0.1, 0],
@@ -393,7 +450,12 @@ function migrate(S, DATA) {
       if (p.pot > potCap(p)) { p.pot = Math.max(potCap(p), Math.ceil(p.ovr)); if (p.pot0 != null && p.pot0 > p.pot) p.pot0 = p.pot; }
     }
   }
-  S.v = Math.max(S.v || 1, 8);
+  // v9 (2026-10-13): Japanese players abroad (Europe / MLS) join the transfer market
+  if ((S.v || 1) < 9) {
+    const n = addAbroad(S, DATA);
+    if (n && !S.fired) news(S, `移籍市場に海外でプレーする日本人選手（${n}人）が加わった。「クラブ → 移籍市場 → 海外組」から。`, 'transfer');
+  }
+  S.v = Math.max(S.v || 1, 9);
   return S;
 }
 // how good the player is in each detailed position (rested, form left out)
@@ -553,7 +615,8 @@ function newGame(DATA, clubId, managerName, todayISO) {
     delete S.players[p.id].fix;
     initAttrs(S.players[p.id]);
   }
-  S.v = 8; S.presV = 4;
+  addAbroad(S, DATA);
+  S.v = 9; S.presV = 4;
   for (const p of squad(S, clubId)) track(S, p);
   for (const id of S.order) autoLineup(S, id);
   S.fixtures = genFixtures(S.order, DATA.round1, sy);
@@ -574,7 +637,7 @@ function addClub(S, c, guest) {
     coach: c.coach || '', tier: c.tier, fan: c.fan, area: c.area, base: c.base || (63 + (c.tier || 2)),
     pres: c.pres || 2, titles: Object.assign({ j1: 0, lc: 0, ec: 0, acl: 0 }, c.titles || {}), o10: !!c.o10,
     funds: startFunds, fac: { train: 2, youth: 2, stadium: 2, medical: 2, scout: 1 },
-    tac: { form: FORMATIONS[c.form] ? c.form : '4-4-2', ment: 'bal', press: 'mid', xi: [], bench: [] },
+    tac: { form: FORMATIONS[c.form] ? c.form : '4-4-2', ment: 'bal', press: 'mid', ...TAC_DEF, xi: [], bench: [] },
     fin: { gate: 0, spon: 0, wages: 0, trans: 0, prize: 0, fac: 0 },
   };
   if (!guest && !S.order.includes(c.id)) S.order.push(c.id);
@@ -693,7 +756,7 @@ function autoLineup(S, cid, opts) {
   const restCond = opts && opts.rotate ? 82 : 72;
   // order: GK, ST/W, CB/FB, MF
   const orderIdx = slots.map((s, i) => i).sort((a, b) => {
-    const pr = r => ({ GK: 0, ST: 1, SS: 1, LW: 2, RW: 2, CB: 3, LB: 4, RB: 4, DM: 5, AM: 6, LAM: 6, RAM: 6, WAM: 6, WB: 7, CM: 8, LM: 9, RM: 9 })[slots[r][0]];
+    const pr = r => ({ GK: 0, ST: 1, SS: 1, LW: 2, RW: 2, CB: 3, LB: 4, RB: 4, DWB: 4, DM: 5, AM: 6, LAM: 6, RAM: 6, WAM: 6, WB: 7, CM: 8, LM: 9, RM: 9 })[slots[r][0]] ?? 9;
     return pr(a) - pr(b);
   });
   for (const i of orderIdx) {
@@ -759,7 +822,9 @@ function clubRating(S, cid) {
   const can = id => id && S.players[id] && available(S.players[id]);
   const slots = FORMATIONS[c.tac.form].map((s0, i) => ({ role: s0[0], pid: can(c.tac.xi[i]) ? c.tac.xi[i] : null }));
   const cond = {}; for (const s0 of slots) if (s0.pid) cond[s0.pid] = S.players[s0.pid].cond;
-  return teamRating(S, { slots, cond, press: c.tac.press, tactBonus: cid === S.my && S.training === 'tact' ? 1 : 0, pres: c.pres || 2 });
+  const r = teamRating(S, { slots, cond, press: PRESS[c.tac.press] ? c.tac.press : 'mid', tactBonus: cid === S.my && S.training === 'tact' ? 1 : 0, pres: c.pres || 2 });
+  const x = tacX(c.tac); r.mid += LINE[x.line].mid + BUILD[x.build].mid + (x.mark ? MARK.mid : 0);
+  return r;
 }
 // what the manager has to sort out before kickoff: empty slots and players who can't play (injured / suspended)
 function lineupIssues(S, cid) {
@@ -811,7 +876,7 @@ const PRESET_MAX = 5;
 function savePreset(S, idx, name) {
   const c = S.clubs[S.my]; c.presets = c.presets || [];
   const ment = MENTALITY[c.tac.ment] ? c.tac.ment : 'bal';
-  const pr = { name: (name || '').trim().slice(0, 16) || `${c.tac.form}・${mentLabel({ ment, ctr: c.tac.ctr })}`, form: c.tac.form, ment, ctr: !!c.tac.ctr, press: c.tac.press, xi: c.tac.xi.slice(), bench: c.tac.bench.slice(), d: S.date };
+  const pr = Object.assign({ name: (name || '').trim().slice(0, 16) || `${c.tac.form}・${mentLabel({ ment, ctr: c.tac.ctr })}`, form: c.tac.form, ment, ctr: !!c.tac.ctr, press: c.tac.press }, tacX(c.tac), { xi: c.tac.xi.slice(), bench: c.tac.bench.slice(), d: S.date });
   if (idx != null && c.presets[idx]) { if (!(name || '').trim()) pr.name = c.presets[idx].name; c.presets[idx] = pr; return idx; }
   if (c.presets.length >= PRESET_MAX) return -1;
   c.presets.push(pr); return c.presets.length - 1;
@@ -825,6 +890,7 @@ function loadPreset(S, idx) {
   c.tac.ment = MENTALITY[pr.ment] ? pr.ment : pr.ment === 'ctr' ? 'def' : 'bal';
   c.tac.ctr = !!pr.ctr || pr.ment === 'ctr';
   c.tac.press = PRESS[pr.press] ? pr.press : 'mid';
+  Object.assign(c.tac, tacX(pr));  // presets saved before the extra instructions load the defaults
   c.tac.xi = FORMATIONS[c.tac.form].map((s0, i) => inClub(pr.xi[i]) ? pr.xi[i] : null);
   c.tac.bench = pr.bench.filter((id, k, a) => inClub(id) && !c.tac.xi.includes(id) && a.indexOf(id) === k);
   c.tac.benchManual = true;
@@ -888,7 +954,7 @@ function sideFor(S, cid) {
   const cond = {};
   for (const s of slots) if (s.pid) cond[s.pid] = S.players[s.pid].cond;
   const tactBonus = cid === S.my && S.training === 'tact' ? 1 : 0;
-  return { cid, form: c.tac.form, ment: MENTALITY[c.tac.ment] ? c.tac.ment : 'bal', ctr: !!c.tac.ctr, press: c.tac.press, slots, bench: c.tac.bench.filter(id => S.players[id] && S.players[id].club === cid && available(S.players[id])), subs: 0, subLog: [], cond, tactBonus, sent: [], pres: c.pres || 2, fan: c.fan || 2 };
+  return { cid, form: c.tac.form, ment: MENTALITY[c.tac.ment] ? c.tac.ment : 'bal', ctr: !!c.tac.ctr, press: PRESS[c.tac.press] ? c.tac.press : 'mid', ...tacX(c.tac), slots, bench: c.tac.bench.filter(id => S.players[id] && S.players[id].club === cid && available(S.players[id])), subs: 0, subLog: [], cond, tactBonus, sent: [], pres: c.pres || 2, fan: c.fan || 2 };
 }
 function createMatch(S, fx) {
   const M = {
@@ -922,6 +988,10 @@ function stepMatch(S, M) {
     return r;
   };
   const rh = live(H), ra = live(A);
+  const XH = tacX(H), XA = tacX(A);
+  // the extra instructions in midfield (a long ball takes half the sting out of the other side's high press)
+  const midAdj = (X, sd, Y) => LINE[X.line].mid + BUILD[X.build].mid + (X.mark ? MARK.mid : 0) - (Y.build === 'long' && sd.press === 'high' ? PRESS.high.mid * 0.5 : 0);
+  rh.mid += midAdj(XH, H, XA); ra.mid += midAdj(XA, A, XH);
   const pH = 1 / (1 + Math.exp(-((rh.mid - ra.mid) + 1.0) / 8));
   M.st.h.pos += pH; M.st.a.pos += 1 - pH; M.pH = pH;
   const ms = MENTALITY, lg = M.lg;
@@ -934,14 +1004,22 @@ function stepMatch(S, M) {
     if (own.ctr) v *= opp.ment === 'att' ? 1.05 : 0.85; // fewer, quicker attacks (plenty when the other side pours forward)
     return v;
   };
+  // build-up, width (read against the other side's shape), their defensive line, and time-wasting with a lead
+  const extra = (X, Y, opp, ownG, oppG) => {
+    let v = BUILD[X.build].rate * WIDTH[X.width].rate * widthFit(X.width, opp) * LINE[Y.line].oppRate;
+    if (M.min >= KILL.from && X.kill && ownG > oppG) v *= KILL.own;
+    if (M.min >= KILL.from && Y.kill && oppG > ownG) v *= KILL.opp;
+    return v;
+  };
   const lateBoost = (M.min > 80 ? 1.08 : 1);
   // 終盤、リードされている／追いつきたい名門は粘る
   const grit = (sd, own, opp) => M.min >= 75 && own <= opp ? 1 + ((sd.pres || 2) - 3) * 0.04 : 1;
-  const rH = rate(rh, ra, pH, H, A) * lateBoost * (M.neutral ? 1 : 1.05 + (H.fan || 2) * 0.01) * grit(H, M.hg, M.ag);
-  const rA = rate(ra, rh, 1 - pH, A, H) * lateBoost * (M.neutral ? 1 : 0.95) * grit(A, M.ag, M.hg);
+  const rH = rate(rh, ra, pH, H, A) * extra(XH, XA, A, M.hg, M.ag) * lateBoost * (M.neutral ? 1 : 1.05 + (H.fan || 2) * 0.01) * grit(H, M.hg, M.ag);
+  const rA = rate(ra, rh, 1 - pH, A, H) * extra(XA, XH, H, M.ag, M.hg) * lateBoost * (M.neutral ? 1 : 0.95) * grit(A, M.ag, M.hg);
   // condition drain
   for (const sd of [H, A]) {
-    const drain = 0.19 + PRESS[sd.press].drain * 0.012;
+    const X = sd === H ? XH : XA;
+    const drain = 0.19 + (PRESS[sd.press].drain + LINE[X.line].drain + BUILD[X.build].drain) * 0.012;
     for (const s of sd.slots) if (s.pid && sd.cond[s.pid] != null) { const st = S.players[s.pid].at ? S.players[s.pid].at[6] : 65; sd.cond[s.pid] = Math.max(20, sd.cond[s.pid] - drain * (1.32 - st / 200)); }
   }
   M.mom = M.mom * 0.85 + (pH - 0.5) * 0.6;
@@ -1004,13 +1082,22 @@ function chance(S, M, k, r, o, push) {
   const sd = M[k], opp = M[k === 'h' ? 'a' : 'h'];
   const shooters = onPitch(sd).filter(s => s.role !== 'GK');
   if (!shooters.length) return;
-  const sh = wpick(shooters, s => (ROLE[s.role].a * 3 + 0.15) * Math.pow(S.players[s.pid].ovr / 70, 3) * (S.players[s.pid].hot ? 2.2 : 1));
+  const X = tacX(sd), Y = tacX(opp);
+  const marked = Y.mark ? markTarget(S, M, k) : null;  // the other side shadows my most dangerous attacker
+  const sh = wpick(shooters, s => (ROLE[s.role].a * 3 + 0.15) * Math.pow(S.players[s.pid].ovr / 70, 3) * (S.players[s.pid].hot ? 2.2 : 1) * widthShooter(X.width, s.role) * (s.pid === marked ? MARK.shot : 1));
   const P = S.players[sh.pid];
   const atk = P.at ? P.at[0] : P.ovr;
+  const pow = P.at ? P.at[5] : P.ovr;
   M.st[k].sh++;
   M.ball = { x: sh.x, y: 85, side: k };
   const shotSkill = (effective(P, sh.role, sd.cond[sh.pid]) * 0.5 + atk * 0.5);
-  const q = 0.112 * Math.exp((shotSkill - o.gk) / 40) * (sd.ctr ? counterQ(k === 'h' ? 1 - (M.pH == null ? 0.5 : M.pH) : (M.pH == null ? 0.5 : M.pH)) : 1);
+  let q = 0.112 * Math.exp((shotSkill - o.gk) / 40) * (sd.ctr ? counterQ(k === 'h' ? 1 - (M.pH == null ? 0.5 : M.pH) : (M.pH == null ? 0.5 : M.pH)) : 1);
+  q *= BUILD[X.build].q * WIDTH[X.width].q;
+  if (X.build === 'long' && (sh.role === 'ST' || sh.role === 'SS')) q *= 1 + clamp((pow - 75) * 0.005, -0.06, 0.08);  // a target man wins the long ball (a typical centre forward's power is ~75)
+  if (X.width === 'wide' && sh.role === 'ST') q *= 1 + clamp((pow - 75) * 0.004, -0.05, 0.06);                         // ...and the cross
+  q *= Y.line === 'high' ? (sd.ctr ? LINE.high.oppQctr : LINE.high.oppQ) : LINE[Y.line].oppQ;
+  if (X.line === 'low' && sd.ctr) q *= LINE.low.ctrQ;
+  if (sh.pid === marked) q *= MARK.q;
   const onT = R() < 0.36 + (shotSkill - 65) * 0.006;
   const gkPid = (onPitch(opp).find(s => s.role === 'GK') || {}).pid;
   if (onT) M.st[k].ot++;
@@ -1096,7 +1183,40 @@ function aiSubs(S, M, k, push, rate) {
 }
 function setMentality(M, k, ment) { M[k].ment = ment; }
 function setCounter(M, k, on) { M[k].ctr = !!on; }
+// change one of the extra instructions during a match (line / build / width / mark / kill)
+function setTac(M, k, key, val) {
+  if (key === 'line' && LINE[val]) M[k].line = val; else if (key === 'build' && BUILD[val]) M[k].build = val;
+  else if (key === 'width' && WIDTH[val]) M[k].width = val; else if (key === 'mark' || key === 'kill') M[k][key] = !!val;
+}
 function mentLabel(t) { return ((MENTALITY[t.ment] || MENTALITY.bal).jp) + (t.ctr ? '＋カウンター' : ''); }
+// the extra instructions that differ from the standard, e.g. 「ライン高・ポゼッション・マンマーク」
+function tacLabel(t) {
+  const x = tacX(t), out = [];
+  if (x.line !== 'mid') out.push('ライン' + (x.line === 'high' ? '高' : '低'));
+  if (x.build !== 'mix') out.push(BUILD[x.build].jp);
+  if (x.width !== 'mix') out.push(x.width === 'wide' ? 'サイド攻撃' : '中央突破');
+  if (x.mark) out.push('マンマーク');
+  if (x.kill) out.push('時間を使う');
+  return out.join('・');
+}
+// width read against the other side's shape: few wide defenders invite crosses, a crowded middle blunts the central game
+const WIDE_D = { LB: 1, RB: 1, WB: 1, DWB: 1, LM: 1, RM: 1 };
+function widthFit(width, opp) {
+  if (width === 'mix') return 1;
+  let wide = 0, mid = 0;
+  for (const s of opp.slots) { if (!s.pid || (opp.sent && opp.sent.includes(s.pid))) continue; if (WIDE_D[s.role]) wide++; if (s.role === 'CB' || s.role === 'DM') mid++; }
+  if (width === 'wide') return wide <= 2 ? 1.05 : 1;
+  return mid >= 4 ? 0.95 : mid <= 2 ? 1.03 : 1;
+}
+const WIDE_R = { LB: 1, RB: 1, WB: 1, DWB: 1, LM: 1, RM: 1, LW: 1, RW: 1, LAM: 1, RAM: 1, WAM: 1 };
+const CENT_R = { ST: 1, SS: 1, AM: 1, CM: 1 };
+function widthShooter(width, role) { return width === 'wide' ? (WIDE_R[role] ? 1.5 : role === 'ST' ? 1.15 : 1) : width === 'center' ? (CENT_R[role] ? 1.25 : 1) : 1; }
+// side k's most dangerous attacker on the pitch (whom the other side man-marks)
+function markTarget(S, M, k) {
+  let best = null, bv = -1;
+  for (const s of onPitch(M[k])) { if (s.role === 'GK') continue; const p = S.players[s.pid]; const v = (ROLE[s.role].a * 3 + 0.15) * Math.pow(p.ovr / 70, 3) * (p.hot ? 2.2 : 1); if (v > bv) { bv = v; best = s.pid; } }
+  return best;
+}
 // counters work when the other side has the ball and space behind; against a side that sits deep there is little to hit
 function counterQ(oppShare) { return clamp(1.15 + (oppShare - 0.5) * 1.5, 0.9, 1.6); }
 
@@ -1168,7 +1288,29 @@ function finishMatch(S, M) {
     }
   }
   M.applied = true;
+  // a final is decided now (the winner is crowned at once, not the next morning); the league title the moment it is certain
+  if (cup && fx.cr === CUPS[fx.cup].rounds.length - 1) progressCups(S);
+  else if (!cup && fx.r >= 20) checkTitle(S);
   return fx;
+}
+/* 優勝のお祝い (2026-10-13): S.cele is a queue of pop-ups for my titles. The league one is queued the moment the title is
+   mathematically certain (nobody can reach my points any more), a cup one when my club wins the final. */
+function leagueLeft(S, cid) { let n = 0; for (const f of S.fixtures) if (!f.cup && !f.played && (f.h === cid || f.a === cid)) n++; return n; }
+function pushCele(S, c) { S.cele = S.cele || []; S.cele.push(c); if (S.cele.length > 6) S.cele.splice(0, S.cele.length - 6); }
+function checkTitle(S) {
+  if (S.titleWon === S.season || !S.order.includes(S.my) || S.fired) return false;
+  const t = table(S); if (!t.length || t[0].id !== S.my) return false;
+  const me = t[0];
+  const rivalMax = Math.max(...t.slice(1).map(r => r.pts + 3 * leagueLeft(S, r.id)));
+  if (me.pts <= rivalMax) return false;
+  S.titleWon = S.season;
+  const left = leagueLeft(S, S.my), c = S.clubs[S.my];
+  const last = S.fixtures.filter(f => !f.cup && f.played && (f.h === S.my || f.a === S.my)).sort((a, b) => b.r - a.r)[0];
+  const top = squad(S, S.my).filter(p => p.st.g > 0).sort((a, b) => b.st.g - a.st.g)[0];
+  pushCele(S, { k: 'j1', season: S.season, d: S.date, r: last ? last.r : 38, left, pts: me.pts, w: me.w, dr: me.d, l: me.l, gf: me.gf, ga: me.ga,
+    second: t[1].id, gap: me.pts - t[1].pts, n: ((c.titles && c.titles.j1) || 0) + 1, top: top ? { name: top.name, g: top.st.g } : null, mgr: S.manager });
+  news(S, left ? `リーグ優勝が決定！ 残り${left}試合を残して${c.name}が${seasonLabel(S.season)}シーズンの王者に。` : `リーグ優勝！ ${c.name}が${seasonLabel(S.season)}シーズンの王者に。`, 'big');
+  return true;
 }
 function attendance(S, hid, aid) {
   const c = S.clubs[hid], o = S.clubs[aid];
@@ -1218,7 +1360,9 @@ function advance(S, maxDays) {
     if (S.seasonEnd) return { stop: 'seasonEnd' };
     const mf = myFixtureToday(S);
     if (mf) { simAIToday(S); return { stop: 'match', fid: mf.id }; }
+    const c0 = (S.cele || []).length;
     simAIToday(S);
+    if ((S.cele || []).length > c0) return { stop: 'cele' };  // the title was settled by the other results today
     if (seasonOver(S) && !S.seasonEnd && S.fixtures.length) { endSeason(S); return { stop: 'seasonEnd' }; }
     const before = S.inbox.filter(x => !x.seen).length;
     nextDay(S);
@@ -1268,7 +1412,7 @@ function matchdayPrep(S) {
   for (const f of today) for (const [cid, opp] of [[f.h, f.a], [f.a, f.h]]) {
     if (cid === S.my || !S.clubs[cid]) continue;
     autoLineup(S, cid, { rotate: true, opp });
-    const plan = aiMentality(S, cid, opp); S.clubs[cid].tac.ment = plan.ment; S.clubs[cid].tac.ctr = plan.ctr;
+    Object.assign(S.clubs[cid].tac, aiPlan(S, cid, opp));
   }
   if (today.some(f => f.h === S.my || f.a === S.my)) validateLineup(S, S.my);
 }
@@ -1379,7 +1523,7 @@ function aiTransfer(S) {
   const pos = pick(['DF', 'MF', 'FW', 'FW', 'MF']);
   const bs = squad(S, buyer).filter(p => p.pos === pos).map(p => p.ovr).sort((a, b) => b - a);
   const bar = bs[1] || 60;
-  const targets = Object.values(S.players).filter(p => p.club !== buyer && p.club !== S.my && !p.loan && S.clubs[p.club] && p.pos === pos && p.ovr > bar && p.ovr < bar + 6 && squad(S, p.club).length > 24);
+  const targets = Object.values(S.players).filter(p => p.club !== buyer && p.club !== S.my && !p.loan && S.clubs[p.club] && !S.clubs[p.club].ab && p.pos === pos && p.ovr > bar && p.ovr < bar + 6 && squad(S, p.club).length > 24);
   if (!targets.length) return;
   const t = pick(targets);
   const fee = Math.round(value(t, S.date) * (0.9 + R() * 0.3) / 100) * 100;
@@ -1388,11 +1532,47 @@ function aiTransfer(S) {
   moveP(S, t, buyer, fee);
   news(S, `【移籍】${t.name}（${fromName}）が${bc.short}へ。移籍金 ${money(fee)}。`, 'transfer');
 }
+/* 海外組 (2026-10-13): Japanese players at clubs in Europe and the USA (MLS), from the data (DATA.abroad). Their clubs sit
+   outside the league (S.clubs[id].ab = {cc, lg, lv}; lv = how big the league is, 2〜5). They can be signed in a transfer
+   window, dearer than at home (price = value × fee(lv)) and harder: the clubs ask more, and a player at a big club — above
+   all a young one — rarely wants to come back; veterans are more willing. AI clubs don't buy them. */
+const ABROAD = { fee: lv => 1 + (lv - 1) * 0.25, reluct: lv => 0.15 + lv * 0.1 };
+function abroadOf(S, p) { const c = p && S.clubs[p.club]; return c && c.ab ? c.ab : null; }
+function isAbroadClub(S, cid) { return !!(S.clubs[cid] && S.clubs[cid].ab); }
+// what it costs to buy him (the market value, with the overseas premium)
+function price(S, p) { const v = value(p, S.date); const ab = abroadOf(S, p); return ab ? Math.round(v * ABROAD.fee(ab.lv) / 100) * 100 : v; }
+function addAbroad(S, DATA) {
+  const A = DATA && DATA.abroad; if (!A) return 0;
+  let n = 0;
+  for (const c of A.clubs) {
+    if (S.clubs[c.id]) continue;
+    addClub(S, { ...c, tier: 3, fan: 3, base: 70, cap: 0, stadium: c.stadium || '', coach: '' }, true);
+    S.clubs[c.id].ab = { cc: c.cc, lg: c.lg, lv: c.lv };
+    S.clubs[c.id].fac.train = c.lv >= 4.5 ? 4 : c.lv >= 3 ? 3 : 2;
+  }
+  const names = new Set(Object.values(S.players).map(p => p.name));
+  for (const d of A.players) {
+    if (S.players[d.id] || names.has(d.name) || !S.clubs[d.club]) continue;
+    const p = { ...d, cond: 100, form: 6.5, inj: 0, sus: 0, ycAcc: 0, listed: false, st: blankStats(), hist: [], joined: S.date };
+    delete p.fix;
+    initAttrs(p); S.players[p.id] = p; n++;
+  }
+  return n;
+}
+// how likely he is to say no (abroad): the league, how much better he is than my squad, his age, my club's standing
+function abroadReluct(S, p) {
+  const ab = abroadOf(S, p); const a = age(p, S.date);
+  const v = ABROAD.reluct(ab.lv) + (p.ovr - strength(S, S.my) - 4) * 0.03 - (a >= 30 ? (a - 29) * 0.07 : 0) + (a <= 24 ? 0.12 : a <= 27 ? 0.05 : 0)
+    + (ab.lv >= 4.5 && p.ovr >= 80 && a < 30 ? 0.08 : 0) + (ab.lv >= 4.5 && a <= 22 ? 0.15 : 0)  // a star in a big league in his prime / a youngster who just got there
+    - (((S.clubs[S.my].pres || 2) - 3) * 0.08);
+  return clamp(v, 0.05, 0.93);
+}
 function marketList(S, filter) {
   const f = filter || {};
   return Object.values(S.players).filter(p => p.club !== S.my && !p.retire && !p.loan && (S.clubs[p.club] || p.club === 'FA'))
+    .filter(p => !f.where || f.where === 'all' || (f.where === 'fa' ? p.club === 'FA' : f.where === 'ab' ? isAbroadClub(S, p.club) : p.club !== 'FA' && !isAbroadClub(S, p.club)))
     .filter(p => !f.pos || p.pos === f.pos)
-    .filter(p => !f.q || p.name.replace(/\s/g, '').includes(f.q.replace(/\s/g, '')) || (S.clubs[p.club] && S.clubs[p.club].short.includes(f.q)))
+    .filter(p => !f.q || p.name.replace(/\s/g, '').includes(f.q.replace(/\s/g, '')) || (S.clubs[p.club] && (S.clubs[p.club].short.includes(f.q) || S.clubs[p.club].name.includes(f.q) || (S.clubs[p.club].ab && S.clubs[p.club].ab.lg.includes(f.q)))))
     .sort((a, b) => b.ovr - a.ovr);
 }
 // Try to buy. mult: offer as multiple of value. Returns {ok, msg}
@@ -1411,13 +1591,15 @@ function bid(S, pid, mult) {
     return { ok: true, msg: `${p.name}と契約しました` };
   }
   if (!inWindow(S.date)) return { ok: false, msg: `移籍期間外です（次は${jdate(nextWindowStart(S.date))}から）` };
-  const v = value(p, S.date); const fee = Math.round(v * mult / 100) * 100;
+  const ab = abroadOf(S, p);
+  const v = price(S, p); const fee = Math.round(v * mult / 100) * 100;
   if (squad(S, S.my).length >= 40) { noteBid(S, p, fee, 'full'); return { ok: false, msg: '登録上限（40人）に達しています' }; }
   if (my.funds < fee) { noteBid(S, p, fee, 'funds'); return { ok: false, msg: `資金が足りません（必要 ${money(fee)}）` }; }
   const seller = S.clubs[p.club];
   const rank = squad(S, p.club).sort((a, b) => b.ovr - a.ovr).findIndex(x => x.id === p.id);
-  const demand = rank < 6 ? 1.35 : rank < 14 ? 1.12 : 0.92;
-  if (squad(S, p.club).length <= 22) { noteBid(S, p, fee, 'thin'); return { ok: false, msg: `${seller.short}は選手層が薄く、放出を拒否しました` }; }
+  // overseas clubs ask more for their regulars and young players (on top of the overseas price)
+  const demand = ab ? 1.1 + (p.ovr >= 80 ? 0.2 : p.ovr >= 75 ? 0.1 : 0) + (age(p, S.date) <= 23 ? 0.1 : 0) : rank < 6 ? 1.35 : rank < 14 ? 1.12 : 0.92;
+  if (!ab && squad(S, p.club).length <= 22) { noteBid(S, p, fee, 'thin'); return { ok: false, msg: `${seller.short}は選手層が薄く、放出を拒否しました` }; }
   S._bids = S._bids || {};
   const we = windowEnd(S.date);
   const prev = S._bids[pid];
@@ -1428,10 +1610,15 @@ function bid(S, pid, mult) {
   // player willingness
   const myLvl = strength(S, S.my), theirLvl = strength(S, p.club);
   // players are drawn to bigger, more storied clubs
-  const reluct = (theirLvl - myLvl) * 0.06 + (p.ovr - myLvl - 4) * 0.04 + ((S.clubs[p.club].pres || 2) - (my.pres || 2)) * 0.1;
-  if (R() < clamp(reluct, 0, 0.75)) { S._bids[pid].refused = true; noteBid(S, p, fee, 'player'); return { ok: false, msg: `クラブ間で合意したが、${p.name}本人が移籍を断った（今期間中は交渉不可）` }; }
+  const reluct = ab ? abroadReluct(S, p) : clamp((theirLvl - myLvl) * 0.06 + (p.ovr - myLvl - 4) * 0.04 + ((S.clubs[p.club].pres || 2) - (my.pres || 2)) * 0.1, 0, 0.75);
+  if (R() < reluct) { S._bids[pid].refused = true; noteBid(S, p, fee, 'player'); return { ok: false, msg: ab ? `クラブ間で合意したが、${p.name}本人が${seller.short}でのプレー継続を望み、断った（今期間中は交渉不可）` : `クラブ間で合意したが、${p.name}本人が移籍を断った（今期間中は交渉不可）` }; }
   const fromName = seller.short;
   moveP(S, p, S.my, fee);
+  if (ab) {
+    p.abFrom = { name: seller.name, lg: ab.lg, cc: ab.cc, s: seasonLabel(S.season), d: S.date };
+    news(S, `【海外から加入】${p.name}（${seller.name}・${ab.lg}）を獲得！ 移籍金 ${money(fee)}。`, 'big');
+    return { ok: true, msg: `${p.name}が${seller.short}から加入！` };
+  }
   news(S, `${p.name}（${fromName}）を獲得！ 移籍金 ${money(fee)}。`, 'transfer');
   return { ok: true, msg: `${p.name}を獲得しました` };
 }
@@ -1567,6 +1754,35 @@ function rebornNum(S, pid) {
   p.num = L.num;
   news(S, `${p.name}に背番号${L.num}を託した。${q ? `（${q.name}は${q.num}番へ）` : ''}`, 'info');
   return { ok: true, msg: `${p.name}が背番号${L.num}を背負う` };
+}
+/* 背番号の変更 (2026-10-13): any player of mine, in the off-season (from the season review until my club's first league
+   match of the new season — a new game starts there too) and in the winter window (12/20〜2/26). 1〜NUM_MAX.
+   A number someone else wears is swapped with him. */
+const NUM_MAX = 99;
+function numOpen(S) {
+  if (S.seasonEnd) return true;
+  const md = S.date.slice(5);
+  if (md >= '12-20' || md <= '02-26') return true;
+  return !S.fixtures.some(f => !f.cup && f.played && (f.h === S.my || f.a === S.my));
+}
+// when the manager can next change numbers (for the message on the button)
+function numNext(S) {
+  if (numOpen(S)) return null;
+  const md = S.date.slice(5);
+  return md > '02-26' && md < '07-01' ? 'シーズン終了後' : '12/20から';
+}
+function setNum(S, pid, n) {
+  const p = S.players[pid]; n = Number(n);
+  if (!p || p.club !== S.my) return { ok: false, msg: '自クラブの選手ではありません' };
+  if (!numOpen(S)) return { ok: false, msg: '背番号を変えられるのはオフシーズンと冬の移籍期間（12/20〜2/26）だけです' };
+  if (!Number.isInteger(n) || n < 1 || n > NUM_MAX) return { ok: false, msg: `背番号は1〜${NUM_MAX}です` };
+  if (p.num === n) return { ok: false, msg: `${p.name}はすでに${n}番です` };
+  const q = squad(S, S.my).find(x => x.id !== p.id && x.num === n);
+  const old = p.num;
+  if (q) q.num = old;
+  p.num = n;
+  news(S, `背番号変更：${p.name} ${old}→${n}${q ? `（${q.name}は${old}番へ）` : ''}`, 'info');
+  return { ok: true, swap: q ? q.id : null, msg: q ? `${p.short}が${n}番、${q.short}が${old}番に` : `${p.short}の背番号を${n}にしました` };
 }
 /* ---------- loans (期限付き移籍): a young player goes to a J2 club until the end of the season ----------
    He belongs to the loan club meanwhile (p.club = loan club, p.loan = {from, to, since, share, ovr0, pot0}), so he is off my
@@ -1813,6 +2029,21 @@ function aiMentality(S, cid, opp) {
   if (gap <= -4) return { ment: R() < 0.2 ? 'att' : 'bal', ctr: false };
   return { ment: 'bal', ctr: gap >= 1.5 && R() < 0.3 };
 }
+// the whole game plan of an AI club for one match: posture (aiMentality) + the extra instructions. A club's own style
+// (CLUB_STYLE) stays; an underdog sits lower and protects a lead, a favourite pushes up. Width follows the opponent's shape.
+function aiPlan(S, cid, opp) {
+  const gap = power(S, opp) - power(S, cid), st = CLUB_STYLE[cid] || {};
+  const m = aiMentality(S, cid, opp);
+  const p = { ment: m.ment, ctr: m.ctr, press: st.press || 'mid', line: st.line || 'mid', build: st.build || 'mix', width: 'mix', mark: false, kill: false };
+  if (gap >= 3) { if (R() < 0.35) p.line = 'low'; if (!st.build && R() < 0.3) p.build = 'long'; p.mark = R() < 0.25; p.kill = R() < 0.5; }
+  else if (gap <= -4) { if (!st.line && R() < 0.15) p.line = 'high'; if (!st.build && R() < 0.4) p.build = 'short'; p.kill = R() < 0.3; }
+  else { p.kill = R() < 0.35; p.mark = R() < 0.1; }
+  const o = S.clubs[opp]; const F = o && FORMATIONS[o.tac.form] || [];
+  const wide = F.filter(s => WIDE_D[s[0]]).length, mid = F.filter(s => s[0] === 'CB' || s[0] === 'DM').length;
+  const x = R();
+  p.width = wide <= 2 && x < 0.45 ? 'wide' : mid <= 2 && x < 0.35 ? 'center' : x < 0.15 ? 'wide' : x < 0.25 && mid < 4 ? 'center' : 'mix';
+  return p;
+}
 
 /* ---------- cups: 天皇杯 and Lカップ (single matches, PK if level after 90 minutes) ---------- */
 const CUPS = {
@@ -1863,7 +2094,7 @@ const PLAN_CUP = [['GK', 2], ['DF', 7], ['MF', 8], ['FW', 5]];
 // clubs from below J1 that enter the 天皇杯 (J2 clubs; relegated clubs keep their players)
 function cupGuests(S, n) {
   const ids = J2.map(c => c.id).filter(id => !S.order.includes(id));
-  for (const id of Object.keys(S.clubs)) if (!S.order.includes(id) && !ids.includes(id)) ids.push(id);
+  for (const id of Object.keys(S.clubs)) if (!S.order.includes(id) && !ids.includes(id) && !S.clubs[id].ab) ids.push(id);  // not the overseas clubs
   const pr = id => (S.clubs[id] ? S.clubs[id].pres : (J2.find(c => c.id === id) || {}).pres) || 1.5;
   const key = Object.fromEntries(ids.map(id => [id, pr(id) + R() * 1.2]));
   const pickd = ids.sort((a, b) => key[b] - key[a]).slice(0, n);
@@ -1937,7 +2168,12 @@ function progressCups(S) {
       c.funds += CUP_PRIZE.win; c.fin.prize += CUP_PRIZE.win;
       c.titles = Object.assign({ j1: 0, lc: 0, ec: 0, acl: 0 }, c.titles || {}); c.titles[key]++;
       c.pres = clamp(Math.round(((c.pres || 2) + 0.12) * 100) / 100, 1, 5);
-      if (champ === S.my) { S.board = clamp(S.board + 12, 0, 100); news(S, `${name}優勝！ ${S.clubs[cu.runner].short}を破ってタイトルを獲得。賞金 ${money(CUP_PRIZE.win)}。`, 'big'); }
+      if (champ === S.my) {
+        S.board = clamp(S.board + 12, 0, 100); news(S, `${name}優勝！ ${S.clubs[cu.runner].short}を破ってタイトルを獲得。賞金 ${money(CUP_PRIZE.win)}。`, 'big');
+        const mine = f.h === S.my ? 'h' : 'a';
+        const goals = (f.sc || []).filter(e => e[2] === 'g' && e[1] === mine).map(e => ({ m: e[0], name: S.players[e[3]] ? S.players[e[3]].name : '' }));
+        pushCele(S, { k: key, season: S.season, d: f.date, opp: cu.runner, my: mine === 'h' ? f.hg : f.ag, op: mine === 'h' ? f.ag : f.hg, pk: f.pk ? (mine === 'h' ? f.pk : [f.pk[1], f.pk[0]]) : null, goals, n: c.titles[key], venue: f.neutral ? NATIONAL.stadium : S.clubs[f.h].stadium, mgr: S.manager });
+      }
       else news(S, `${name}は${c.name}が優勝（決勝で${S.clubs[cu.runner].short}を下す）。`, cu.runner === S.my ? 'loss' : 'info');
       continue;
     }
@@ -2203,6 +2439,9 @@ const API = {
   createMatch, stepMatch, simulateFull, finishMatch, doSub, benchOptions, onPitch, setMentality, bestSubFor, setCounter, mentLabel,
   advance, nextDay, simAIToday, myFixtureToday, nextMyFixture, todaysFixtures, inWindow, windowEnd, nextWindowStart,
   acceptOffer, rejectOffer, setListed, setKeep, transferDay, bid, decideRetirements, shortlist, shortEntry, unshort, bidBlock,
+  FORM_DESC, LINE, BUILD, WIDTH, MARK, KILL, TAC_DEF, tacX, tacLabel, setTac, aiPlan, aiMentality, CLUB_STYLE, widthFit, markTarget,
+  NUM_MAX, numOpen, numNext, setNum, checkTitle, leagueLeft, progressCups,
+  ABROAD, abroadOf, isAbroadClub, price, addAbroad, abroadReluct,
   BOARD, BOARD_LV, boardLv, tenure, CUPS, CUP_PRIZE, NATIONAL, fxLabel, cupResult, cupWinner, hypeMatch, HYPE, SUB_RATE, subRate, STYLE, GROW, RARE, INTAKE, potCap, clubBase, devWeek, shareFor, LOAN, GEM, REBORN, LEGENDS, legendOf, rebornCheck, makeReborn, rebornNum, myLoans, loanCan, loanOptions, loanOut, growthOutlook, weeksLeft, yearsTo, bigGame, rivalry, SCOUT, sendScout, playShare, marketList, ensureFreeAgents, upgrade, facCost, takeJob, rollover, endSeason, news, fire,
 };
 if (typeof module !== 'undefined' && module.exports) module.exports = API; else root.Engine = API;

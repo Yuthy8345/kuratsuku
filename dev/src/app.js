@@ -259,6 +259,11 @@ function dock() {
 }
 
 /* ---------- home ---------- */
+// one side of the match ticket; the opponent's side opens their club sheet
+function tside(cid, lab) {
+  const inner = `${kit(cid, 'lg')}<b>${esc(S.clubs[cid].short)}</b><small>${lab}</small>`;
+  return cid === S.my ? `<div class="tside me">${inner}</div>` : `<button class="tside" data-act="team" data-id="${cid}" aria-label="${esc(S.clubs[cid].name)}の情報">${inner}</button>`;
+}
 function ticket(f) {
   const H = S.clubs[f.h], A = S.clubs[f.a];
   const t = E.table(S); const opp = f.h === S.my ? f.a : f.h;
@@ -268,13 +273,14 @@ function ticket(f) {
   return `<section class="ticket ${f.cup ? 'cup' : ''}" aria-label="次の試合">
     <div class="ticket-top"><span>${f.cup ? `${E.CUPS[f.cup].en} ${E.CUPS[f.cup].enr[f.cr]}` : `ROUND ${String(f.r).padStart(2, '0')}`}</span><span>${jdw(f.date)}${f.date === S.date ? ' TODAY' : ''}</span></div>
     <div class="ticket-mid">
-      <div class="tside ${f.h === S.my ? 'me' : ''}">${kit(f.h, 'lg')}<b>${esc(H.short)}</b><small>${rk(f.h)}・${f.neutral ? '国立' : 'HOME'}</small></div>
+      ${tside(f.h, `${rk(f.h)}・${f.neutral ? '国立' : 'HOME'}`)}
       <div class="tvs">VS</div>
-      <div class="tside ${f.a === S.my ? 'me' : ''}">${kit(f.a, 'lg')}<b>${esc(A.short)}</b><small>${rk(f.a)}・${f.neutral ? '国立' : 'AWAY'}</small></div>
+      ${tside(f.a, `${rk(f.a)}・${f.neutral ? '国立' : 'AWAY'}`)}
     </div>
     ${story ? `<div class="ticket-story">${story}</div>` : ''}
     <div class="ticket-perf"></div>
     <div class="ticket-foot"><span>${E.fxLabel(f)}・${esc(venueOf(f))}</span>${inJ1(opp) ? `<span class="row">相手の直近 <span class="formline">${formChips(of)}</span></span>` : ''}</div>
+    <button class="ticket-scout" data-act="team" data-id="${opp}"><span>${esc(S.clubs[opp].short)}を詳しく見る</span><small>順位・戦い方・注目選手</small><span class="arrow" aria-hidden="true">›</span></button>
   </section>`;
 }
 function offerCard(it) {
@@ -318,7 +324,7 @@ function viewHome() {
     <div class="small muted">目標：${esc(c.target.jp)}　／　開幕前予想 ${c.pred}位</div>
     ${boardAlert()}
   </section>`);
-  out.push(`<div class="tbl-wrap"><table class="tbl"><thead><tr><th>#</th><th style="text-align:left">クラブ</th><th>試</th><th>差</th><th>勝点</th></tr></thead><tbody>${mini.map(r => { const i = t.indexOf(r) + 1; return `<tr class="${r.id === S.my ? 'me' : ''}"><td>${r.p ? i : '—'}</td><td class="club"><div>${kit(r.id, 'sm')}${esc(S.clubs[r.id].short)}</div></td><td>${r.p}</td><td>${r.gf - r.ga > 0 ? '+' : ''}${r.gf - r.ga}</td><td class="pts">${r.pts}</td></tr>`; }).join('')}</tbody></table></div>`);
+  out.push(`<div class="tbl-wrap"><table class="tbl"><thead><tr><th>#</th><th style="text-align:left">クラブ</th><th>試</th><th>差</th><th>勝点</th></tr></thead><tbody>${mini.map(r => { const i = t.indexOf(r) + 1; return `<tr class="${r.id === S.my ? 'me' : ''}" data-act="team" data-id="${r.id}" tabindex="0" role="button" aria-label="${esc(S.clubs[r.id].name)}の情報"><td>${r.p ? i : '—'}</td><td class="club"><div>${kit(r.id, 'sm')}${esc(S.clubs[r.id].short)}</div></td><td>${r.p}</td><td>${r.gf - r.ga > 0 ? '+' : ''}${r.gf - r.ga}</td><td class="pts">${r.pts}</td></tr>`; }).join('')}</tbody></table></div>`);
   out.push(`<h3 class="sec-h">ニュース</h3><ul class="news">${S.news.slice(0, 18).map(n => `<li class="t-${n.type}"><time>${jd(n.d)}</time><span>${esc(n.text)}</span></li>`).join('')}</ul>`);
   return out.join('');
 }
@@ -339,7 +345,8 @@ function prow(p, ctx) {
   if (p.reborn) chips.push('<span class="chip rbchip">転生</span>');
   if (ctx === 'market' && E.shortEntry(S, p.id)) chips.push('<span class="chip acc">入札済み</span>');
   const lead = ctx === 'market' ? (S.clubs[p.club] ? kit(p.club) : '<span class="chip">FA</span>') : `<span class="no">${p.num}</span>`;
-  const sub = ctx === 'market' ? `${S.clubs[p.club] ? esc(S.clubs[p.club].short) : 'フリー'}・${a}歳・${E.money(E.value(p, S.date))}` : `${a}歳`;
+  const abc = ctx === 'market' && E.abroadOf(S, p);
+  const sub = ctx === 'market' ? `${S.clubs[p.club] ? esc(S.clubs[p.club].short) : 'フリー'}・${a}歳・${E.money(E.price(S, p))}${abc ? ` <span class="chip abchip">${esc(abc.lg)}</span>` : ''}` : `${a}歳`;
   return `<li><button class="prow" data-act="player" data-id="${p.id}">${lead}${posTag(p)}<span class="nm"><b>${esc(p.name)}</b><span>${sub} ${natChip(p)}${chips.join('')}</span></span><span class="rt"><span class="ovr ${oc(p.ovr)}">${E.ovr(p)}</span>${ctx === 'market' ? '' : condBar(p.cond)}</span></button></li>`;
 }
 const POS_ORD = { GK: 0, DF: 1, MF: 2, FW: 3 };
@@ -452,12 +459,12 @@ function subRateCtl() {
   const cur = E.SUB_RATE[S.settings.subRate] ? S.settings.subRate : 'mid';
   return `<div class="ctlrow"><label>交代の頻度</label><div class="seg">${['low', 'mid', 'high'].map(k => `<button data-act="subRate" data-k="${k}" aria-pressed="${cur === k}">${E.SUB_RATE[k].jp}</button>`).join('')}</div><span class="fine">${E.SUB_RATE[cur].sub}</span></div>`;
 }
-function sheetPlayer(id) {
+function sheetPlayer(id, back) {
   const p = S.players[id]; if (!p) return;
-  sheetState = { type: 'player', id };
+  sheetState = { type: 'player', id, back: back || null };
   const mine = p.club === S.my; const club = S.clubs[p.club];
   const lent = !!(p.loan && p.loan.from === S.my);  // out on loan from my club
-  const a = E.age(p, S.date); const v = E.value(p, S.date);
+  const a = E.age(p, S.date); const v = E.value(p, S.date); const abc = E.abroadOf(S, p);
   const avgR = p.st.apps ? (p.st.rt / p.st.apps).toFixed(2) : '—';
   const status = [];
   if (p.inj > 0) status.push(`<span class="chip warn">負傷中（あと${p.inj}日）</span>`);
@@ -473,6 +480,8 @@ function sheetPlayer(id) {
   if (p.hot) status.push(`<span class="chip fire">燃えている（${esc(p.hot.why)}）</span>`);
   if (E.bigGame(p)) status.push('<span class="chip">大舞台に強い</span>');
   if (p.found && p.club === 'FA') status.push('<span class="chip acc">スカウト推薦</span>');
+  if (E.abroadOf(S, p)) status.push(`<span class="chip abchip">海外組・${esc(COUNTRY[E.abroadOf(S, p).cc] || E.abroadOf(S, p).cc)}</span>`);
+  if (mine && p.abFrom) status.push(`<span class="chip abchip">${esc(p.abFrom.name)}から加入（${esc(p.abFrom.s)}）</span>`);
   const se = !mine && E.shortEntry(S, p.id);
   if (se) status.push('<span class="chip acc">ショートリスト</span>');
   const hist = p.hist && p.hist.length ? `<div><div class="eyebrow" style="margin-bottom:6px">過去の成績</div><ul class="list">${p.hist.map(h => `<li><div class="row" style="padding:9px 12px;font-size:13px"><b>${h.s}</b><span class="muted">${esc(S.clubs[h.c] ? S.clubs[h.c].short : '')}</span><span class="spacer"></span><span class="tnum">${h.apps}試合 ${h.g}得点 ${h.a}A</span></div></li>`).join('')}</ul></div>` : '';
@@ -493,12 +502,14 @@ function sheetPlayer(id) {
     const last = se ? `<div class="small muted">${shortStatus(se, p)}</div>` : '';
     foot = !open ? `${last}<div class="small muted">移籍期間外です。次の移籍期間は ${jd(E.nextWindowStart(S.date))} から。</div>${shortFoot(se, p)}`
       : blk && blk.why === 'player' ? `${last}${shortFoot(se, p)}`
-      : `${last}<div class="small muted">移籍金を提示（${club ? esc(club.short) : ''}・〜${jd(E.windowEnd(S.date))}）${blk ? '・同じ日の再入札はできません' : ''}</div><div class="grid2">${mults.map(m => `<button class="btn ${m === 1.2 ? 'primary' : ''}" data-act="bid" data-id="${p.id}" data-m="${m}" ${blk ? 'disabled' : ''}>${E.money(Math.round(v * m / 100) * 100)}</button>`).join('')}</div>${shortFoot(se, p)}`;
+      : `${last}<div class="small muted">移籍金を提示（${club ? esc(club.short) : ''}・〜${jd(E.windowEnd(S.date))}）${blk ? '・同じ日の再入札はできません' : ''}${abc ? '<br>海外クラブは移籍金が高く、本人がJリーグ復帰に前向きとは限りません' : ''}</div><div class="grid2">${mults.map(m => `<button class="btn ${m === 1.2 ? 'primary' : ''}" data-act="bid" data-id="${p.id}" data-m="${m}" ${blk ? 'disabled' : ''}>${E.money(Math.round(E.price(S, p) * m / 100) * 100)}</button>`).join('')}</div>${shortFoot(se, p)}`;
   }
-  openSheet(`<div class="row">${posTag(p)}<span class="small muted">#${p.num}・${club ? esc(club.name) : 'フリー'}${lent ? `（${esc(S.clubs[S.my].short)}から期限付き移籍）` : ''}・${a}歳 ${natChip(p)}</span></div>
+  if (back && back.type === 'team' && S.clubs[back.id]) foot = `<button class="btn ghost block" data-act="playerBack">← ${esc(S.clubs[back.id].short)}の情報に戻る</button>` + foot;
+  const numTag = mine && !p.retire ? `<button class="numbtn" data-act="numSheet" data-id="${p.id}" aria-label="背番号${p.num}を変更"><b>${p.num}</b><span>変更</span></button>` : '';
+  openSheet(`<div class="row">${posTag(p)}${numTag}<span class="small muted">${numTag ? '' : `#${p.num}・`}${club ? esc(club.name) : 'フリー'}${abc ? `（${esc(abc.lg)}）` : ''}${lent ? `（${esc(S.clubs[S.my].short)}から期限付き移籍）` : ''}・${a}歳 ${natChip(p)}</span></div>
     <h2>${esc(p.name)}</h2>
     ${status.length ? `<div class="row wrap">${status.join('')}</div>` : ''}
-    <div class="bigovr"><span class="ovr ${oc(p.ovr)}">${E.ovr(p)}</span><dl class="kv" style="flex:1"><dt>伸びしろ</dt><dd><span class="stars">${potStars(p)}</span>${mine || lent ? `（最大 ${Math.round(p.pot)}）` : p.found ? `（見立て ${Math.round(p.pot) - 3}〜${Math.round(p.pot) + 3}）` : ''}</dd><dt>市場価値</dt><dd>${E.money(v)}</dd><dt>年俸</dt><dd>${E.money(E.wage(p))}</dd></dl></div>
+    <div class="bigovr"><span class="ovr ${oc(p.ovr)}">${E.ovr(p)}</span><dl class="kv" style="flex:1"><dt>伸びしろ</dt><dd><span class="stars">${potStars(p)}</span>${mine || lent ? `（最大 ${Math.round(p.pot)}）` : p.found ? `（見立て ${Math.round(p.pot) - 3}〜${Math.round(p.pot) + 3}）` : ''}</dd><dt>市場価値</dt><dd>${E.money(v)}</dd>${abc ? `<dt>移籍金の相場</dt><dd>${E.money(E.price(S, p))}</dd>` : ''}<dt>年俸</dt><dd>${E.money(E.wage(p))}</dd></dl></div>
     ${leg ? `<div class="rb-line"><span class="chip rbchip">転生</span><span>「${esc(leg.epi)}」の魂を継ぐ。${leg.num ? `かつての背番号${leg.num}` : 'クラブのレジェンド'}（${esc(leg.era)}）。${esc(leg.line)}</span></div>` : ''}
     ${attrRows(p, mine || lent)}
     ${mine || lent ? growthBlock(p, lent) : ''}
@@ -561,6 +572,27 @@ function growthBlock(p, lent) {
   const chart = growthChart(p, target);
   return `<div style="display:grid;gap:8px"><div class="eyebrow">成長の記録</div>${chart ? chart + legend : '<p class="fine" style="margin:0">成長の記録は毎月1日に付けています。来月からグラフになります。</p>'}${eta}
     ${young ? '<p class="fine" style="margin:0">23歳以下は試合に出るほど伸び、よく出てよく活躍すると伸びしろそのものが広がります（開花）。</p>' : ''}${loanBtn}</div>`;
+}
+// 背番号の変更: a board of 1〜99 with who wears each number. Open in the off-season and the winter window only.
+function sheetNum(id, sel) {
+  const p = S.players[id]; if (!p || p.club !== S.my) return;
+  sheetState = { type: 'num', id, sel: sel || null };
+  const open = E.numOpen(S);
+  const who = {}; for (const q of E.squad(S, S.my)) who[q.num] = q;
+  const leg = p.reborn && E.legendOf(p.reborn);
+  const cell = n => {
+    const q = who[n]; const own = q && q.id === p.id;
+    const cls = `numcell${own ? ' own' : q ? ' taken' : ''}${leg && leg.num === n ? ' legend' : ''}`;
+    return `<button class="${cls}" data-act="numPick" data-id="${p.id}" data-n="${n}" aria-pressed="${sel === n}" ${!open || own ? 'disabled' : ''} aria-label="${n}番${q ? `（${esc(q.name)}）` : '（空き）'}"><b>${n}</b><small>${q ? esc(q.short) : ''}</small></button>`;
+  };
+  const tgt = sel && who[sel];
+  openSheet(`<div class="row">${posTag(p)}<span class="small muted">${esc(p.name)}・${E.age(p, S.date)}歳</span></div>
+    <h2>背番号の変更</h2>
+    <div class="numnow"><span class="numnow-mag" style="--k1:${S.clubs[S.my].c1};--k2:${S.clubs[S.my].c2};--kt:${lum(S.clubs[S.my].c1) > 0.6 ? '#141414' : '#ffffff'}">${p.num}</span>${sel ? `<span class="numnow-arrow" aria-hidden="true">→</span><span class="numnow-mag new" style="--k1:${S.clubs[S.my].c1};--k2:${S.clubs[S.my].c2};--kt:${lum(S.clubs[S.my].c1) > 0.6 ? '#141414' : '#ffffff'}">${sel}</span>` : ''}
+      <span class="small" style="flex:1;min-width:0">${!open ? `今は変更できません。${E.numNext(S)}変更できます。` : sel ? (tgt ? `${esc(tgt.name)}の${sel}番と入れ替えます（${esc(tgt.short)}は${p.num}番へ）。` : `空いている${sel}番に変えます。`) : '新しい番号をタップしてください。'}</span></div>
+    <p class="fine" style="margin:0">変更できるのはオフシーズン（シーズン総括〜開幕前）と冬の移籍期間（12/20〜2/26）です。ほかの選手が着けている番号を選ぶと、その選手と番号を入れ替えます。${leg && leg.num ? `金色の${leg.num}は「${esc(leg.epi)}」の番号です。` : ''}</p>
+    <div class="numgrid${open ? '' : ' closed'}">${Array.from({ length: E.NUM_MAX }, (_, i) => cell(i + 1)).join('')}</div>`,
+    `${sel && open ? `<button class="btn primary block" data-act="numSet" data-id="${p.id}" data-n="${sel}">背番号${sel}にする</button>` : ''}<button class="btn ghost block" data-act="player" data-id="${p.id}">戻る</button>`);
 }
 // 期限付き移籍: three J2 clubs with how much he would play and where he would be at the end of the season
 function sheetLoan(id) {
@@ -655,13 +687,15 @@ function viewTactics() {
   const iss = E.lineupIssues(S, S.my);
   const banner = iss.block ? `<div class="card alert"><div class="eyebrow">試合の前に入れ替えが必要です</div><ul>${issueLines(iss).map(t => `<li>${esc(t)}</li>`).join('')}</ul><p class="fine" style="margin:6px 0 0">選手やベンチの行をタップして入れ替えてください。自動では入れ替わりません。</p></div>` : '';
   return `${banner}<div class="trate"><div><small>攻撃</small><b>${Math.round(r.att)}</b></div><div><small>中盤</small><b>${Math.round(r.mid)}</b></div><div><small>守備</small><b>${Math.round(r.def)}</b></div></div>
-    <div class="formrow" role="group" aria-label="フォーメーション">${Object.keys(E.FORMATIONS).map(f => `<button data-act="form" data-k="${f}" aria-pressed="${c.tac.form === f}">${f}</button>`).join('')}</div>
+    <div class="formgrid" role="group" aria-label="フォーメーション">${Object.keys(E.FORMATIONS).map(f => `<button data-act="form" data-k="${f}" aria-pressed="${c.tac.form === f}">${f}</button>`).join('')}</div>
+    <p class="fine" style="margin:-6px 0 0">${esc(E.FORM_DESC[c.tac.form] || '')}</p>
     <div class="pitch">${PITCH_SVG}${toks}</div>
     <button class="btn ghost block" data-act="presets">戦術の保存・読み込み<span class="small muted">　${(c.presets || []).length}/${E.PRESET_MAX}</span></button>
     <p class="fine">選手をタップすると入れ替えられます。「!」は適性が低いポジションか疲れている選手、「×」はケガや出場停止で出られない選手です。</p>
     <div class="ctlrow"><label>攻撃の姿勢</label>${seg('ment', c.tac.ment, MENT_OPTS)}<span class="fine">${MENT_DESC[c.tac.ment] || ''}</span></div>
     <button class="toggle" role="switch" aria-checked="${!!c.tac.ctr}" data-act="ctr"><span><b>カウンターを狙う</b><br><span class="small muted">${CTR_DESC}</span></span><span class="sw"></span></button>
     <div class="ctlrow"><label>プレスの強度（高いほど中盤で優位、ただし消耗）</label>${seg('press', c.tac.press, [['low', '低'], ['mid', '中'], ['high', '高']])}</div>
+    ${tacXBlock(E.tacX(c.tac), 't', nextOpp())}
     <button class="toggle" role="switch" aria-checked="${!!S.settings.autoSubs}" data-act="autoSubs"><span><b>交代はおまかせ</b><br><span class="small muted">オフにすると試合中に自分で交代を選びます</span></span><span class="sw"></span></button>
     ${subRateCtl()}
     <h3 class="sec-h">ベンチ（${c.tac.bench.length}/${E.BENCH_SIZE}人）<small>自動では入れ替わりません</small></h3>
@@ -758,9 +792,9 @@ function viewLeague() {
     const t = E.table(S); const n = t.length;
     body = `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>#</th><th style="text-align:left">クラブ</th><th>試</th><th>勝</th><th>分</th><th>敗</th><th>得失</th><th>勝点</th></tr></thead><tbody>${t.map((r, i) => {
       const z = i === 0 ? 'z-champ' : i < 3 ? 'z-top' : i >= n - 3 ? 'z-rel' : '';
-      return `<tr class="${z} ${r.id === S.my ? 'me' : ''}"><td>${i + 1}</td><td class="club"><div>${kit(r.id, 'sm')}${esc(S.clubs[r.id].short)}</div></td><td>${r.p}</td><td>${r.w}</td><td>${r.d}</td><td>${r.l}</td><td>${r.gf - r.ga > 0 ? '+' : ''}${r.gf - r.ga}</td><td class="pts">${r.pts}</td></tr>`;
+      return `<tr class="${z} ${r.id === S.my ? 'me' : ''}" data-act="team" data-id="${r.id}" tabindex="0" role="button" aria-label="${esc(S.clubs[r.id].name)}の情報"><td>${i + 1}</td><td class="club"><div>${kit(r.id, 'sm')}${esc(S.clubs[r.id].short)}</div></td><td>${r.p}</td><td>${r.w}</td><td>${r.d}</td><td>${r.l}</td><td>${r.gf - r.ga > 0 ? '+' : ''}${r.gf - r.ga}</td><td class="pts">${r.pts}</td></tr>`;
     }).join('')}</tbody></table></div>
-    <div class="legend"><span><i style="background:var(--accent-bg)"></i>優勝</span><span><i style="background:var(--zone-top)"></i>上位</span><span><i style="background:var(--loss)"></i>J2降格</span></div>`;
+    <div class="legend"><span><i style="background:var(--accent-bg)"></i>優勝</span><span><i style="background:var(--zone-top)"></i>上位</span><span><i style="background:var(--loss)"></i>J2降格</span><span class="spacer"></span><span>クラブをタップで詳しい情報</span></div>`;
   } else if (v === 'fixtures') {
     const r = UI.lg.round || curRound();
     const fx = S.fixtures.filter(f => f.r === r).sort((a, b) => a.date.localeCompare(b.date));
@@ -779,6 +813,64 @@ function viewLeague() {
   }
   return `${body}<div class="subnav"><div class="seg">${[['table', '順位表'], ['fixtures', '日程'], ['cups', 'カップ戦'], ['stats', '個人成績']].map(([k, l]) => `<button data-act="lgView" data-k="${k}" aria-pressed="${v === k}">${l}</button>`).join('')}</div></div>`;
 }
+/* 他チーム情報 (2026-10-13): a club's sheet — standing, strength next to mine, how they play (shape and likely XI on a
+   board), our meetings this season, who to watch, and the whole squad. Opened from the tables, the home ticket, the
+   pre-match sheet and match details. back = the sheet to return to ({type:'pre', id}). */
+function sheetTeam(cid, tab, back) {
+  const c = S.clubs[cid]; if (!c) return;
+  tab = tab === 'squad' ? 'squad' : 'info';
+  sheetState = { type: 'team', id: cid, tab, back: back || null };
+  const t = E.table(S); const ri = t.findIndex(r => r.id === cid); const row = ri >= 0 ? t[ri] : null;
+  const j1 = inJ1(cid);
+  const kt = lum(c.c1) > 0.6 ? '#141414' : '#ffffff';
+  const head = `<div class="team-head"><span class="kit lg" style="--c1:${c.c1};--c2:${c.c2}" aria-hidden="true"></span><div style="min-width:0"><div class="eyebrow">${esc(c.area || '')}・${j1 ? 'J1' : c.ab ? esc(c.ab.lg) : 'J2'}${c.coach ? `・監督 ${esc(c.coach)}` : ''}</div><h2>${esc(c.name)}</h2></div></div>`;
+  const tabs = `<div class="seg" role="tablist">${[['info', '概要'], ['squad', `選手（${E.squad(S, cid).length}人）`]].map(([k, l]) => `<button data-act="teamTab" data-k="${k}" aria-pressed="${tab === k}">${l}</button>`).join('')}</div>`;
+  let body = '';
+  if (tab === 'squad') {
+    const ps = E.squad(S, cid).sort((a, b) => (POS_ORD[a.pos] - POS_ORD[b.pos]) || (DP_ORD(a) - DP_ORD(b)) || b.ovr - a.ovr);
+    const xi = new Set(c.tac.xi);
+    body = `<ul class="list">${ps.map(p => `<li><button class="prow" data-act="teamPlayer" data-id="${p.id}"><span class="no">${p.num}</span>${posTag(p)}<span class="nm"><b>${esc(p.name)}</b><span>${E.age(p, S.date)}歳 ${natChip(p)}${xi.has(p.id) ? '<span class="chip ok">主力</span>' : ''}${p.inj > 0 ? '<span class="chip warn">負傷</span>' : ''}${p.st.g ? `<span class="chip">${p.st.g}得点</span>` : ''}</span></span><span class="rt"><span class="ovr ${oc(p.ovr)}">${E.ovr(p)}</span></span></button></li>`).join('')}</ul>
+      <p class="fine" style="margin:0">選手をタップすると詳しい情報（と移籍金の提示）が見られます。「主力」は直近の試合の先発です。</p>`;
+  } else {
+    const parts = [];
+    if (row) {
+      const gd = row.gf - row.ga;
+      parts.push(`<div class="team-rank"><div><small>順位</small><b>${row.p ? `${ri + 1}<i>位</i>` : '—'}</b></div><div><small>勝点</small><b>${row.pts}</b></div><div><small>勝-分-敗</small><b class="rec">${row.w}-${row.d}-${row.l}</b></div><div><small>得失点</small><b>${gd > 0 ? '+' : ''}${gd}</b></div></div>
+        <div class="row small muted">直近の結果 <span class="formline">${formChips(row.form.slice(-5))}</span><span class="spacer"></span>開幕前予想 ${c.pred || '—'}位</div>`);
+    } else parts.push(`<p class="small muted" style="margin:0">${c.ab ? `${esc(c.ab.lg)}のクラブ` : 'J2のクラブ'}です。${S.cups && S.cups.ec && S.cups.ec.alive.includes(cid) ? '天皇杯を勝ち残っています。' : ''}</p>`);
+    if (cid !== S.my && !c.ab) {
+      const me = E.clubRating(S, S.my), op = E.clubRating(S, cid);
+      const bar = (lab, a, b) => { const mx = Math.max(a, b, 1); return `<div class="cmp"><b class="l">${a.toFixed(0)}</b><span class="bar bl"><i style="width:${Math.max(8, 100 - (mx - a) * 9)}%;background:var(--accent-bg)"></i></span><span class="lab">${lab}</span><span class="bar"><i style="width:${Math.max(8, 100 - (mx - b) * 9)}%;background:var(--muted)"></i></span><b>${b.toFixed(0)}</b></div>`; };
+      const gap = E.power(S, cid) - E.power(S, S.my);
+      parts.push(`<div style="display:grid;gap:8px"><div class="row small"><b>${esc(S.clubs[S.my].short)}</b><span class="spacer"></span><span class="muted">チーム力の比較</span><span class="spacer"></span><b>${esc(c.short)}</b></div>${bar('攻撃', me.att, op.att)}${bar('中盤', me.mid, op.mid)}${bar('守備', me.def, op.def)}
+        <p class="fine" style="margin:0">${gap >= 3 ? '格上の相手。守備的な戦い方やカウンターが有効です。' : gap <= -3 ? '格下の相手。主導権を握って押し込みたい。' : '力は互角。'}クラブの格 ${presBadge(c)} ${E.presLabel(c.pres)}</p></div>`);
+    }
+    if (!c.ab && c.tac.xi.some(Boolean)) {
+      const F = E.FORMATIONS[c.tac.form];
+      const toks = F.map((s, i) => { const p = S.players[c.tac.xi[i]]; if (!p) return ''; return `<button class="tok" style="left:${s[1]}%;top:${88 - (s[2] - 7) * 1.04}%;--k1:${c.c1};--k2:${c.c2};--kt:${kt}" data-act="teamPlayer" data-id="${p.id}" aria-label="${E.ROLE[s[0]].jp} ${esc(p.name)}"><span class="shirt">${p.num}</span><span class="lbl">${esc(p.short)}</span><span class="ov">${E.ROLE[s[0]].jp}・${E.ovr(p)}</span></button>`; }).join('');
+      const plan = [E.mentLabel(c.tac), E.tacLabel(c.tac)].filter(Boolean).join('・');
+      parts.push(`<div style="display:grid;gap:8px"><div class="row"><div class="eyebrow">戦い方</div><span class="spacer"></span><b class="small">${c.tac.form}${cid !== S.my && j1 ? `・${esc(plan)}` : ''}</b></div>
+        <div class="pitch team-pitch">${PITCH_SVG}${toks}</div>
+        <p class="fine" style="margin:0">${esc(E.FORM_DESC[c.tac.form] || '')}${cid !== S.my ? '並びは直近の先発。試合ごとの戦い方は当日の朝に決まります（試合前の画面で確認できます）。' : ''}</p></div>`);
+    }
+    // our meetings this season
+    if (cid !== S.my) {
+      const fx = S.fixtures.filter(f => (f.h === cid && f.a === S.my) || (f.a === cid && f.h === S.my)).sort((a, b) => a.date.localeCompare(b.date));
+      if (fx.length) parts.push(`<div><div class="eyebrow" style="margin-bottom:6px">今季の対戦</div><ul class="list">${fx.map(f => { const w = f.played ? (f.cup ? E.cupWinner(f) : f.hg > f.ag ? f.h : f.hg < f.ag ? f.a : null) : null; const r = !f.played ? '' : w === S.my ? '<span class="res res-W">勝</span>' : w ? '<span class="res res-L">敗</span>' : '<span class="res res-D">分</span>'; return `<li><button class="fx ${f.played ? '' : 'next'}" style="width:100%" data-act="fxDetail" data-id="${f.id}"><span class="h">${esc(S.clubs[f.h].short)}${kit(f.h, 'sm')}</span><span class="sc ${f.played ? '' : 'pending'}">${f.played ? `${f.hg}-${f.ag}${f.pk ? `<small>PK${f.pk[0]}-${f.pk[1]}</small>` : ''}` : jd(f.date)}</span><span class="a">${kit(f.a, 'sm')}${esc(S.clubs[f.a].short)}${r}</span></button><div class="fx-note">${E.fxLabel(f)}・${f.played ? '' : jdw(f.date) + '・'}${esc(venueOf(f))}</div></li>`; }).join('')}</ul></div>`);
+    }
+    // who to watch: top scorers this season and the best players
+    const sq = E.squad(S, cid);
+    const scorers = sq.filter(p => p.st.g > 0).sort((a, b) => b.st.g - a.st.g || b.st.a - a.st.a).slice(0, 3);
+    const best = sq.slice().sort((a, b) => b.ovr - a.ovr).slice(0, 5);
+    const prow2 = (p, note) => `<li><button class="prow" data-act="teamPlayer" data-id="${p.id}"><span class="no">${p.num}</span>${posTag(p)}<span class="nm"><b>${esc(p.name)}</b><span>${note}${p.hot ? '<span class="chip fire">燃えている</span>' : ''}${p.inj > 0 ? `<span class="chip warn">負傷 ${p.inj}日</span>` : ''}${p.sus > 0 ? '<span class="chip warn">出場停止</span>' : ''}</span></span><span class="rt"><span class="ovr ${oc(p.ovr)}">${E.ovr(p)}</span></span></button></li>`;
+    if (scorers.length) parts.push(`<div><div class="eyebrow" style="margin-bottom:6px">得点源</div><ul class="list">${scorers.map(p => prow2(p, `${p.st.g}得点 ${p.st.a}アシスト・${p.st.apps}試合`)).join('')}</ul></div>`);
+    parts.push(`<div><div class="eyebrow" style="margin-bottom:6px">主力選手</div><ul class="list">${best.map(p => prow2(p, `${E.age(p, S.date)}歳 ${natChip(p)}`)).join('')}</ul></div>`);
+    if (!c.ab) parts.push(`<dl class="kv"><dt>ホーム</dt><dd>${esc(c.stadium || '—')}</dd><dt>タイトル</dt><dd>${titlesText(c)}${c.o10 ? '・Jリーグ創設メンバー' : ''}</dd></dl>`);
+    body = parts.join('');
+  }
+  const backBtn = back && back.type === 'pre' ? `<button class="btn ghost" data-act="teamBack">試合前の画面に戻る</button>` : '';
+  openSheet(`${head}${tabs}${body}`, backBtn ? `<div class="grid2">${backBtn}<button class="btn ghost" data-act="closeSheet">閉じる</button></div>` : '<button class="btn ghost block" data-act="closeSheet">閉じる</button>');
+}
 function sheetFixture(id) {
   const f = S.fixtures.find(x => x.id === id); if (!f) return;
   sheetState = { type: 'fx', id };
@@ -786,7 +878,7 @@ function sheetFixture(id) {
   const goals = (f.sc || []).filter(e => e[2] === 'g');
   const line = side => goals.filter(e => e[1] === side).map(e => `<div>${e[0] > 90 ? '90+' + (e[0] - 90) : e[0]}' ${esc(S.players[e[3]] ? S.players[e[3]].name : '—')}</div>`).join('') || '<div class="muted">—</div>';
   openSheet(`<div class="eyebrow">${E.fxLabel(f)}・${jdw(f.date)}</div>
-    <div class="sb" style="margin:0"><div class="team"><span>${esc(H.short)}</span><span class="kitline" style="background:${H.c1}"></span></div><div><div class="score">${f.played ? `${f.hg}-${f.ag}` : 'vs'}</div><div class="clock">${f.played ? (f.pk ? `PK ${f.pk[0]}-${f.pk[1]}` : 'FULL TIME') : jd(f.date)}</div></div><div class="team"><span>${esc(A.short)}</span><span class="kitline" style="background:${A.c1}"></span></div></div>
+    <div class="sb" style="margin:0"><div class="team"><button class="teamlink" data-act="team" data-id="${f.h}">${esc(H.short)}</button><span class="kitline" style="background:${H.c1}"></span></div><div><div class="score">${f.played ? `${f.hg}-${f.ag}` : 'vs'}</div><div class="clock">${f.played ? (f.pk ? `PK ${f.pk[0]}-${f.pk[1]}` : 'FULL TIME') : jd(f.date)}</div></div><div class="team"><button class="teamlink" data-act="team" data-id="${f.a}">${esc(A.short)}</button><span class="kitline" style="background:${A.c1}"></span></div></div>
     ${f.played ? `<div class="scorers"><div>${line('h')}</div><div>${line('a')}</div></div><dl class="kv"><dt>会場</dt><dd>${esc(venueOf(f))}</dd><dt>入場者数</dt><dd>${(f.att || 0).toLocaleString('ja-JP')}人</dd></dl>` : `<dl class="kv"><dt>会場</dt><dd>${esc(venueOf(f))}</dd></dl>`}`,
     '<button class="btn ghost block" data-act="closeSheet">閉じる</button>');
 }
@@ -841,7 +933,8 @@ function viewClub() {
     else body += `
       <input class="input" id="mk-q" type="search" placeholder="選手名・クラブで検索" value="${esc(UI.mk.q)}" autocomplete="off">
       <div class="seg">${[['', '全員'], ['GK', 'GK'], ['DF', 'DF'], ['MF', 'MF'], ['FW', 'FW']].map(([k, l]) => `<button data-act="mkPos" data-k="${k}" aria-pressed="${UI.mk.pos === k}">${l}</button>`).join('')}</div>
-      <button class="toggle" role="switch" aria-checked="${UI.mk.fa}" data-act="mkFA"><span><b>フリーの選手だけ</b><br><span class="small muted">移籍金なし・契約金のみ（架空の選手です）</span></span><span class="sw"></span></button>
+      <div class="seg" role="group" aria-label="所属">${[['all', 'すべて'], ['j', 'Jリーグ'], ['ab', '海外組'], ['fa', 'フリー']].map(([k, l]) => `<button data-act="mkWhere" data-k="${k}" aria-pressed="${mkWhere() === k}">${l}</button>`).join('')}</div>
+      ${MK_NOTE[mkWhere()] ? `<p class="fine" style="margin:-4px 0 0">${MK_NOTE[mkWhere()]}</p>` : ''}
       <ul class="list" id="mk-list">${marketRows()}</ul>`;
   } else {
     const h = S.history;
@@ -877,11 +970,17 @@ function shortRow(e) {
   const lead = club ? kit(p.club) : '<span class="chip">FA</span>';
   return `<li><button class="prow" data-act="player" data-id="${p.id}">${lead}${posTag(p)}<span class="nm"><b>${esc(p.name)}</b><span>${club ? esc(club.short) : 'フリー'}・${a}歳・${E.money(E.value(p, S.date))} ${state}${moved}</span><span class="sl-last">${shortStatus(e, p, true)}</span></span><span class="rt"><span class="ovr ${oc(p.ovr)}">${E.ovr(p)}</span></span></button></li>`;
 }
+const COUNTRY = { ENG: 'イングランド', ESP: 'スペイン', GER: 'ドイツ', FRA: 'フランス', ITA: 'イタリア', NED: 'オランダ', POR: 'ポルトガル', BEL: 'ベルギー', AUT: 'オーストリア', SCO: 'スコットランド', DEN: 'デンマーク', SUI: 'スイス', POL: 'ポーランド', SVK: 'スロバキア', SRB: 'セルビア', USA: 'アメリカ', CAN: 'カナダ' };
+// which market: all / J.League / overseas Japanese players / free agents (old UI state: the 'free agents only' switch)
+const mkWhere = () => UI.mk.where || (UI.mk.fa ? 'fa' : 'all');
+const MK_NOTE = {
+  ab: 'ヨーロッパとアメリカでプレーする日本人選手。移籍期間中に獲得できます。移籍金は高く、とくに若手や大きなリーグの主力はJリーグ復帰に慎重です。ベテランほど前向き。',
+  fa: '移籍金なし・契約金のみ（架空の選手です）。いつでも契約できます。',
+};
 function marketRows() {
-  let list = E.marketList(S, { pos: UI.mk.pos, q: UI.mk.q.trim() });
-  if (UI.mk.fa) list = list.filter(p => p.club === 'FA');
-  const n = list.length; list = list.slice(0, 60);
-  return list.map(p => prow(p, 'market')).join('') + (n > 60 ? `<li class="empty">ほか${n - 60}人。検索で絞り込めます。</li>` : '') || '<li class="empty">見つかりませんでした</li>';
+  let list = E.marketList(S, { pos: UI.mk.pos, q: UI.mk.q.trim(), where: mkWhere() });
+  const n = list.length, lim = mkWhere() === 'ab' ? 120 : 60; list = list.slice(0, lim);
+  return list.map(p => prow(p, 'market')).join('') + (n > lim ? `<li class="empty">ほか${n - lim}人。検索で絞り込めます。</li>` : '') || '<li class="empty">見つかりませんでした</li>';
 }
 function clubRecords() {
   const my = S.fixtures.filter(f => f.played && !f.cup && (f.h === S.my || f.a === S.my));
@@ -921,8 +1020,9 @@ function sheetPrematch(fid) {
   openSheet(`<div class="eyebrow">${E.fxLabel(f)}・${jdw(f.date)}・${f.neutral ? '国立競技場' : f.h === S.my ? 'ホーム' : 'アウェイ'}</div>
     <h2>vs ${esc(o.name)}</h2>
     ${story ? `<div class="row wrap">${story}</div>` : ''}
-    <div class="row small muted"><span>${esc(c.short)} ${c.tac.form}・${esc(E.mentLabel(c.tac))}</span><span class="spacer"></span><span>${esc(o.short)} ${o.tac.form}${o.tac.ment !== 'bal' || o.tac.ctr ? '・' + esc(E.mentLabel(o.tac)) : ''}</span></div>
+    <div class="plans small"><div><b>${esc(c.short)}</b> ${c.tac.form}・${esc(E.mentLabel(c.tac))}${E.tacLabel(c.tac) ? '・' + esc(E.tacLabel(c.tac)) : ''}</div><div><b>${esc(o.short)}</b> ${o.tac.form}${o.tac.ment !== 'bal' || o.tac.ctr ? '・' + esc(E.mentLabel(o.tac)) : ''}${E.tacLabel(o.tac) ? '・' + esc(E.tacLabel(o.tac)) : ''}</div></div>
     <div style="display:grid;gap:8px">${row('攻撃', me.att, op.att)}${row('中盤', me.mid, op.mid)}${row('守備', me.def, op.def)}</div>
+    <button class="btn ghost block" data-act="team" data-id="${opp}" data-back="pre" data-fid="${fid}">${esc(o.short)}を詳しく見る</button>
     ${gap >= 3 && c.tac.ment !== 'def' && !c.tac.ctr ? '<p class="fine" style="margin:0">格上が相手です。「守備的」や「カウンターを狙う」で戦うと勝機が増えます（戦術画面）。</p>' : ''}
     ${fire}
     <div><div class="eyebrow" style="margin-bottom:6px">警戒する選手</div><div class="row wrap">${keys.map(p => `<span class="chip">${posTag(p, 'width:26px;height:16px;font-size:9px')}${esc(p.name)} ${E.ovr(p)}</span>`).join('')}</div></div>
@@ -1007,6 +1107,48 @@ function sheetReborn(id, again) {
       : `<button class="btn primary block rb-go" data-act="rebornDone">チームに迎え入れる</button>`);
   const b = sheetEl.querySelector('.sheet-body'); if (b) b.scrollTop = 0;
 }
+/* 優勝のお祝い (2026-10-13): the league title the moment it is certain, a cup the moment the final is won. A night stadium:
+   gold rays, confetti in the club's colours, the trophy rises (a silver plate for the league, a gold cup for the cups),
+   the club's magnet snaps on and 「優勝」 is stamped. Queue: S.cele (one pop-up each). */
+const TROPHY = {
+  j1: '<svg viewBox="0 0 120 120" aria-hidden="true"><defs><radialGradient id="ceS" cx="38%" cy="32%" r="75%"><stop offset="0" stop-color="#ffffff"/><stop offset=".45" stop-color="#d9dee4"/><stop offset="1" stop-color="#8d96a1"/></radialGradient><linearGradient id="ceR" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f4f6f8"/><stop offset="1" stop-color="#7b8590"/></linearGradient></defs><circle cx="60" cy="60" r="56" fill="url(#ceR)"/><circle cx="60" cy="60" r="49" fill="url(#ceS)"/><circle cx="60" cy="60" r="41" fill="none" stroke="#9aa3ad" stroke-width="1.4"/><circle cx="60" cy="60" r="33" fill="none" stroke="#b3bac2" stroke-width="1" stroke-dasharray="2 3"/><path d="M60 38l6.1 12.4 13.7 2-9.9 9.6 2.3 13.6L60 69.2l-12.2 6.4 2.3-13.6-9.9-9.6 13.7-2z" fill="#f3cf7a" stroke="#b8862b" stroke-width="1.2"/><path d="M27 34a40 40 0 0 1 22-14" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".8"/></svg>',
+  cup: '<svg viewBox="0 0 120 130" aria-hidden="true"><defs><linearGradient id="ceG" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#9a6a12"/><stop offset=".3" stop-color="#ffe6a3"/><stop offset=".55" stop-color="#f3c45a"/><stop offset="1" stop-color="#8a5c0e"/></linearGradient><linearGradient id="ceB" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a2a1a"/><stop offset="1" stop-color="#1a120a"/></linearGradient></defs><path d="M30 14h60v8c0 26-12 44-30 48-18-4-30-22-30-48z" fill="url(#ceG)"/><path d="M30 22c-14 0-20 8-18 18 2 11 12 18 22 19" fill="none" stroke="url(#ceG)" stroke-width="6" stroke-linecap="round"/><path d="M90 22c14 0 20 8 18 18-2 11-12 18-22 19" fill="none" stroke="url(#ceG)" stroke-width="6" stroke-linecap="round"/><rect x="54" y="70" width="12" height="18" fill="url(#ceG)"/><path d="M40 88h40l6 10H34z" fill="url(#ceG)"/><rect x="30" y="98" width="60" height="22" rx="3" fill="url(#ceB)"/><rect x="40" y="104" width="40" height="9" rx="2" fill="#d9b25a" opacity=".85"/><path d="M42 20c0 18 6 32 14 40" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".55"/><ellipse cx="60" cy="15" rx="30" ry="4" fill="#fff2c4" opacity=".7"/></svg>',
+};
+function sheetCele() {
+  const ce = S.cele && S.cele[0]; if (!ce) return;
+  sheetState = { type: 'cele' };
+  const c = S.clubs[S.my]; const kt = lum(c.c1) > 0.6 ? '#141414' : '#ffffff';
+  const league = ce.k === 'j1';
+  const title = league ? 'J1リーグ' : E.CUPS[ce.k].jp;
+  const colors = [c.c1, c.c2, '#f3cf7a', '#ffffff', c.c1, '#f3cf7a'];
+  const conf = Array.from({ length: 36 }, (_, i) => `<i style="left:${(i * 37 + 11) % 100}%;background:${colors[i % colors.length]};animation-delay:${((i * 53) % 30) / 10 + 0.6}s;animation-duration:${3.4 + (i % 7) * 0.45}s;--r:${(i * 47) % 360}deg;--dx:${((i * 29) % 60) - 30}px"></i>`).join('');
+  const opp = !league && S.clubs[ce.opp];
+  const line = league
+    ? (ce.left ? `${E.D.m(ce.d)}月${E.D.d(ce.d)}日、残り${ce.left}試合を残して優勝が決まった。` : '最後まで続いた争いを制し、頂点に立った。')
+    : `決勝で${opp ? esc(opp.name) : ''}を${ce.my}-${ce.op}${ce.pk ? `（PK ${ce.pk[0]}-${ce.pk[1]}）` : ''}で下した。`;
+  const stats = league
+    ? `<div><small>勝点</small><b>${ce.pts}</b></div><div><small>勝-分-敗</small><b class="sm">${ce.w}-${ce.dr}-${ce.l}</b></div><div><small>得失点</small><b>${ce.gf - ce.ga > 0 ? '+' : ''}${ce.gf - ce.ga}</b></div><div><small>2位と</small><b>${ce.gap}<i>差</i></b></div>`
+    : `<div class="wide"><small>決勝・${esc(ce.venue || '')}</small><b class="sm">${esc(c.short)} ${ce.my}-${ce.op} ${opp ? esc(opp.short) : ''}${ce.pk ? `<i>PK ${ce.pk[0]}-${ce.pk[1]}</i>` : ''}</b></div>`;
+  const goals = !league && ce.goals && ce.goals.length ? `<p class="ce-goals">得点　${ce.goals.map(g => `${esc(g.name)} ${g.m > 90 ? '90+' + (g.m - 90) : g.m}'`).join('、')}</p>` : '';
+  const star = league && ce.top ? `<p class="ce-goals">チーム得点王　${esc(ce.top.name)}（${ce.top.g}得点）</p>` : '';
+  const more = S.cele.length > 1;
+  openSheet(`<div class="cele ${league ? 'ce-league' : 'ce-cup'}" style="--k1:${c.c1};--k2:${c.c2};--kt:${kt}">
+      <div class="ce-rays" aria-hidden="true"></div><div class="ce-conf" aria-hidden="true">${conf}</div>
+      <div class="ce-head"><span>CHAMPIONS</span><span>${esc(E.seasonLabel(ce.season))}</span></div>
+      <div class="ce-stage">
+        <div class="ce-trophy">${league ? TROPHY.j1 : TROPHY.cup}</div>
+        <div class="ce-mag" aria-hidden="true">${esc(c.abbr || '')}</div>
+      </div>
+      <div class="ce-title"><span>${title}</span><b>優勝</b></div>
+      <h2 class="ce-club">${esc(c.name)}</h2>
+      <p class="ce-line">${line}</p>
+      <div class="ce-stats">${stats}</div>
+      ${goals}${star}
+      <div class="ce-foot"><span>クラブ${ce.n}度目の${league ? 'リーグ優勝' : title + '制覇'}</span><span>監督 ${esc(ce.mgr || S.manager)}</span></div>
+    </div>`,
+    `<button class="btn primary block ce-go" data-act="celeDone">${more ? '次へ' : '優勝を祝う'}</button>`);
+  const b = sheetEl.querySelector('.sheet-body'); if (b) b.scrollTop = 0;
+}
 const MENT_OPTS = [['def', '守備的'], ['bal', 'バランス'], ['att', '攻撃的']];
 const MENT_DESC = {
   def: '引いて守る。失点は減るが得点も減る。格上が相手ほど効果が大きい。',
@@ -1014,6 +1156,30 @@ const MENT_DESC = {
   att: '前に出て押し込む。得点も失点も増えやすい。格下相手に。',
 };
 const CTR_DESC = 'ボールを奪ったら素早く攻める。チャンスは減るが決まりやすい。相手がボールを持つほど、攻めてくるほど効く。「守備的」と組み合わせるのが定番。';
+const LINE_OPTS = [['low', '低い'], ['mid', '標準'], ['high', '高い']];
+const BUILD_OPTS = [['long', 'ロングボール'], ['mix', '標準'], ['short', 'ポゼッション']];
+const WIDTH_OPTS = [['wide', 'サイド'], ['mix', '標準'], ['center', '中央']];
+// the extra instructions (守備ライン・組み立て・攻め方・マンマーク・時間を使う). scope t = tactics screen, m = during a match.
+// ace: the player a man-marker would follow (next opponent / the opponent on the pitch now)
+function tacXBlock(x, scope, ace) {
+  const seg = (key, cur, opts) => `<div class="seg">${opts.map(([k, l]) => `<button data-act="tacx" data-s="${scope}" data-key="${key}" data-k="${k}" aria-pressed="${cur === k}">${l}</button>`).join('')}</div>`;
+  const tg = (key, on, title, sub) => `<button class="toggle" role="switch" aria-checked="${!!on}" data-act="tacx" data-s="${scope}" data-key="${key}" data-k="${on ? '' : '1'}"><span><b>${title}</b><br><span class="small muted">${sub}</span></span><span class="sw"></span></button>`;
+  return `<section class="card tacx"><div class="eyebrow">詳しい指示</div>
+    <div class="ctlrow"><label>守備ライン</label>${seg('line', x.line, LINE_OPTS)}<span class="fine">${E.LINE[x.line].sub}</span></div>
+    <div class="ctlrow"><label>組み立て</label>${seg('build', x.build, BUILD_OPTS)}<span class="fine">${E.BUILD[x.build].sub}</span></div>
+    <div class="ctlrow"><label>攻め方</label>${seg('width', x.width, WIDTH_OPTS)}<span class="fine">${E.WIDTH[x.width].sub}</span></div>
+    ${tg('mark', x.mark, '相手のエースをマンマーク', `いちばん危険なアタッカーに1人をつけて自由を奪う${ace ? `（${esc(ace)}）` : ''}。そのぶん中盤が手薄になる。`)}
+    ${tg('kill', x.kill, 'リードしたら時間を使う', '70分以降にリードしていれば、テンポを落として逃げ切る。追加点も狙いにくくなる。')}
+  </section>`;
+}
+// the next opponent's most dangerous attacker (for the man-marking note)
+function nextOpp() {
+  const nx = E.nextMyFixture(S); if (!nx) return '';
+  const opp = nx.h === S.my ? nx.a : nx.h; const c = S.clubs[opp]; if (!c) return '';
+  const F = E.FORMATIONS[c.tac.form]; let best = null, bv = -1;
+  c.tac.xi.forEach((id, i) => { const p = S.players[id]; if (!p || !F[i] || F[i][0] === 'GK') return; const v = (E.ROLE[F[i][0]].a * 3 + 0.15) * Math.pow(p.ovr / 70, 3); if (v > bv) { bv = v; best = p; } });
+  return best ? `次の${c.short}なら${best.name}` : '';
+}
 // saved tactics: load / overwrite / rename / delete, and save the current one
 function sheetPresets() {
   const c = S.clubs[S.my]; const list = c.presets || [];
@@ -1027,7 +1193,7 @@ function sheetPresets() {
       ? `<div class="row" style="gap:8px"><input class="input" id="pr-name" maxlength="16" value="${esc(pr.name)}" autocomplete="off" style="flex:1"><button class="btn" data-act="presetRename" data-i="${i}">決定</button></div>`
       : `<div class="row"><b>${esc(pr.name)}</b><span class="spacer"></span><span class="small muted">${jd(pr.d)}保存</span></div>`;
     return `<li><div class="preset">${head}
-      <div class="small muted">${pr.form}・${esc(E.mentLabel(pr))}・プレス${esc(E.PRESS[pr.press].jp)}</div>
+      <div class="small muted">${pr.form}・${esc(E.mentLabel(pr))}・プレス${esc(E.PRESS[pr.press].jp)}${E.tacLabel(pr) ? '・' + esc(E.tacLabel(pr)) : ''}</div>
       ${chips ? `<div class="row wrap">${chips}</div>` : ''}
       <div class="preset-act"><button class="btn primary" data-act="presetLoad" data-i="${i}">読み込む</button><button class="btn ghost" data-act="presetSave" data-i="${i}">上書き</button><button class="btn ghost" data-act="presetEdit" data-i="${i}">名前</button><button class="btn ghost ${ui.del === i ? 'danger' : ''}" data-act="presetDel" data-i="${i}">${ui.del === i ? '本当に削除' : '削除'}</button></div>
     </div></li>`;
@@ -1036,7 +1202,7 @@ function sheetPresets() {
   openSheet(`<div class="eyebrow">戦術の保存・読み込み</div><h2>保存した戦術<small class="muted" style="font-size:14px">　${list.length}/${E.PRESET_MAX}</small></h2>
     ${list.length ? `<ul class="list">${list.map(row).join('')}</ul>` : '<p class="fine">まだ保存した戦術はありません。</p>'}
     <section class="card" style="display:grid;gap:8px"><div class="eyebrow">今の戦術を保存</div>
-      <div class="small muted">${c.tac.form}・${esc(E.mentLabel(c.tac))}・プレス${esc(E.PRESS[c.tac.press].jp)}・先発とベンチ ${c.tac.xi.filter(Boolean).length + c.tac.bench.length}人</div>
+      <div class="small muted">${c.tac.form}・${esc(E.mentLabel(c.tac))}・プレス${esc(E.PRESS[c.tac.press].jp)}${E.tacLabel(c.tac) ? '・' + esc(E.tacLabel(c.tac)) : ''}・先発とベンチ ${c.tac.xi.filter(Boolean).length + c.tac.bench.length}人</div>
       ${full ? '<p class="fine" style="margin:0">保存枠がいっぱいです。上の「上書き」で入れ替えてください。</p>' : `<div class="row" style="gap:8px"><input class="input" id="pr-new" maxlength="16" placeholder="名前（例：格上用カウンター）" autocomplete="off" style="flex:1"><button class="btn primary" data-act="presetSave">保存</button></div>`}
     </section>
     <p class="fine">読み込むと、保存したときのフォーメーション・進め方・プレス・先発・ベンチをそのまま反映します。ケガや出場停止の選手もそのまま入るので、試合の前に自分で入れ替えてください。移籍した選手の枠は空きになります。</p>`,
@@ -1117,6 +1283,8 @@ function openSheet(body, foot) {
   requestAnimationFrame(() => requestAnimationFrame(() => { sheetEl.classList.add('on'); scrimEl.classList.add('on'); }));
 }
 function closeSheet() {
+  // a celebration closed by tapping outside counts as seen (the next one, if any, comes up)
+  if (sheetState && sheetState.type === 'cele' && S && S.cele && S.cele.length) { S.cele.shift(); persist(false); if (S.cele.length) setTimeout(sheetCele, 300); }
   sheetEl.classList.remove('on'); scrimEl.classList.remove('on'); sheetState = null;
   if (sheetOpen) { sheetOpen = false; unlockScroll(); }
   setTimeout(() => { if (!sheetEl.classList.contains('on')) { sheetEl.hidden = true; scrimEl.hidden = true; sheetEl.innerHTML = ''; } }, 230);
@@ -1128,7 +1296,10 @@ function refreshSheet() {
   if (s.type === 'presets') return sheetPresets();
   if (s.type === 'reborn') return sheetReborn(s.id, true);
   if (s.type === 'loan') return S.players[s.id] && S.players[s.id].club === S.my ? sheetLoan(s.id) : sheetPlayer(s.id);
-  if (s.type === 'player') sheetPlayer(s.id); else if (s.type === 'train') sheetTrain(s.id); else if (s.type === 'bench') sheetBench(s.id); else if (s.type === 'slot') sheetSlot(s.i); else if (s.type === 'pre') sheetPrematch(s.id); else if (s.type === 'msub') sheetMatchTactics();
+  if (s.type === 'num') return sheetNum(s.id, s.sel);
+  if (s.type === 'team') return sheetTeam(s.id, s.tab, s.back);
+  if (s.type === 'cele') return sheetCele();
+  if (s.type === 'player') sheetPlayer(s.id, s.back); else if (s.type === 'train') sheetTrain(s.id); else if (s.type === 'bench') sheetBench(s.id); else if (s.type === 'slot') sheetSlot(s.i); else if (s.type === 'pre') sheetPrematch(s.id); else if (s.type === 'msub') sheetMatchTactics();
 }
 let toastT = null;
 function toast(msg) { toastEl.textContent = msg; toastEl.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => toastEl.classList.remove('on'), 2600); }
@@ -1308,6 +1479,7 @@ function closeMatch() {
   const el = document.getElementById('mlayer'); if (el) el.remove();
   if (wasLocked) unlockScroll();
   UI.tab = 'home'; render(); window.scrollTo(0, 0);
+  if (S && S.cele && S.cele.length) setTimeout(sheetCele, 320);
 }
 function sheetMatchTactics() {
   if (!MATCH) return;
@@ -1320,6 +1492,7 @@ function sheetMatchTactics() {
   openSheet(`<div class="eyebrow">${M.min}分・${M.hg}-${M.ag}</div><h2>采配</h2>
     <div class="ctlrow"><label>攻撃の姿勢</label><div class="seg">${MENT_OPTS.map(([x, l]) => `<button data-act="mMent" data-k="${x}" aria-pressed="${sd.ment === x}">${l}</button>`).join('')}</div><span class="fine">${MENT_DESC[sd.ment] || ''}</span></div>
     <button class="toggle" role="switch" aria-checked="${!!sd.ctr}" data-act="mCtr"><span><b>カウンターを狙う</b><br><span class="small muted">${CTR_DESC}</span></span><span class="sw"></span></button>
+    ${(() => { const ace = E.markTarget(S, M, k === 'h' ? 'a' : 'h'); return tacXBlock(E.tacX(sd), 'm', ace && S.players[ace] ? S.players[ace].name : ''); })()}
     <button class="toggle" role="switch" aria-checked="${!!S.settings.autoSubs}" data-act="autoSubs"><span><b>交代はおまかせ</b><br><span class="small muted">残り交代 ${left}回</span></span><span class="sw"></span></button>
     ${subRateCtl()}
     <div class="eyebrow">${sel ? 'OUT：' + esc(S.players[sel].name) + ' → 入れる選手を選ぶ' : '下げる選手を選ぶ'}</div>
@@ -1339,6 +1512,7 @@ function go() {
   if (st.stop === 'match') sheetPrematch(st.fid);
   else if (st.stop === 'inbox') { const it = S.inbox.find(x => x.type !== 'youth'); UI.tab = 'home'; render(); window.scrollTo(0, 0); toast(it && it.type === 'scout' ? 'スカウトが戻りました' : '移籍オファーが届きました'); }
   else if (st.stop === 'note') { if (/フロント/.test(st.text)) { UI.tab = 'home'; render(); window.scrollTo(0, 0); } toast(st.text); }
+  else if (st.stop === 'cele') { persist(true); UI.tab = 'home'; render(); window.scrollTo(0, 0); sheetCele(); }
   else if (st.stop === 'seasonEnd') { persist(true); render(); sheetSeasonEnd(); }
   else if (st.stop === 'fired') { persist(true); render(); sheetFired(); }
 }
@@ -1355,7 +1529,7 @@ const ACT = {
     UI.tab = 'home'; closeSheet(); persist(true); render(); window.scrollTo(0, 0);
     toast(`${S.clubs[S.my].short}の監督に就任しました`);
   },
-  continue() { const st = pickSave(loadLocal(), Cloud.cand); if (!st) return toast('セーブデータが読み込めません'); S = E.migrate(st, DATA); UI.tab = 'home'; render(); if (Cloud.cand === st) saveLocal(); if (!S.fired && S.reborn && S.reborn.show) setTimeout(() => sheetReborn(), 320); },
+  continue() { const st = pickSave(loadLocal(), Cloud.cand); if (!st) return toast('セーブデータが読み込めません'); S = E.migrate(st, DATA); UI.tab = 'home'; render(); if (Cloud.cand === st) saveLocal(); if (!S.fired && S.cele && S.cele.length) setTimeout(sheetCele, 320); else if (!S.fired && S.reborn && S.reborn.show) setTimeout(() => sheetReborn(), 320); },
   go() { go(); },
   tab(d) { UI.tab = d.tab; if (d.tab === 'league') UI.lg.round = null; render(); window.scrollTo(0, 0); },
   closeSheet() { closeSheet(); },
@@ -1426,10 +1600,19 @@ const ACT = {
   fxDetail(d) { sheetFixture(Number(d.id)); },
   clView(d) { UI.cl.view = d.k; render(); window.scrollTo(0, 0); },
   mkPos(d) { UI.mk.pos = d.k; render(); },
-  mkFA() { UI.mk.fa = !UI.mk.fa; render(); },
+  mkWhere(d) { UI.mk.where = d.k; UI.mk.fa = false; render(); },
   mkView(d) { UI.mk.view = d.k; render(); },
   rebornNum(d) { const r = E.rebornNum(S, Number(d.id)); toast(r.msg); persist(false); if (r.ok) refreshSheet(); render(); },
   rebornDone() { if (S.reborn) delete S.reborn.show; persist(false); closeSheet(); render(); },
+  celeDone() { if (S.cele) S.cele.shift(); persist(false); if (S.cele && S.cele.length) sheetCele(); else { sheetState = null; closeSheet(); } render(); },
+  numSheet(d) { sheetNum(Number(d.id)); },
+  team(d) { sheetTeam(d.id, 'info', d.back === 'pre' ? { type: 'pre', id: Number(d.fid) } : null); },
+  teamTab(d) { const st = sheetState || {}; sheetTeam(st.id, d.k, st.back); },
+  teamPlayer(d) { const st = sheetState || {}; sheetPlayer(Number(d.id), { type: 'team', id: st.id, tab: st.tab, back: st.back }); },
+  teamBack() { const st = sheetState || {}; if (st.back && st.back.type === 'pre') sheetPrematch(st.back.id); else closeSheet(); },
+  playerBack() { const b = sheetState && sheetState.back; if (b && b.type === 'team') sheetTeam(b.id, b.tab, b.back); else closeSheet(); },
+  numPick(d) { sheetNum(Number(d.id), Number(d.n)); },
+  numSet(d) { const r = E.setNum(S, Number(d.id), Number(d.n)); toast(r.msg); if (r.ok) { persist(false); sheetPlayer(Number(d.id)); render(); } else sheetNum(Number(d.id)); },
   loanSheet(d) { sheetLoan(Number(d.id)); },
   loanGo(d) { const r = E.loanOut(S, Number(d.id), d.k); toast(r.msg); if (r.ok) { persist(true); sheetPlayer(Number(d.id)); render(); } else refreshSheet(); },
   youthDone(d) { const it = S.inbox.find(x => x.id === Number(d.id)); if (it) it.done = true; persist(false); render(); },
@@ -1483,6 +1666,13 @@ const ACT = {
   mTac() { if (!MATCH.paused && !MATCH.ht) { MATCH.paused = true; MATCH.resumeOnClose = true; clearTimeout(MATCH.timer); } MATCH.sel = null; sheetMatchTactics(); },
   mMent(d) { E.setMentality(MATCH.M, MATCH.k, d.k); refreshSheet(); },
   mCtr() { const sd = MATCH.M[MATCH.k]; E.setCounter(MATCH.M, MATCH.k, !sd.ctr); refreshSheet(); },
+  // 詳しい指示 (守備ライン・組み立て・攻め方・マンマーク・時間を使う): on the tactics screen or during a match
+  tacx(d) {
+    const v = d.key === 'mark' || d.key === 'kill' ? !!d.k : d.k;
+    if (d.s === 'm') { if (MATCH) E.setTac(MATCH.M, MATCH.k, d.key, v); refreshSheet(); return; }
+    const t = S.clubs[S.my].tac; if (d.key === 'mark' || d.key === 'kill') t[d.key] = v; else if ((d.key === 'line' && E.LINE[v]) || (d.key === 'build' && E.BUILD[v]) || (d.key === 'width' && E.WIDTH[v])) t[d.key] = v;
+    persist(false); render();
+  },
   mOut(d) { MATCH.sel = d.id ? Number(d.id) : null; refreshSheet(); },
   mIn(d) { const ok = E.doSub(S, MATCH.M, MATCH.k, MATCH.sel, Number(d.id)); if (ok) { const ev = MATCH.M.ev[MATCH.M.ev.length - 1]; feedAdd(ev); if (MATCH.viz) MATCH.viz.sync(); toast('交代しました'); } MATCH.sel = null; refreshSheet(); renderMatchCtl(); },
 };
@@ -1496,7 +1686,10 @@ scrimEl.addEventListener('click', () => closeSheet());
 document.addEventListener('input', e => {
   if (e.target && e.target.id === 'mk-q') { UI.mk.q = e.target.value; const l = document.getElementById('mk-list'); if (l) l.innerHTML = marketRows(); }
 });
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && sheetState) closeSheet(); });
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && sheetState) closeSheet();
+  if ((e.key === 'Enter' || e.key === ' ') && e.target && e.target.matches && e.target.matches('[role="button"][data-act]')) { e.preventDefault(); e.target.click(); }
+});
 
 /* ---------- boot ---------- */
 function start(hot) {
