@@ -107,6 +107,13 @@ async def main():
                             if nxt == vh: break
                             flips += 1; vh = nxt; await page.set_viewport_size({'width': w, 'height': vh}); await page.wait_for_timeout(120)
                         if vh != h or flips: print(f"   {name} {where}: viewport {vh} (screen {h}) after {flips} change(s)"); bad.append(f'{tag} {where} viewport')
+                    async def subnav(where):  # the sub-nav sits right on the dock at the top and at the end of the page
+                        for to in (0, 10**6):
+                            await page.evaluate(f'scrollTo(0, {to})'); await page.wait_for_timeout(60)
+                            r_ = await page.evaluate('''() => { const s = document.querySelector('.view > .subnav'); if (!s) return null;
+                              return [s.getBoundingClientRect().bottom, innerHeight - parseFloat(getComputedStyle(s).bottom)]; }''')
+                            if r_ and abs(r_[0] - r_[1]) > 1: print(f"   {name} {where}: sub-nav bottom {r_[0]:.0f}, want {r_[1]:.0f} ({'end' if to else 'top'})"); bad.append(f'{tag} {where} subnav')
+                        await page.evaluate('scrollTo(0, 0)')
                     async def bottom_of(sel, where):
                         await again(where)
                         b_ = await page.evaluate(f"document.querySelector('{sel}').getBoundingClientRect().bottom")
@@ -122,10 +129,13 @@ async def main():
                         if abs(g['dockBottom'] - h) > 1: q.append(f"dock bottom {g['dockBottom']:.0f} (screen {h})")
                         if g['sw'] > g['iw'] + 1: q.append('horizontal scroll')
                         if q: print(f"   {name} {tab}: {' / '.join(q)}"); bad.append(f'{tag} {tab}')
-                    # a short screen: club → 移籍市場 → ショートリスト (empty)
+                        await subnav(tab)
+                    # a short screen: club → 移籍市場 → ショートリスト (empty); its 経営/移籍市場/記録 bar used to float halfway up
                     await page.locator('[data-act="clView"][data-k="market"]').dispatch_event('click'); await page.wait_for_timeout(150)
+                    await subnav('market')
                     await page.locator('[data-act="mkView"][data-k="short"]').dispatch_event('click'); await page.wait_for_timeout(150)
                     await bottom_of('.dock', 'shortlist')
+                    await subnav('shortlist')
                     if w == 393: await page.screenshot(path=str(OUT/f"ip-short-{mode}-{w}x{h}.png"))
                     await page.locator('[data-act="clView"][data-k="main"]').dispatch_event('click'); await page.wait_for_timeout(100)
                     # an open sheet (the page is pinned while it is open)
