@@ -1,5 +1,5 @@
-// クラつく service worker — version 202610131042
-const CACHE = 'kuratsuku-202610131042';
+// クラつく service worker — version 202610131247
+const CACHE = 'kuratsuku-202610131247';
 const CORE = ['./', 'index.html', 'manifest.webmanifest', 'lz-string.min.js', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'favicon-32.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k.startsWith('kuratsuku-') && k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });

@@ -87,16 +87,20 @@ async def main(vw=390, vh=844, tag=''):
         bb = await page.locator('.formgrid').bounding_box(); bad += [] if bb and bb['width'] <= vw else ['formgrid width']
         await page.click('.formgrid [data-k="5-3-2"]'); await page.wait_for_timeout(250)
         await shot('tactics')
-        await page.locator('[data-act="tacx"][data-key="line"][data-k="low"]').click(); await page.wait_for_timeout(150)
-        await page.locator('[data-act="tacx"][data-key="build"][data-k="long"]').click(); await page.wait_for_timeout(150)
-        await page.locator('[data-act="tacx"][data-key="mark"]').click(); await page.wait_for_timeout(150)
-        await page.locator('.card.tacx').scroll_into_view_if_needed(); await page.wait_for_timeout(150)
+        await page.click('.plancard'); await page.wait_for_timeout(400)  # the 戦術 sheet
+        await page.locator('#sheet [data-act="tacx"][data-key="line"][data-k="low"]').click(); await page.wait_for_timeout(150)
+        await page.locator('#sheet [data-act="tacx"][data-key="build"][data-k="long"]').click(); await page.wait_for_timeout(150)
+        await page.locator('#sheet [data-act="tacx"][data-key="mark"]').click(); await page.wait_for_timeout(150)
+        await page.locator('#sheet .card.tacx').scroll_into_view_if_needed(); await page.wait_for_timeout(150)
         await shot('tactics-x')
         st = await page.evaluate(LOAD); t = st['clubs'][st['my']]['tac']
         print('saved tac:', t['form'], t.get('line'), t.get('build'), t.get('width'), t.get('mark'), t.get('kill'))
         bad += [] if (t['form'], t.get('line'), t.get('build'), t.get('mark')) == ('5-3-2', 'low', 'long', True) else ['tactics saved']
-        mt = await page.locator('[data-act="tacx"][data-key="mark"]').inner_text(); print('mark note:', mt.replace('\n', ' ')[:70])
+        mt = await page.locator('#sheet [data-act="tacx"][data-key="mark"]').inner_text(); print('mark note:', mt.replace('\n', ' ')[:70])
         bad += [] if '次の横浜FMなら' in mt else ['mark note names the ace']
+        await page.keyboard.press('Escape'); await page.wait_for_timeout(300)
+        plate = await page.locator('.plancard').inner_text(); print('plate:', plate.replace('\n', ' ')[:60])
+        bad += [] if 'ライン低・ロングボール・マンマーク' in plate else ['summary plate']
         # pre-match: both plans, the opponent's sheet and back
         await page.click('[data-act="go"]'); await page.wait_for_timeout(450)
         plans = await sheet.locator('.plans').inner_text(); print('plans:', plans.replace('\n', ' | '))

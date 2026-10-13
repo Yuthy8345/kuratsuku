@@ -510,6 +510,15 @@ button.tside:active { background: var(--surface2); }
 .btn.ce-go { min-height: 56px; font-size: 17px; }
 @media (prefers-reduced-motion: reduce) { .cele, .cele *, .cele::after { animation: none !important; opacity: 1; filter: none; } .cele .ce-rays { opacity: 1; } .cele .ce-conf { display: none; } }
 
+/* 戦術: the summary plate on the tactics screen (the controls are in the 戦術 sheet) */
+.plancard { display: grid; gap: 8px; width: 100%; padding: 12px 14px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); text-align: left; color: var(--ink); box-shadow: var(--mag-shadow); }
+.plancard:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0,0,0,.3); }
+.pc-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.pc-edit { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 8px; background: var(--accent-bg); color: var(--on-accent); font-size: 12px; font-weight: 900; }
+.pc-edit span { font-size: 15px; line-height: 1; }
+.pc-kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; margin: 0; font-size: 13px; }
+.pc-kv dt { color: var(--muted); }
+.pc-kv dd { margin: 0; font-weight: 700; text-align: right; min-width: 0; }
 /* bench: magnets on the board, three to a row */
 .bgrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .btile { position: relative; display: grid; justify-items: center; align-content: start; gap: 4px; min-width: 0; padding: 12px 6px 10px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); text-align: center; color: var(--ink); }
@@ -4257,19 +4266,38 @@ function viewTactics() {
     <div class="formgrid" role="group" aria-label="フォーメーション">${Object.keys(E.FORMATIONS).map(f => `<button data-act="form" data-k="${f}" aria-pressed="${c.tac.form === f}">${f}</button>`).join('')}</div>
     <p class="fine" style="margin:-6px 0 0">${esc(E.FORM_DESC[c.tac.form] || '')}</p>
     <div class="pitch">${PITCH_SVG}${toks}</div>
+    <p class="fine" style="margin:-4px 0 0">選手をタップすると入れ替えられます。「!」は適性が低いポジションか疲れている選手、「×」はケガや出場停止で出られない選手です。</p>
+    ${planCard(c)}
     <button class="btn ghost block" data-act="presets">戦術の保存・読み込み<span class="small muted">　${(c.presets || []).length}/${E.PRESET_MAX}</span></button>
-    <p class="fine">選手をタップすると入れ替えられます。「!」は適性が低いポジションか疲れている選手、「×」はケガや出場停止で出られない選手です。</p>
+    <h3 class="sec-h">ベンチ（${c.tac.bench.length}/${E.BENCH_SIZE}人）<small>自動では入れ替わりません</small></h3>
+    <p class="fine" style="margin:-6px 0 0">選手をタップすると、ベンチ外の選手と入れ替えられます。</p>
+    <div class="bgrid" role="list" aria-label="ベンチ">${c.tac.bench.map(id => benchTile(S.players[id], c)).join('')}${Array.from({ length: Math.max(0, E.BENCH_SIZE - c.tac.bench.length) }, () => `<button class="btile addrow" role="listitem" data-act="benchPick" data-id="0" aria-label="ベンチに加える"><span class="bt-mag">+</span><b class="bt-name">ベンチに加える</b><span class="bt-meta">空き枠</span></button>`).join('')}</div>
+    <button class="btn ghost block" data-act="benchAuto">ベンチをおまかせで組み直す</button>
+    <div class="subnav"><button class="btn primary block" data-act="autoXI">おまかせでベストメンバーを組む</button></div>`;
+}
+// 戦術 (posture, counter, press, the extra instructions, substitutions): a summary plate on the tactics screen; the
+// controls live in their own sheet so the board and the bench come one after the other
+function planCard(c) {
+  const t = c.tac, x = E.tacLabel(t);
+  const subs = S.settings.autoSubs ? `おまかせ（${(E.SUB_RATE[S.settings.subRate] || E.SUB_RATE.mid).jp}）` : '自分で選ぶ';
+  return `<button class="plancard" data-act="plan" aria-label="戦術を変える">
+    <span class="pc-head"><span class="eyebrow">戦術</span><span class="pc-edit">変える<span aria-hidden="true">›</span></span></span>
+    <dl class="pc-kv"><dt>攻撃の姿勢</dt><dd>${esc(E.mentLabel(t))}</dd><dt>プレス</dt><dd>${esc((E.PRESS[t.press] || E.PRESS.mid).jp)}</dd><dt>詳しい指示</dt><dd>${x ? esc(x) : '標準'}</dd><dt>交代</dt><dd>${subs}</dd></dl>
+  </button>`;
+}
+function sheetPlan() {
+  const c = S.clubs[S.my];
+  sheetState = { type: 'plan' };
+  const seg = (act, cur, opts) => `<div class="seg">${opts.map(([k, l]) => `<button data-act="${act}" data-k="${k}" aria-pressed="${cur === k}">${l}</button>`).join('')}</div>`;
+  openSheet(`<div class="eyebrow">${esc(c.short)}・${c.tac.form}</div><h2>戦術</h2>
     <div class="ctlrow"><label>攻撃の姿勢</label>${seg('ment', c.tac.ment, MENT_OPTS)}<span class="fine">${MENT_DESC[c.tac.ment] || ''}</span></div>
     <button class="toggle" role="switch" aria-checked="${!!c.tac.ctr}" data-act="ctr"><span><b>カウンターを狙う</b><br><span class="small muted">${CTR_DESC}</span></span><span class="sw"></span></button>
     <div class="ctlrow"><label>プレスの強度（高いほど中盤で優位、ただし消耗）</label>${seg('press', c.tac.press, [['low', '低'], ['mid', '中'], ['high', '高']])}</div>
     ${tacXBlock(E.tacX(c.tac), 't', nextOpp())}
     <button class="toggle" role="switch" aria-checked="${!!S.settings.autoSubs}" data-act="autoSubs"><span><b>交代はおまかせ</b><br><span class="small muted">オフにすると試合中に自分で交代を選びます</span></span><span class="sw"></span></button>
     ${subRateCtl()}
-    <h3 class="sec-h">ベンチ（${c.tac.bench.length}/${E.BENCH_SIZE}人）<small>自動では入れ替わりません</small></h3>
-    <p class="fine" style="margin:-6px 0 0">選手をタップすると、ベンチ外の選手と入れ替えられます。</p>
-    <div class="bgrid" role="list" aria-label="ベンチ">${c.tac.bench.map(id => benchTile(S.players[id], c)).join('')}${Array.from({ length: Math.max(0, E.BENCH_SIZE - c.tac.bench.length) }, () => `<button class="btile addrow" role="listitem" data-act="benchPick" data-id="0" aria-label="ベンチに加える"><span class="bt-mag">+</span><b class="bt-name">ベンチに加える</b><span class="bt-meta">空き枠</span></button>`).join('')}</div>
-    <button class="btn ghost block" data-act="benchAuto">ベンチをおまかせで組み直す</button>
-    <div class="subnav"><button class="btn primary block" data-act="autoXI">おまかせでベストメンバーを組む</button></div>`;
+    <p class="fine" style="margin:0">変えた内容はすぐに反映されます。試合中も「采配」から変えられます。</p>`,
+    '<button class="btn primary block" data-act="closeSheet">閉じる</button>');
 }
 // the bench as magnets on the board, three to a row: number magnet in the club's colours, name, position, age, rating,
 // condition; × = can't play (injury / suspension), ! = tired
@@ -4868,6 +4896,8 @@ function closeSheet() {
   setTimeout(() => { if (!sheetEl.classList.contains('on')) { sheetEl.hidden = true; scrimEl.hidden = true; sheetEl.innerHTML = ''; } }, 230);
   if (MATCH && MATCH.resumeOnClose) { MATCH.resumeOnClose = false; MATCH.paused = false; tickLoop(); renderMatchCtl(); }
 }
+// a tactics setting changed: redraw the screen behind and, if it is open, the 戦術 sheet
+function planRefresh() { render(); if (sheetState && sheetState.type === 'plan') refreshSheet(); }
 function refreshSheet() {
   if (!sheetState) return;
   const s = sheetState;
@@ -4875,6 +4905,7 @@ function refreshSheet() {
   if (s.type === 'reborn') return sheetReborn(s.id, true);
   if (s.type === 'loan') return S.players[s.id] && S.players[s.id].club === S.my ? sheetLoan(s.id) : sheetPlayer(s.id);
   if (s.type === 'num') return sheetNum(s.id, s.sel);
+  if (s.type === 'plan') return sheetPlan();
   if (s.type === 'team') return sheetTeam(s.id, s.tab, s.back);
   if (s.type === 'cele') return sheetCele();
   if (s.type === 'player') sheetPlayer(s.id, s.back); else if (s.type === 'train') sheetTrain(s.id); else if (s.type === 'bench') sheetBench(s.id); else if (s.type === 'slot') sheetSlot(s.i); else if (s.type === 'pre') sheetPrematch(s.id); else if (s.type === 'msub') sheetMatchTactics();
@@ -5122,12 +5153,13 @@ const ACT = {
   setTi(d) { const p = S.players[d.id]; p.ti = d.k; persist(false); refreshSheet(); render(); },
   setLearn(d) { const p = S.players[d.id]; if (!d.k) p.learn = null; else if (!p.learn || p.learn.pos !== d.k) p.learn = { pos: d.k }; persist(false); refreshSheet(); render(); },
   form(d) { reslot(d.k); persist(false); render(); },
-  ment(d) { S.clubs[S.my].tac.ment = d.k; persist(false); render(); },
-  ctr() { const t = S.clubs[S.my].tac; t.ctr = !t.ctr; persist(false); render(); },
-  press(d) { S.clubs[S.my].tac.press = d.k; persist(false); render(); },
-  autoSubs() { S.settings.autoSubs = !S.settings.autoSubs; persist(false); if (sheetState && sheetState.type === 'msub') refreshSheet(); else render(); },
+  plan() { sheetPlan(); },
+  ment(d) { S.clubs[S.my].tac.ment = d.k; persist(false); planRefresh(); },
+  ctr() { const t = S.clubs[S.my].tac; t.ctr = !t.ctr; persist(false); planRefresh(); },
+  press(d) { S.clubs[S.my].tac.press = d.k; persist(false); planRefresh(); },
+  autoSubs() { S.settings.autoSubs = !S.settings.autoSubs; persist(false); if (sheetState && sheetState.type === 'msub') refreshSheet(); else planRefresh(); },
   boardLv(d) { S.settings.boardLv = d.k; persist(false); render(); },
-  subRate(d) { S.settings.subRate = d.k; persist(false); if (sheetState && sheetState.type === 'msub') refreshSheet(); else render(); },
+  subRate(d) { S.settings.subRate = d.k; persist(false); if (sheetState && sheetState.type === 'msub') refreshSheet(); else planRefresh(); },
   autoXI() { E.autoLineup(S, S.my); persist(false); render(); toast('ベストメンバーを組みました'); },
   benchPick(d) { sheetBench(Number(d.id)); },
   benchIn(d) {
@@ -5249,7 +5281,7 @@ const ACT = {
     const v = d.key === 'mark' || d.key === 'kill' ? !!d.k : d.k;
     if (d.s === 'm') { if (MATCH) E.setTac(MATCH.M, MATCH.k, d.key, v); refreshSheet(); return; }
     const t = S.clubs[S.my].tac; if (d.key === 'mark' || d.key === 'kill') t[d.key] = v; else if ((d.key === 'line' && E.LINE[v]) || (d.key === 'build' && E.BUILD[v]) || (d.key === 'width' && E.WIDTH[v])) t[d.key] = v;
-    persist(false); render();
+    persist(false); planRefresh();
   },
   mOut(d) { MATCH.sel = d.id ? Number(d.id) : null; refreshSheet(); },
   mIn(d) { const ok = E.doSub(S, MATCH.M, MATCH.k, MATCH.sel, Number(d.id)); if (ok) { const ev = MATCH.M.ev[MATCH.M.ev.length - 1]; feedAdd(ev); if (MATCH.viz) MATCH.viz.sync(); toast('交代しました'); } MATCH.sel = null; refreshSheet(); renderMatchCtl(); },

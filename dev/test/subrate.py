@@ -33,6 +33,7 @@ async def main():
         await page.click('text=新しく始める'); await page.click('[data-id="okayama"]'); await page.wait_for_timeout(350)
         await page.click('[data-act="nameClub"]'); await page.wait_for_timeout(250); await page.click('#sheet [data-act="startClub"]'); await page.wait_for_timeout(500)
         await page.click('[data-tab="tactics"]'); await page.wait_for_timeout(250)
+        await page.click('.plancard'); await page.wait_for_timeout(400)  # the settings live in the 戦術 sheet
         async def state(scope=''):  # in a match the tactics screen is still under the overlay, so look inside the sheet
             btns = await page.locator(f'{scope} [data-act="subRate"]'.strip()).all()
             pressed = [await x.inner_text() for x in btns if await x.get_attribute('aria-pressed') == 'true']
@@ -69,7 +70,7 @@ async def main():
         await page.goto('file://' + str(ROOT/'test/page.html')); await page.wait_for_timeout(500)
         if await page.locator('[data-act="continue"]').count(): await page.click('[data-act="continue"]'); await page.wait_for_timeout(400)
         if await page.locator('[data-tab="tactics"]').count():
-            await page.click('[data-tab="tactics"]'); await page.wait_for_timeout(250)
+            await page.click('[data-tab="tactics"]'); await page.wait_for_timeout(250); await page.click('.plancard'); await page.wait_for_timeout(400)
             n, pr = await state(); print('old save ->', pr); bad += [] if pr == ['ふつう'] else ['old save']
         else: print('old save: not on the club screen (match in progress?)')
         print('\n'.join(errs) or 'no errors')

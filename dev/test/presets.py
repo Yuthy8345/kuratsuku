@@ -23,8 +23,10 @@ async def main():
         await page.click('[data-act="nameClub"]'); await page.wait_for_timeout(250); await page.click('#sheet [data-act="startClub"]'); await page.wait_for_timeout(400)
         await page.click('[data-tab="tactics"]'); await page.wait_for_timeout(200)
         # preset A: the opening XI, counter
-        await page.click('[data-act="ment"][data-k="def"]'); await page.wait_for_timeout(150)
-        await page.click('[data-act="ctr"]'); await page.wait_for_timeout(150)
+        await page.click('.plancard'); await page.wait_for_timeout(400)
+        await page.click('#sheet [data-act="ment"][data-k="def"]'); await page.wait_for_timeout(150)
+        await page.click('#sheet [data-act="ctr"]'); await page.wait_for_timeout(150)
+        await page.keyboard.press('Escape'); await page.wait_for_timeout(300)
         await page.click('[data-act="presets"]'); await page.wait_for_timeout(350)
         await page.fill('#pr-new', '格上用カウンター'); await page.click('#sheet [data-act="presetSave"]'); await page.wait_for_timeout(250)
         st = await page.evaluate(LOAD); A = st['clubs']['urawa']['presets'][0]
@@ -33,7 +35,9 @@ async def main():
         # preset B: another shape and best XI, attacking
         await page.click('.formgrid [data-k="3-4-2-1"]'); await page.wait_for_timeout(200)
         await page.click('[data-act="autoXI"]'); await page.wait_for_timeout(200)
-        await page.click('[data-act="ment"][data-k="att"]'); await page.wait_for_timeout(150)
+        await page.click('.plancard'); await page.wait_for_timeout(400)
+        await page.click('#sheet [data-act="ment"][data-k="att"]'); await page.wait_for_timeout(150)
+        await page.keyboard.press('Escape'); await page.wait_for_timeout(300)
         await page.click('[data-act="presets"]'); await page.wait_for_timeout(350)
         await page.click('#sheet [data-act="presetSave"]:not([data-i])'); await page.wait_for_timeout(250)
         st = await page.evaluate(LOAD); print('presets', [(x['name'], x['form']) for x in st['clubs']['urawa']['presets']])
