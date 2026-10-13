@@ -700,12 +700,23 @@ function viewTactics() {
     ${subRateCtl()}
     <h3 class="sec-h">ベンチ（${c.tac.bench.length}/${E.BENCH_SIZE}人）<small>自動では入れ替わりません</small></h3>
     <p class="fine" style="margin:-6px 0 0">選手をタップすると、ベンチ外の選手と入れ替えられます。</p>
-    <ul class="list">${c.tac.bench.map(id => benchRow(S.players[id])).join('')}${c.tac.bench.length < E.BENCH_SIZE ? `<li><button class="prow addrow" data-act="benchPick" data-id="0"><span class="no">+</span><span class="nm"><b>ベンチに加える</b><span>空き ${E.BENCH_SIZE - c.tac.bench.length}枠</span></span></button></li>` : ''}</ul>
+    <div class="bgrid" role="list" aria-label="ベンチ">${c.tac.bench.map(id => benchTile(S.players[id], c)).join('')}${Array.from({ length: Math.max(0, E.BENCH_SIZE - c.tac.bench.length) }, () => `<button class="btile addrow" role="listitem" data-act="benchPick" data-id="0" aria-label="ベンチに加える"><span class="bt-mag">+</span><b class="bt-name">ベンチに加える</b><span class="bt-meta">空き枠</span></button>`).join('')}</div>
     <button class="btn ghost block" data-act="benchAuto">ベンチをおまかせで組み直す</button>
     <div class="subnav"><button class="btn primary block" data-act="autoXI">おまかせでベストメンバーを組む</button></div>`;
 }
-function benchRow(p) {
-  return prow(p).replace('data-act="player"', 'data-act="benchPick"').replace('<span class="chip">ベンチ</span>', '');
+// the bench as magnets on the board, three to a row: number magnet in the club's colours, name, position, age, rating,
+// condition; × = can't play (injury / suspension), ! = tired
+function benchTile(p, c) {
+  const kt = lum(c.c1) > 0.6 ? '#141414' : '#ffffff';
+  const out = !E.available(p), tired = !out && p.cond < 70;
+  const st = out ? `<span class="chip warn">${p.inj > 0 ? `負傷 ${p.inj}日` : '出場停止'}</span>` : p.hot ? '<span class="chip fire">燃えている</span>' : p.reborn ? '<span class="chip rbchip">転生</span>' : '';
+  return `<button class="btile${out ? ' out' : ''}${p.hot ? ' hot' : ''}" role="listitem" data-act="benchPick" data-id="${p.id}" aria-label="ベンチ ${esc(p.name)} ${dpOf(p)} 能力${E.ovr(p)}${out ? ' ' + outShort(p) : ''}">
+    <span class="bt-ovr ${oc(p.ovr)}">${E.ovr(p)}</span>
+    <span class="bt-mag${tired ? ' warn' : ''}" style="--k1:${c.c1};--k2:${c.c2};--kt:${kt}">${p.num}</span>
+    <b class="bt-name">${esc(p.name)}</b>
+    <span class="bt-meta">${posTag(p)}${E.age(p, S.date)}歳</span>
+    ${st ? `<span class="bt-st">${st}</span>` : condBar(p.cond)}
+  </button>`;
 }
 function sheetBench(outId) {
   const c = S.clubs[S.my]; const o = S.players[outId];
