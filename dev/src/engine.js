@@ -99,7 +99,17 @@ const TRAINING = {
 // rises when they play (開花): about +2 potential a season for a 21-or-under regular (scaled by how well they play; only with
 // 25%+ of the minutes), +6 in a career. Other clubs' youngsters bloom at 40% of that (they don't plan minutes around them),
 // which keeps the league from filling up with stars over the seasons.
-const GROW = { youngBase: 0.9, youngPlay: 1.3, oldBase: 0.8, oldPlay: 0.45, gMax: 0.08, bloom21: 0.045, bloom23: 0.02, bloomMin: 0.25, bloomMax: 6, bloomAI: 0.4, potMax: 93 };
+// 2026-10-13 balance: the ceiling (最大 = p.pot) of everyone but the 転生 players stops at potMax (90) unless the player
+// carries his own p.cap (a rare talent: 91〜95, or 三井寺 93). Real players (data, !p.gen) aged 20〜29 close the gap to
+// their ceiling faster (realK, by age) so they keep up with the academy.
+const GROW = { youngBase: 0.9, youngPlay: 1.3, oldBase: 0.8, oldPlay: 0.45, gMax: 0.08, bloom21: 0.045, bloom23: 0.02, bloomMin: 0.25, bloomMax: 3, bloomAI: 0.4, potMax: 90,
+  realK: [[19, 0.06], [22, 0.07], [29, 0.08]] };
+// a rare talent: his ceiling may pass 90 (p.cap 91〜95). Chance per academy graduate / per ユースの逸材.
+const RARE = { youth: 0.012, gem: 0.12, cap: [91, 95] };
+// the most he can ever reach (the 転生 players: the legend's own ceiling, 100+)
+function potCap(p) { return p.cap || GROW.potMax; }
+function attrMax(p) { return potCap(p) > 95 ? potCap(p) + 15 : 97; }
+function ovrMax(p) { return potCap(p) > 95 ? potCap(p) + 5 : 95; }
 const FACILITY = {
   train: { jp: '練習場', desc: '選手の成長スピードが上がる' },
   youth: { jp: 'ユース', desc: '昇格してくる若手の質と人数が上がる' },
@@ -281,13 +291,15 @@ function migrate(S, DATA) {
   for (const p of Object.values(S.players)) if (!p.at) initAttrs(p);
   // data corrections (e.g. verified birthdates) flow into existing saves
   if (DATA && DATA.players) for (const d of DATA.players) { const q = S.players[d.id]; if (q && q.name === d.name && q.birth !== d.birth) q.birth = d.birth; }
-  // rating corrections by data revision (d.fix = {r, d}: added to the rating in that revision). Growth since then is kept.
+  // rating corrections by data revision (d.fix = {r, d, dr}: r = the latest revision that touched him, d = added to the
+  // rating in revision dr (r when missing); the potential is raised to the data's). Growth since then is kept.
   if (DATA && DATA.players && (S.dataRev || 1) < (DATA.rev || 1)) {
     const from = S.dataRev || 1; let n = 0;
     for (const d of DATA.players) {
       const q = S.players[d.id]; if (!q || q.name !== d.name || !d.fix || d.fix.r <= from) continue;
       if (!q.at) initAttrs(q);
-      const k = d.fix.d || 0;
+      if (d.cap) q.cap = d.cap;
+      const k = (d.fix.dr || d.fix.r) > from ? d.fix.d || 0 : 0;
       if (k) {
         q.at = q.at.map(x => Math.round(clamp(x + k, 15, 97) * 100) / 100); q.ovr = clamp(calcOvr(q), 30, 95);
         if (q.at0) q.at0 = q.at0.map(x => Math.round(clamp(x + k, 15, 97) * 100) / 100);
@@ -370,7 +382,18 @@ function migrate(S, DATA) {
     if (p.pot0 == null) p.pot0 = p.pot;  // 開花 is measured from here
     if (p.at && (p.club === S.my || (p.loan && p.loan.from === S.my))) track(S, p);
   }
-  S.v = Math.max(S.v || 1, 7);
+  // v8 (2026-10-13 balance): every club remembers its academy level (c.base); a 転生 player gets the legend's 100+ ceiling;
+  // everyone else's ceiling stops at 90 (p.cap: 三井寺 93). Nobody loses what he can already do — the ceiling only
+  // stops at his current rating when that is higher.
+  if ((S.v || 1) < 8) {
+    for (const c of Object.values(S.clubs)) if (c.base == null) c.base = (src[c.id] && src[c.id].base) || (63 + (c.tier || 2));
+    for (const p of Object.values(S.players)) {
+      const L = p.reborn && legendOf(p.reborn);
+      if (L) { p.cap = L.pot; const pb = p.pot; p.pot = Math.max(p.pot, L.pot); if (p.pot0 != null) p.pot0 += p.pot - pb; continue; }
+      if (p.pot > potCap(p)) { p.pot = Math.max(potCap(p), Math.ceil(p.ovr)); if (p.pot0 != null && p.pot0 > p.pot) p.pot0 = p.pot; }
+    }
+  }
+  S.v = Math.max(S.v || 1, 8);
   return S;
 }
 // how good the player is in each detailed position (rested, form left out)
@@ -392,16 +415,19 @@ function devWeek(S, p, dry) {
   const gap = p.pot - p.ovr;
   let g = 0;
   if (gap > 0) {
-    const k = a <= 19 ? 0.055 : a <= 22 ? 0.045 : a <= 25 ? 0.03 : 0.015;
-    // playing time: regulars grow faster, young regulars much faster
+    const rb = p.reborn ? REBORN.grow : null;
+    const k = rb ? (rb.k.find(x => a <= x[0]) || [0, rb.kOld])[1]
+      : !p.gen ? (GROW.realK.find(x => a <= x[0]) || [0, 0.015])[1]
+      : a <= 19 ? 0.055 : a <= 22 ? 0.045 : a <= 25 ? 0.03 : 0.015;
+    // playing time: regulars grow faster, young regulars much faster (a 転生 player grows well even from the bench)
     const sh = shareFor(S, p);
-    const playing = sh == null ? 1 : a <= 23 ? GROW.youngBase + sh * GROW.youngPlay : GROW.oldBase + sh * GROW.oldPlay;
+    const playing = sh == null ? 1 : rb ? rb.base + sh * rb.play : a <= 23 ? GROW.youngBase + sh * GROW.youngPlay : GROW.oldBase + sh * GROW.oldPlay;
     const tr = isMy ? TRAINING[S.training] || TRAINING.bal : TRAINING.bal;
     const trg = tr.young ? (a <= 23 ? tr.young : tr.rest) : tr.grow;
     const fac = p.loan ? 2 : c.fac.train;  // on loan: an average J2 training ground
     // a big gap (a 16-year-old prodigy) closes over a few seasons rather than in one: the base rate is capped,
     // and playing time, the team menu and the intensity still multiply on top
-    g = Math.min(gap * k / 4.33 * (1 + (fac - 2) * 0.12), GROW.gMax) * playing * trg * it.g;
+    g = Math.min(gap * k / 4.33 * (1 + (fac - 2) * 0.12), rb ? rb.gMax : GROW.gMax) * playing * trg * it.g;
     if (p.learn) g *= 0.75;
   }
   // 開花: playing young players raise their own ceiling (how much depends on minutes and how well they play)
@@ -411,18 +437,19 @@ function devWeek(S, p, dry) {
       const apps = p.st.apps || 0, avg = apps ? p.st.rt / apps : 6.5;
       const perf = apps >= 3 ? clamp(1 + (avg - 6.5) * 0.6, 0.5, 1.6) : 1;
       const add = sh * (a <= 21 ? GROW.bloom21 : GROW.bloom23) * perf * (isMy || p.loan ? 1 : GROW.bloomAI);
-      const room = Math.min(GROW.potMax - p.pot, GROW.bloomMax - (p.bloom || 0));
+      const room = Math.min(potCap(p) - p.pot, GROW.bloomMax - (p.bloom || 0));
       if (room > 0) { const x = Math.min(add, room); p.pot += x; p.bloom = (p.bloom || 0) + x; }
     }
   }
   const w = AW[p.pos]; const f = FOCUS[tf] && FOCUS[tf].v;
   const d = w.map((wi, i) => f ? 0.4 * wi + 0.6 * (f[i] || 0) : wi);
   const T = g / AW_SQ[p.pos];
+  const aMax = attrMax(p);
   for (let i = 0; i < 9; i++) {
     if (!d[i]) continue;
     const cap = p.pot + 10;
     const mult = clamp((cap - at[i]) / 12, 0.05, 1);
-    at[i] = Math.min(97, at[i] + T * d[i] * mult);
+    at[i] = Math.min(aMax, at[i] + T * d[i] * mult);
   }
   // ageing: legs go first, the head keeps improving for a while
   if (a >= 30) {
@@ -431,12 +458,12 @@ function devWeek(S, p, dry) {
     for (const i of [0, 1, 2, 3, 8]) at[i] -= (a - 29) * 0.008 * r2;
   }
   if (a >= 24 && a <= 33 && at[7] < p.pot + 6) at[7] += 0.012;
-  for (let i = 0; i < 9; i++) at[i] = clamp(at[i], 15, 97);
+  for (let i = 0; i < 9; i++) at[i] = clamp(at[i], 15, aMax);
   const before = p.ovr;
   const nOvr = calcOvr({ pos: p.pos, at });
   if (dry) return { dOvr: nOvr - before, dAt: at.map((x, i) => x - p.at[i]) };
   p.at = at.map(x => Math.round(x * 100) / 100);
-  p.ovr = clamp(calcOvr(p), 30, 95);
+  p.ovr = clamp(calcOvr(p), 30, ovrMax(p));
   if (p.ovr > p.pot) p.pot = Math.ceil(p.ovr);
   // position retraining: aptitude in the chosen position climbs toward LEARN_MAX
   if (p.learn) {
@@ -471,7 +498,7 @@ function growthOutlook(S, p, share, weeks, loanTo) {
     const r = devWeek(S2, q, true); if (!r) break;
     q.at = q.at.map((x, i) => x + r.dAt[i]); q.ovr = calcOvr(q);
     const a = age(q, S2.date);
-    if (a <= 23 && share >= GROW.bloomMin) { const add = share * (a <= 21 ? GROW.bloom21 : GROW.bloom23) * (mine ? 1 : GROW.bloomAI); const room = Math.min(GROW.potMax - q.pot, GROW.bloomMax - (q.bloom || 0)); if (room > 0) { q.pot += Math.min(add, room); q.bloom = (q.bloom || 0) + Math.min(add, room); } }
+    if (a <= 23 && share >= GROW.bloomMin) { const add = share * (a <= 21 ? GROW.bloom21 : GROW.bloom23) * (mine ? 1 : GROW.bloomAI); const room = Math.min(potCap(q) - q.pot, GROW.bloomMax - (q.bloom || 0)); if (room > 0) { q.pot += Math.min(add, room); q.bloom = (q.bloom || 0) + Math.min(add, room); } }
     if (q.ovr > q.pot) q.pot = q.ovr;
   }
   return { ovr: q.ovr, pot: q.pot };
@@ -488,7 +515,7 @@ function yearsTo(S, p, share, target) {
     const r = devWeek(S2, q, true); if (!r) return null;
     q.at = q.at.map((x, i) => x + r.dAt[i]); q.ovr = calcOvr(q);
     const a = age(q, S2.date);
-    if (a <= 23 && share >= GROW.bloomMin) { const add = share * (a <= 21 ? GROW.bloom21 : GROW.bloom23); const room = Math.min(GROW.potMax - q.pot, GROW.bloomMax - (q.bloom || 0)); if (room > 0) { q.pot += Math.min(add, room); q.bloom = (q.bloom || 0) + Math.min(add, room); } }
+    if (a <= 23 && share >= GROW.bloomMin) { const add = share * (a <= 21 ? GROW.bloom21 : GROW.bloom23); const room = Math.min(potCap(q) - q.pot, GROW.bloomMax - (q.bloom || 0)); if (room > 0) { q.pot += Math.min(add, room); q.bloom = (q.bloom || 0) + Math.min(add, room); } }
     if (q.ovr >= target) return Math.round(w / 52 * 2) / 2 || 0.5;
   }
   return null;
@@ -526,7 +553,7 @@ function newGame(DATA, clubId, managerName, todayISO) {
     delete S.players[p.id].fix;
     initAttrs(S.players[p.id]);
   }
-  S.v = 7; S.presV = 4;
+  S.v = 8; S.presV = 4;
   for (const p of squad(S, clubId)) track(S, p);
   for (const id of S.order) autoLineup(S, id);
   S.fixtures = genFixtures(S.order, DATA.round1, sy);
@@ -544,7 +571,7 @@ function addClub(S, c, guest) {
   const startFunds = [0, 30000, 50000, 80000, 120000, 180000][c.tier];
   S.clubs[c.id] = {
     id: c.id, name: c.name, short: c.short, abbr: c.abbr, c1: c.c1, c2: c.c2, stadium: c.stadium, cap: c.cap,
-    coach: c.coach || '', tier: c.tier, fan: c.fan, area: c.area,
+    coach: c.coach || '', tier: c.tier, fan: c.fan, area: c.area, base: c.base || (63 + (c.tier || 2)),
     pres: c.pres || 2, titles: Object.assign({ j1: 0, lc: 0, ec: 0, acl: 0 }, c.titles || {}), o10: !!c.o10,
     funds: startFunds, fac: { train: 2, youth: 2, stadium: 2, medical: 2, scout: 1 },
     tac: { form: FORMATIONS[c.form] ? c.form : '4-4-2', ment: 'bal', press: 'mid', xi: [], bench: [] },
@@ -1413,91 +1440,94 @@ function bid(S, pid, mult) {
    (met) and for each title (title), certain once `pity` draws in a row have missed. Each legend once per save.
    Names are made up in the style of the real ones (中村俊輔 → 外町俊之輔); the pop-up tells who he was through the
    number, the era and the epithet. Retired players only (deceased: only on request, e.g. yfm4). num: the number he made his own (null if none). */
-const REBORN = { base: 0.25, met: 0.15, title: 0.2, pity: 2, ovr: [62, 66] };
+// grow: how a 転生 player develops — his ceiling is the legend's (100〜108), the weekly base rate is capped higher than a
+// normal prodigy's (gMax) and he grows well even from the bench (base + share × play), so a few seasons make him a star
+const REBORN = { base: 0.25, met: 0.15, title: 0.2, pity: 2, ovr: [62, 66],
+  grow: { k: [[19, 0.06], [22, 0.055], [26, 0.045]], kOld: 0.02, gMax: 0.13, base: 1.0, play: 0.6 } };
 const LEGENDS = {
   yokohamafm: [
-    { id: 'yfm1', name: '外町 俊之輔', pp: 'OMF', sty: 'tech', num: 25, era: '1997–2016', epi: 'ハマの左足', line: '左足ひとつで試合を変えた。フリーキックの名手にしてファンタジスタ。', pot: 90 },
-    { id: 'yfm4', name: '梅田 直輝', pp: 'CB', sty: 'phys', num: 3, era: '1995–2010', epi: 'トリコロールの闘将', line: '誰よりも熱く、誰よりも勝利を求めた。マリノスの背番号3。', pot: 87 },
-    { id: 'yfm2', name: '奥澤 佑仁', pp: 'CB', sty: 'phys', num: 22, era: '2002–2018', epi: '不屈のボンバー', line: '空中戦で負けない。長く最終ラインに立ち続けた柱。', pot: 87 },
-    { id: 'yfm3', name: '井野 正己', pp: 'CB', sty: '', num: 4, era: '1990–1999', epi: 'アジアの壁', line: '読みと統率で守備をまとめ上げたリベロ。', pot: 86 },
+    { id: 'yfm1', name: '外町 俊之輔', pp: 'OMF', sty: 'tech', num: 25, era: '1997–2016', epi: 'ハマの左足', line: '左足ひとつで試合を変えた。フリーキックの名手にしてファンタジスタ。', pot: 108 },
+    { id: 'yfm4', name: '梅田 直輝', pp: 'CB', sty: 'phys', num: 3, era: '1995–2010', epi: 'トリコロールの闘将', line: '誰よりも熱く、誰よりも勝利を求めた。マリノスの背番号3。', pot: 105 },
+    { id: 'yfm2', name: '奥澤 佑仁', pp: 'CB', sty: 'phys', num: 22, era: '2002–2018', epi: '不屈のボンバー', line: '空中戦で負けない。長く最終ラインに立ち続けた柱。', pot: 105 },
+    { id: 'yfm3', name: '井野 正己', pp: 'CB', sty: '', num: 4, era: '1990–1999', epi: 'アジアの壁', line: '読みと統率で守備をまとめ上げたリベロ。', pot: 104 },
   ],
   kashima: [
-    { id: 'ksm1', name: '大笠原 満夫', pp: 'CMF', sty: 'tech', num: 40, era: '1998–2018', epi: '常勝の背番号40', line: '黙々とタイトルを積み上げた、中盤の主。', pot: 88 },
-    { id: 'ksm2', name: '春田 豊', pp: 'CB', sty: 'phys', num: 3, era: '1993–2003', epi: '空中戦の鬼', line: 'ヘディングで跳ね返し続けた闘将。', pot: 85 },
-    { id: 'ksm3', name: '桜沢 敦史', pp: 'ST', sty: 'speed', num: 13, era: '1996–2007', epi: '動き出しの天才', line: 'ひと呼吸早い動き出しで、何度も裏を取ったストライカー。', pot: 86 },
+    { id: 'ksm1', name: '大笠原 満夫', pp: 'CMF', sty: 'tech', num: 40, era: '1998–2018', epi: '常勝の背番号40', line: '黙々とタイトルを積み上げた、中盤の主。', pot: 106 },
+    { id: 'ksm2', name: '春田 豊', pp: 'CB', sty: 'phys', num: 3, era: '1993–2003', epi: '空中戦の鬼', line: 'ヘディングで跳ね返し続けた闘将。', pot: 103 },
+    { id: 'ksm3', name: '桜沢 敦史', pp: 'ST', sty: 'speed', num: 13, era: '1996–2007', epi: '動き出しの天才', line: 'ひと呼吸早い動き出しで、何度も裏を取ったストライカー。', pot: 104 },
   ],
   urawa: [
-    { id: 'urw1', name: '福山 正弘', pp: 'CF', sty: '', num: 9, era: '1989–2002', epi: 'ミスターレッズ', line: '苦しい時代も赤いユニフォームでゴールを奪い続けた。', pot: 85 },
-    { id: 'urw2', name: '大野 伸三', pp: 'OMF', sty: 'tech', num: null, era: '1998–2007', epi: '天才ゲームメーカー', line: 'ボールが足に吸い付くようなタッチで観客を魅了した。', pot: 90 },
+    { id: 'urw1', name: '福山 正弘', pp: 'CF', sty: '', num: 9, era: '1989–2002', epi: 'ミスターレッズ', line: '苦しい時代も赤いユニフォームでゴールを奪い続けた。', pot: 103 },
+    { id: 'urw2', name: '大野 伸三', pp: 'OMF', sty: 'tech', num: null, era: '1998–2007', epi: '天才ゲームメーカー', line: 'ボールが足に吸い付くようなタッチで観客を魅了した。', pot: 108 },
   ],
   kawasakif: [
-    { id: 'kwf1', name: '仲村 憲豪', pp: 'CMF', sty: 'tech', num: 14, era: '2003–2020', epi: '等々力のバンディエラ', line: 'クラブ一筋。パス一本で試合を動かした司令塔。', pot: 89 },
-    { id: 'kwf2', name: '小久保 嘉仁', pp: 'CF', sty: '', num: 13, era: '2013–2016', epi: '三年連続の得点王', line: 'ゴール前の嗅覚と強烈なシュートで、得点王を取り続けた。', pot: 88 },
+    { id: 'kwf1', name: '仲村 憲豪', pp: 'CMF', sty: 'tech', num: 14, era: '2003–2020', epi: '等々力のバンディエラ', line: 'クラブ一筋。パス一本で試合を動かした司令塔。', pot: 107 },
+    { id: 'kwf2', name: '小久保 嘉仁', pp: 'CF', sty: '', num: 13, era: '2013–2016', epi: '三年連続の得点王', line: 'ゴール前の嗅覚と強烈なシュートで、得点王を取り続けた。', pot: 106 },
   ],
   gosaka: [
-    { id: 'gos1', name: '近藤 保之', pp: 'DMF', sty: 'tech', num: 7, era: '2001–2020', epi: 'コロコロの司令塔', line: '慌てず、急がず。冷静なパスとPKで黄金期を支えた。', pot: 89 },
-    { id: 'gos2', name: '三川 孝弘', pp: 'OMF', sty: 'tech', num: 10, era: '1999–2016', epi: '魔法のスルーパス', line: '誰も見えていない道筋にパスを通した、ガンバの10番。', pot: 86 },
+    { id: 'gos1', name: '近藤 保之', pp: 'DMF', sty: 'tech', num: 7, era: '2001–2020', epi: 'コロコロの司令塔', line: '慌てず、急がず。冷静なパスとPKで黄金期を支えた。', pot: 107 },
+    { id: 'gos2', name: '三川 孝弘', pp: 'OMF', sty: 'tech', num: 10, era: '1999–2016', epi: '魔法のスルーパス', line: '誰も見えていない道筋にパスを通した、ガンバの10番。', pot: 104 },
   ],
   hiroshima: [
-    { id: 'hir1', name: '加藤 寿仁', pp: 'CF', sty: '', num: 11, era: '2005–2016', epi: 'ゴールの匂いを嗅ぐ男', line: 'わずかなスキを逃さず、ゴールを積み重ねたストライカー。', pot: 87 },
-    { id: 'hir2', name: '林崎 和之', pp: 'DMF', sty: 'tech', num: 8, era: '1999–2018', epi: '紫の舵取り', line: 'クラブ一筋。中盤の底からタイトルへ導いた。', pot: 85 },
+    { id: 'hir1', name: '加藤 寿仁', pp: 'CF', sty: '', num: 11, era: '2005–2016', epi: 'ゴールの匂いを嗅ぐ男', line: 'わずかなスキを逃さず、ゴールを積み重ねたストライカー。', pot: 105 },
+    { id: 'hir2', name: '林崎 和之', pp: 'DMF', sty: 'tech', num: 8, era: '1999–2018', epi: '紫の舵取り', line: 'クラブ一筋。中盤の底からタイトルへ導いた。', pot: 103 },
   ],
   kashiwa: [
-    { id: 'ksw1', name: '小谷 秀一', pp: 'DMF', sty: '', num: 7, era: '2003–2021', epi: '柏の主将', line: 'クラブ一筋。誰よりも走り、チームをまとめ続けた。', pot: 84 },
-    { id: 'ksw2', name: '南嶋 秀明', pp: 'CF', sty: 'phys', num: null, era: '1997–2010', epi: '日立台のストライカー', line: '体を張ってゴールに向かい、スタジアムを沸かせた。', pot: 83 },
+    { id: 'ksw1', name: '小谷 秀一', pp: 'DMF', sty: '', num: 7, era: '2003–2021', epi: '柏の主将', line: 'クラブ一筋。誰よりも走り、チームをまとめ続けた。', pot: 102 },
+    { id: 'ksw2', name: '南嶋 秀明', pp: 'CF', sty: 'phys', num: null, era: '1997–2010', epi: '日立台のストライカー', line: '体を張ってゴールに向かい、スタジアムを沸かせた。', pot: 101 },
   ],
   fctokyo: [
-    { id: 'fct1', name: '石山 直弘', pp: 'WG', sty: 'speed', num: 18, era: '2002–2017', epi: '青赤の快速ウイング', line: 'サイドを駆け上がる速さで、何度もスタジアムを揺らした。', pot: 86 },
+    { id: 'fct1', name: '石山 直弘', pp: 'WG', sty: 'speed', num: 18, era: '2002–2017', epi: '青赤の快速ウイング', line: 'サイドを駆け上がる速さで、何度もスタジアムを揺らした。', pot: 104 },
   ],
   tokyov: [
-    { id: 'tkv1', name: 'ラミレス 瑠威', pp: 'OMF', sty: 'tech', num: 10, era: '1977–1998', epi: '緑のカリスマ', line: '技術と気迫でクラブを日本一に導いた司令塔。', pot: 89 },
-    { id: 'tkv2', name: '南澤 剛', pp: 'CMF', sty: 'phys', num: null, era: '1991–2002', epi: '中盤のダイナモ', line: '90分走り続け、ボールを奪い続けた。', pot: 84 },
+    { id: 'tkv1', name: 'ラミレス 瑠威', pp: 'OMF', sty: 'tech', num: 10, era: '1977–1998', epi: '緑のカリスマ', line: '技術と気迫でクラブを日本一に導いた司令塔。', pot: 107 },
+    { id: 'tkv2', name: '南澤 剛', pp: 'CMF', sty: 'phys', num: null, era: '1991–2002', epi: '中盤のダイナモ', line: '90分走り続け、ボールを奪い続けた。', pot: 102 },
   ],
   nagoya: [
-    { id: 'ngy1', name: '楢原 正豪', pp: 'GK', sty: '', num: 1, era: '1999–2018', epi: '鉄壁の守護神', line: '20年近くゴールマウスを守り、リーグ優勝をもたらした。', pot: 88 },
-    { id: 'ngy2', name: 'ドラゴ ストイコフ', pp: 'OMF', sty: 'tech', num: 10, era: '1994–2001', epi: '名古屋の妖精', line: '魔法のようなボールタッチで、見る者を魅了した。', pot: 90, nat: 'SRB' },
+    { id: 'ngy1', name: '楢原 正豪', pp: 'GK', sty: '', num: 1, era: '1999–2018', epi: '鉄壁の守護神', line: '20年近くゴールマウスを守り、リーグ優勝をもたらした。', pot: 106 },
+    { id: 'ngy2', name: 'ドラゴ ストイコフ', pp: 'OMF', sty: 'tech', num: 10, era: '1994–2001', epi: '名古屋の妖精', line: '魔法のようなボールタッチで、見る者を魅了した。', pot: 108, nat: 'SRB' },
   ],
   cosaka: [
-    { id: 'cos1', name: '林島 寛明', pp: 'OMF', sty: '', num: 8, era: '1991–2008', epi: 'ミスターセレッソ', line: 'クラブ一筋。背番号8の系譜はここから始まった。', pot: 86 },
-    { id: 'cos2', name: '東澤 明則', pp: 'CF', sty: 'phys', num: null, era: '1995–2011', epi: '桜の大砲', line: '高さと強さで前線に君臨したストライカー。', pot: 84 },
+    { id: 'cos1', name: '林島 寛明', pp: 'OMF', sty: '', num: 8, era: '1991–2008', epi: 'ミスターセレッソ', line: 'クラブ一筋。背番号8の系譜はここから始まった。', pot: 104 },
+    { id: 'cos2', name: '東澤 明則', pp: 'CF', sty: 'phys', num: null, era: '1995–2011', epi: '桜の大砲', line: '高さと強さで前線に君臨したストライカー。', pot: 102 },
   ],
   kobe: [
-    { id: 'kob1', name: 'アンドレア イニエスト', pp: 'OMF', sty: 'tech', num: 8, era: '2018–2023', epi: '魔法の8番', line: '世界の頂点を知る技術で、神戸に初タイトルをもたらした。', pot: 90, nat: 'ESP' },
+    { id: 'kob1', name: 'アンドレア イニエスト', pp: 'OMF', sty: 'tech', num: 8, era: '2018–2023', epi: '魔法の8番', line: '世界の頂点を知る技術で、神戸に初タイトルをもたらした。', pot: 108, nat: 'ESP' },
   ],
   shimizu: [
-    { id: 'shm1', name: '澤上 正明', pp: 'OMF', sty: 'tech', num: 10, era: '1992–2005', epi: 'ミスターエスパルス', line: 'クラブ一筋。正確なキックでオレンジの攻撃を操った。', pot: 86 },
+    { id: 'shm1', name: '澤上 正明', pp: 'OMF', sty: 'tech', num: 10, era: '1992–2005', epi: 'ミスターエスパルス', line: 'クラブ一筋。正確なキックでオレンジの攻撃を操った。', pot: 104 },
   ],
   chiba: [
-    { id: 'chb1', name: '巻 誠二郎', pp: 'CF', sty: 'phys', num: null, era: '2003–2010', epi: '泥臭きストライカー', line: '体を投げ出してゴールを奪う、ひたむきなフォワード。', pot: 84 },
-    { id: 'chb2', name: '加藤 勇斗', pp: 'DMF', sty: 'phys', num: null, era: '2000–2019', epi: 'ジェフの闘将', line: '中盤で戦い続け、苦しい時代のチームを支えた。', pot: 83 },
+    { id: 'chb1', name: '巻 誠二郎', pp: 'CF', sty: 'phys', num: null, era: '2003–2010', epi: '泥臭きストライカー', line: '体を投げ出してゴールを奪う、ひたむきなフォワード。', pot: 102 },
+    { id: 'chb2', name: '加藤 勇斗', pp: 'DMF', sty: 'phys', num: null, era: '2000–2019', epi: 'ジェフの闘将', line: '中盤で戦い続け、苦しい時代のチームを支えた。', pot: 101 },
   ],
   fukuoka: [
-    { id: 'fuk1', name: '山上 芳樹', pp: 'CF', sty: 'speed', num: null, era: '1990年代', epi: '博多の点取り屋', line: 'クラブの草創期に、スピードでゴールを量産した。', pot: 84 },
+    { id: 'fuk1', name: '山上 芳樹', pp: 'CF', sty: 'speed', num: null, era: '1990年代', epi: '博多の点取り屋', line: 'クラブの草創期に、スピードでゴールを量産した。', pot: 102 },
   ],
   kyoto: [
-    { id: 'kyo1', name: '松山 大介', pp: 'SH', sty: 'tech', num: null, era: '2000–2004', epi: '古都の魔術師', line: '変幻自在のドリブルで、クラブに初のタイトルをもたらした。', pot: 87 },
+    { id: 'kyo1', name: '松山 大介', pp: 'SH', sty: 'tech', num: null, era: '2000–2004', epi: '古都の魔術師', line: '変幻自在のドリブルで、クラブに初のタイトルをもたらした。', pot: 105 },
   ],
   machida: [
-    { id: 'mcd1', name: '李 漢才', pp: 'CMF', sty: '', num: null, era: '2014–2020', epi: '町田の主将', line: 'キャプテンとしてチームをJ2へ押し上げた。', pot: 82 },
+    { id: 'mcd1', name: '李 漢才', pp: 'CMF', sty: '', num: null, era: '2014–2020', epi: '町田の主将', line: 'キャプテンとしてチームをJ2へ押し上げた。', pot: 100 },
   ],
   mito: [
-    { id: 'mit1', name: '本宮 幸治', pp: 'GK', sty: '', num: null, era: '1999–2024', epi: '水戸の守護神', line: '26年ゴールを守り、J2最多出場を積み上げた。', pot: 84 },
+    { id: 'mit1', name: '本宮 幸治', pp: 'GK', sty: '', num: null, era: '1999–2024', epi: '水戸の守護神', line: '26年ゴールを守り、J2最多出場を積み上げた。', pot: 102 },
   ],
   nagasaki: [
-    { id: 'ngs1', name: '前川 悠介', pp: 'DMF', sty: '', num: null, era: '2010年代', epi: 'クラブの心臓', line: '最古参として、地域リーグからJ1までの道のりを支えた。', pot: 82 },
+    { id: 'ngs1', name: '前川 悠介', pp: 'DMF', sty: '', num: null, era: '2010年代', epi: 'クラブの心臓', line: '最古参として、地域リーグからJ1までの道のりを支えた。', pot: 100 },
   ],
   okayama: [
-    { id: 'oky1', name: '喜川 康太', pp: 'DMF', sty: '', num: null, era: '2010年代', epi: '岡山の背骨', line: '長く中盤に立ち、J2を戦い抜いた。', pot: 82 },
+    { id: 'oky1', name: '喜川 康太', pp: 'DMF', sty: '', num: null, era: '2010年代', epi: '岡山の背骨', line: '長く中盤に立ち、J2を戦い抜いた。', pot: 100 },
   ],
   iwata: [
-    { id: 'iwt1', name: '名浜 浩之', pp: 'OMF', sty: 'tech', num: 10, era: '1995–2008', epi: 'サックスブルーの司令塔', line: '左足のパスで黄金期の攻撃を組み立てた。', pot: 88 },
-    { id: 'iwt2', name: '中川 雅志', pp: 'CF', sty: '', num: 9, era: '1994–2009', epi: '炎のストライカー', line: '最後まで諦めない姿勢で、ゴールを奪い続けた。', pot: 86 },
+    { id: 'iwt1', name: '名浜 浩之', pp: 'OMF', sty: 'tech', num: 10, era: '1995–2008', epi: 'サックスブルーの司令塔', line: '左足のパスで黄金期の攻撃を組み立てた。', pot: 106 },
+    { id: 'iwt2', name: '中川 雅志', pp: 'CF', sty: '', num: 9, era: '1994–2009', epi: '炎のストライカー', line: '最後まで諦めない姿勢で、ゴールを奪い続けた。', pot: 104 },
   ],
   shonan: [
-    { id: 'shn1', name: '外田 英斗', pp: 'OMF', sty: 'tech', num: null, era: '1995–1998', epi: '湘南の天才', line: '10代で頭角を現し、世界へ羽ばたいた。', pot: 90 },
+    { id: 'shn1', name: '外田 英斗', pp: 'OMF', sty: 'tech', num: null, era: '1995–1998', epi: '湘南の天才', line: '10代で頭角を現し、世界へ羽ばたいた。', pot: 108 },
   ],
   oita: [
-    { id: 'oit1', name: '低松 大輝', pp: 'CF', sty: 'phys', num: null, era: '2000年代', epi: 'トリニータの大黒柱', line: '高さと強さで前線を支え続けた。', pot: 83 },
+    { id: 'oit1', name: '低松 大輝', pp: 'CF', sty: 'phys', num: null, era: '2000年代', epi: 'トリニータの大黒柱', line: '高さと強さで前線を支え続けた。', pot: 101 },
   ],
 };
 function legendOf(id) { for (const ls of Object.values(LEGENDS)) { const l = ls.find(x => x.id === id); if (l) return l; } return null; }
@@ -1516,7 +1546,7 @@ function rebornCheck(S, se) {
 }
 function makeReborn(S, L) {
   const pos = DP_CAT[L.pp] || 'MF';
-  const p = genPlayer(S, S.my, { age: 16, foreign: !!L.nat, pos, pp: L.pp, ovr: ri(REBORN.ovr[0], REBORN.ovr[1]), pot: Math.min(GROW.potMax, L.pot), sty: L.sty });
+  const p = genPlayer(S, S.my, { age: 16, foreign: !!L.nat, pos, pp: L.pp, ovr: ri(REBORN.ovr[0], REBORN.ovr[1]), pot: L.pot, cap: L.pot, sty: L.sty });
   const parts = L.name.split(' ');
   p.name = L.name; p.short = L.nat ? parts[parts.length - 1] : parts[0]; p.nat = L.nat || 'JPN';
   initAttrs(p);
@@ -1543,8 +1573,26 @@ function rebornNum(S, pid) {
    squad, lineups, wages and registration. He grows as if he got p.loan.share of the minutes there (shareFor) and comes back in
    rollover with his J2 record. Only in a transfer window, only 23 or under, at most LOAN.max at once. */
 const LOAN = { maxAge: 23, max: 6 };
-// ユースの逸材: chance per season (mine: base + lv × ユースLv → Lv1 11% … Lv5 31%; other clubs 4%), potential GEM.pot+
-const GEM = { base: 0.06, lv: 0.05, ai: 0.04, pot: 80 };
+// ユースの逸材: chance per season (mine: base + lv × ユースLv → Lv1 11% … Lv5 31%; other clubs 4%), potential GEM.pot
+// + 0〜4 + lv × 0.6 (Lv2 80〜84, Lv5 82〜86), a rare one (RARE.gem) beyond 90
+const GEM = { base: 0.06, lv: 0.05, ai: 0.04, pot: 79 };
+/* academy graduates (18) are rated against the club's own level from the data (c.base: the academy's standing), not
+   against the current squad — that fed back season after season (a strong squad → stronger graduates → a stronger
+   squad) until my club ran away with the league. pot = base + pot + lv × lvP + 0〜spread (+ 0〜tailAdd now and then),
+   capped at 90 unless a rare talent (RARE.youth). Other clubs count as Lv2. */
+const INTAKE = { ovr: -13, lvO: 0.8, pot: -3, lvP: 1.2, spread: 7, tail: 0.1, tailAdd: 6, ref: 69, pull: 0.5 };
+// the academy's standing: the club's level from the data, pulled halfway to the league's usual level (ref)
+function clubBase(S, cid) { const c = S.clubs[cid]; const b = c.base || (63 + (c.tier || 2)); return INTAKE.ref + (b - INTAKE.ref) * INTAKE.pull; }
+// a rare talent's ceiling (91〜95) and where his potential starts (just below it)
+function rareRoll(p) { if (R() >= p) return null; const cap = ri(RARE.cap[0], RARE.cap[1]); return { cap, pot: ri(Math.max(86, cap - 5), cap) }; }
+function intakePot(S, cid, lv) {
+  const r = rareRoll(RARE.youth); if (r) return r;
+  return { pot: Math.min(GROW.potMax, Math.round(clubBase(S, cid) + INTAKE.pot + lv * INTAKE.lvP + R() * INTAKE.spread + (R() < INTAKE.tail ? R() * INTAKE.tailAdd : 0))) };
+}
+function gemPot(lv) {
+  const r = rareRoll(RARE.gem); if (r) return r;
+  return { pot: Math.min(GROW.potMax, Math.round(GEM.pot + ri(0, 4) + lv * 0.6)) };
+}
 function myLoans(S) { return Object.values(S.players).filter(p => p.loan && p.loan.from === S.my); }
 function loanClubs(S) { return Object.keys(S.clubs).filter(cid => !S.order.includes(cid) && J2.some(j => j.id === cid)); }
 function loanShare(S, p, cid) { const lv = strength(S, cid); return clamp(0.62 + (p.ovr - (lv - 7)) * 0.06, 0.2, 0.95); }
@@ -1622,12 +1670,13 @@ function genPlayer(S, cid, opts) {
   const birth = by + '-' + String(ri(1, 12)).padStart(2, '0') + '-' + String(ri(1, 28)).padStart(2, '0');
   const pos = o.pos || wpick(['GK', 'DF', 'MF', 'FW'], x => ({ GK: 1.2, DF: 3, MF: 3.4, FW: 2 })[x]);
   const ov = o.ovr != null ? o.ovr : 60;
-  const pot = Math.max(ov, o.pot != null ? o.pot : ov + (a <= 19 ? ri(6, 16) : a <= 22 ? ri(3, 9) : ri(0, 3)));
+  const pot = Math.max(ov, Math.min(o.cap || GROW.potMax, o.pot != null ? o.pot : ov + (a <= 19 ? ri(6, 16) : a <= 22 ? ri(3, 9) : ri(0, 3))));
   const used = new Set(squad(S, cid).map(x => x.num));
   let num = o.num || ri(2, 49); while (used.has(num)) num++;
   const parts = name.split(' ');
   const p = { id: S.nextPid++, club: cid, pos, pp: o.pp || (pos === 'GK' ? 'GK' : genPP(pos)), num, name, short: foreign ? parts[1] : parts[0], birth, nat: foreign ? 'BRA' : 'JPN', ovr: ov, pot, cond: 100, form: 6.5, inj: 0, sus: 0, ycAcc: 0, listed: false, st: blankStats(), hist: [], joined: S.date, gen: true };
   if (o.sty && STYLE[o.sty]) p.sty = o.sty;
+  if (o.cap && o.cap > GROW.potMax) p.cap = o.cap;
   initAttrs(p);
   S.players[p.id] = p;
   return p;
@@ -2099,16 +2148,17 @@ function rollover(S) {
   for (const cid of S.order) {
     const c = S.clubs[cid];
     const k = cid === S.my ? 2 + Math.floor(c.fac.youth / 2) : 2;
-    const base = Math.round(strength(S, cid));
+    const base = clubBase(S, cid), lv = cid === S.my ? c.fac.youth : 2;
     for (let i = 0; i < k; i++) {
-      const pr = genPlayer(S, cid, { age: 18, foreign: false, ovr: base - 15 + (cid === S.my ? c.fac.youth : 2) + ri(-2, 2), pot: base - 4 + ri(0, 8) + (cid === S.my ? c.fac.youth * 2 : 3) });
+      const pt = intakePot(S, cid, lv);
+      const pr = genPlayer(S, cid, { age: 18, foreign: false, ovr: Math.round(base + INTAKE.ovr + lv * INTAKE.lvO) + ri(-2, 2), pot: pt.pot, cap: pt.cap });
       if (cid === S.my) { news(S, `ユースから${pr.name}（${pr.pos}）がトップ昇格。`, 'grow'); track(S, pr); }
     }
     // ユースの逸材: now and then a 16-17-year-old with a huge ceiling (a better academy finds them more often)
     const gemP = cid === S.my ? GEM.base + GEM.lv * c.fac.youth : GEM.ai;
     if (R() < gemP) {
-      const lv = cid === S.my ? c.fac.youth : 2;
-      const pr = genPlayer(S, cid, { age: 16, foreign: false, pos: wpick(['DF', 'MF', 'FW'], x => ({ DF: 2.6, MF: 3.4, FW: 2.6 })[x]), ovr: base - 11 + Math.round(lv / 2) + ri(-2, 2), pot: Math.min(GROW.potMax, GEM.pot + ri(0, 5) + lv), sty: pick(['tech', 'tech', 'speed', 'phys', '']) });
+      const pt = gemPot(lv);
+      const pr = genPlayer(S, cid, { age: 16, foreign: false, pos: wpick(['DF', 'MF', 'FW'], x => ({ DF: 2.6, MF: 3.4, FW: 2.6 })[x]), ovr: base - 10 + Math.round(lv / 2) + ri(-2, 2), pot: pt.pot, cap: pt.cap, sty: pick(['tech', 'tech', 'speed', 'phys', '']) });
       pr.gem = true;
       if (cid === S.my) { news(S, `ユースの逸材、${pr.name}（${age(pr, S.date)}歳・${pr.pos}）がトップ昇格。早くから注目されてきた才能だ。`, 'big'); track(S, pr); }
     }
@@ -2153,7 +2203,7 @@ const API = {
   createMatch, stepMatch, simulateFull, finishMatch, doSub, benchOptions, onPitch, setMentality, bestSubFor, setCounter, mentLabel,
   advance, nextDay, simAIToday, myFixtureToday, nextMyFixture, todaysFixtures, inWindow, windowEnd, nextWindowStart,
   acceptOffer, rejectOffer, setListed, setKeep, transferDay, bid, decideRetirements, shortlist, shortEntry, unshort, bidBlock,
-  BOARD, BOARD_LV, boardLv, tenure, CUPS, CUP_PRIZE, NATIONAL, fxLabel, cupResult, cupWinner, hypeMatch, HYPE, SUB_RATE, subRate, STYLE, GROW, shareFor, LOAN, GEM, REBORN, LEGENDS, legendOf, rebornCheck, makeReborn, rebornNum, myLoans, loanCan, loanOptions, loanOut, growthOutlook, weeksLeft, yearsTo, bigGame, rivalry, SCOUT, sendScout, playShare, marketList, ensureFreeAgents, upgrade, facCost, takeJob, rollover, endSeason, news, fire,
+  BOARD, BOARD_LV, boardLv, tenure, CUPS, CUP_PRIZE, NATIONAL, fxLabel, cupResult, cupWinner, hypeMatch, HYPE, SUB_RATE, subRate, STYLE, GROW, RARE, INTAKE, potCap, clubBase, devWeek, shareFor, LOAN, GEM, REBORN, LEGENDS, legendOf, rebornCheck, makeReborn, rebornNum, myLoans, loanCan, loanOptions, loanOut, growthOutlook, weeksLeft, yearsTo, bigGame, rivalry, SCOUT, sendScout, playShare, marketList, ensureFreeAgents, upgrade, facCost, takeJob, rollover, endSeason, news, fire,
 };
 if (typeof module !== 'undefined' && module.exports) module.exports = API; else root.Engine = API;
 })(typeof window !== 'undefined' ? window : globalThis);

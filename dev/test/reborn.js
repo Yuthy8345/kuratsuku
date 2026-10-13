@@ -10,7 +10,7 @@ const seasonDone = (S, verdict, cups) => { S.history.unshift({ season: 'x', club
 
 ok(DATA.clubs.every(c => (E.LEGENDS[c.id] || []).length), 'every J1 club has a legend');
 const all = Object.values(E.LEGENDS).flat();
-ok(new Set(all.map(l => l.id)).size === all.length && all.every(l => E.DP_CAT[l.pp] && l.pot >= 80 && l.pot <= 93 && l.epi && l.line && l.era), `${all.length} legends, ids unique, positions valid`);
+ok(new Set(all.map(l => l.id)).size === all.length && all.every(l => E.DP_CAT[l.pp] && l.pot >= 100 && l.pot <= 110 && l.epi && l.line && l.era), `${all.length} legends, ids unique, positions valid`);
 const real = new Set(DATA.players.map(p => p.name));
 ok(all.every(l => !real.has(l.name)), 'made-up names (none is a registered player)');
 
@@ -23,7 +23,7 @@ let p = E.rebornCheck(S, seasonDone(S, 'missed'));
 ok(p && p.reborn && E.age(p, S.date) <= 17 && p.club === S.my && S.reborn.show === p.id && S.reborn.wait === 0, `guaranteed: ${p && p.name} (${p && p.pp}, ${p && p.ovr.toFixed(0)}/${p && p.pot})`);
 ok(E.bigGame(p), '転生 → 大舞台に強い');
 const L = E.legendOf(p.reborn);
-ok(p.pp === L.pp && p.pot === Math.min(E.GROW.potMax, L.pot) && (L.sty ? p.sty === L.sty : true), 'position, potential and style from the legend');
+ok(p.pp === L.pp && p.pot === L.pot && E.potCap(p) === L.pot && (L.sty ? p.sty === L.sty : true), 'position, potential and style from the legend');
 // chance: ~25% after a poor season, higher after meeting the target and winning a cup
 function rate(verdict, cups, n) {
   let hit = 0;

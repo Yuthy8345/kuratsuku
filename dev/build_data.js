@@ -216,7 +216,9 @@ const YOUTH = {
 };
 // playing style (ability split; see STYLE in engine.js)
 const STYLE = { 三井寺眞: 'tech' };
-const DATA_REV = 2;
+// players whose ceiling may pass the usual 90 (engine GROW.potMax): 三井寺 keeps his 88 → 開花 up to 93 as before
+const CAP = { 三井寺眞: 93 };
+const DATA_REV = 3;
 const FLA = {};
 for (const l of fs.readFileSync(path.join(__dirname, 'positions_footballlab.txt'), 'utf8').split('\n')) {
   if (!l || l[0] === '#') continue;
@@ -236,9 +238,29 @@ for (const p of players) {
   const margin = a <= 17 ? 14 : a <= 19 ? 10 : a <= 21 ? 7 : a <= 22 ? 4 : 2;
   p.pot = Math.max(p.pot, p.ovr + (p.ovr > old.ovr ? margin : 0), p.ovr);
   if (STYLE[key]) p.sty = STYLE[key];
-  if (p.ovr !== old.ovr || p.pot !== old.pot || p.sty) p.fix = { r: DATA_REV, d: p.ovr - old.ovr };
+  if (p.ovr !== old.ovr || p.pot !== old.pot || p.sty) p.fix = { r: 2, d: p.ovr - old.ovr };
 }
 console.log('young players re-rated', youthStat, 'changed', players.filter(p => p.fix).length);
+
+// ---------- data revision 3 (2026-10-13): real players' ceilings ----------
+// Most players over 26 had a ceiling equal to their rating (no room at all), so after a few seasons the academy
+// graduates pushed every real player out of the side. Now each one keeps some room by age (a little more for the
+// best), up to 90. 21 or under keep the room they already had. Old saves get it through fix (r 3, the rating change
+// of revision 2 stays tagged dr 2).
+const room3 = (a, r) => a <= 21 ? 0 : a <= 23 ? 5 + r * 4 : a <= 26 ? 4 + r * 4 : a <= 29 ? 3 + r * 3 : a <= 31 ? 2 + r * 2 : a <= 33 ? 1 + r * 2 : r * 1.5;
+const rev3 = { raised: 0, sum: 0 };
+for (const p of players) {
+  const key = p.name.replace(/\s/g, '');
+  if (CAP[key]) { p.cap = CAP[key]; p.fix = p.fix ? { r: 3, d: p.fix.d, dr: 2 } : { r: 3, d: 0 }; continue; }
+  const a = ageAt(p.birth.replace(/-/g, '/'));
+  const r = rnd(hash('rev3' + p.club + key))();
+  const want = Math.min(90, Math.round(p.ovr + room3(a, r) + (p.ovr >= 76 ? 1 : 0)));
+  if (want <= p.pot) continue;
+  rev3.raised++; rev3.sum += want - p.pot;
+  p.pot = want;
+  p.fix = p.fix ? { r: 3, d: p.fix.d, dr: 2 } : { r: 3, d: 0 };
+}
+console.log('rev3 ceilings raised', rev3.raised, 'avg +' + (rev3.sum / Math.max(1, rev3.raised)).toFixed(1));
 
 // ---------- detailed positions: 本職 (pp) and extra aptitude (ap) ----------
 // CB SB / DMF CMF OMF SH / CF ST(セカンドトップ・シャドー) WG

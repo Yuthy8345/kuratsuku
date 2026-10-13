@@ -389,7 +389,7 @@ function dlt(x, soft) {
 const shownDiff = (now, then) => Math.round(now) - Math.round(then);
 function attrRows(p, withDelta) {
   const at = p.at || E.attrs(p); const idx = E.ATTR_SHOW[p.pos];
-  return `<div style="display:grid;gap:7px">${idx.map(i => { const v = Math.round(at[i]); const d = withDelta && p.at0 ? shownDiff(at[i], p.at0[i]) : 0; return `<div class="attr"><span>${E.ATTR[i]}</span><span class="bar"><i class="${v >= 70 ? '' : v >= 55 ? 'mid' : 'low'}" style="width:${v}%"></i></span><b>${v}</b>${withDelta ? dlt(d) : ''}</div>`; }).join('')}</div>`;
+  return `<div style="display:grid;gap:7px">${idx.map(i => { const v = Math.round(at[i]); const d = withDelta && p.at0 ? shownDiff(at[i], p.at0[i]) : 0; return `<div class="attr"><span>${E.ATTR[i]}</span><span class="bar"><i class="${v >= 70 ? '' : v >= 55 ? 'mid' : 'low'}" style="width:${Math.min(100, v)}%"></i></span><b>${v}</b>${withDelta ? dlt(d) : ''}</div>`; }).join('')}</div>`;
 }
 function rolesLine(p) { return E.bestRoles(p, 3).map(r => `<span class="chip">${r.jp} <b style="color:var(--ink)">${Math.round(r.v)}</b></span>`).join(''); }
 function devRow(p) {
