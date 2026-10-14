@@ -129,7 +129,54 @@ async function cloudWipe() {
 
 /* ---------- small renderers ---------- */
 function lum(hex) { const h = hex.replace('#', ''); const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16); return (0.299 * r + 0.587 * g + 0.114 * b) / 255; }
-function kit(cid, size) { const c = S && S.clubs[cid] || (PREVIEW && PREVIEW.clubs[cid]); if (!c) return '<span class="kit"></span>'; return `<span class="kit ${size || ''}" style="--c1:${c.c1};--c2:${c.c2}" aria-hidden="true"></span>`; }
+// club magnets: no real crests — the club's colours and one simple pattern each (.k-* in template.html), so that clubs in the
+// same colour still look different (2026-10-14). [pattern, colour 1, colour 2, colour 3, ring]; 'so' = plain colour 1 with a
+// colour-2 ring (the old look). Clubs not listed (海外組) keep the plain look in their kit colours.
+const EMB = {
+  // J1
+  kashima:    ['hp', '#A6192E', '#14234B', null, '#14234B'],
+  yokohamafm: ['tr', '#0B3B8C', '#FFFFFF', '#D7101F', '#FFFFFF'],
+  kashiwa:    ['so', '#F2CC0C', '#1A1A1A'],
+  kawasakif:  ['so', '#3BA2E0', '#111111'],
+  urawa:      ['so', '#D7000F', '#111111'],
+  machida:    ['so', '#0A3D91', '#C9A227'],
+  tokyov:     ['so', '#00843D', '#F3F3F3'],
+  fctokyo:    ['hf', '#123E8C', '#C8102E', null, '#0B1E44'],
+  mito:       ['tf', '#1D4FA0', '#FFFFFF', null, '#FFFFFF'],
+  chiba:      ['sh', '#F7D117', '#00753A', null, '#00753A'],
+  shimizu:    ['pn', '#F28A00', '#123A7A', null, '#123A7A'],
+  nagoya:     ['bd', '#D6271C', '#F2A900', null, '#F2A900'],
+  kyoto:      ['sh', '#6B2A8F', '#D7262E', null, '#E8E3EE'],
+  gosaka:     ['st', '#0A4AA6', '#111111', null, '#111111'],
+  cosaka:     ['so', '#E2187A', '#1B2A4A'],
+  kobe:       ['cs', '#8E1B2E', '#FFFFFF', '#111111', '#111111'],
+  okayama:    ['cd', '#8C1D3A', '#F2F2F2', null, '#F2F2F2'],
+  hiroshima:  ['pn', '#5A2D91', '#FFFFFF', null, '#FFFFFF'],
+  fukuoka:    ['hp', '#0D2C6C', '#B8BEC9', null, '#B8BEC9'],
+  nagasaki:   ['v', '#0F4C9C', '#F39800', null, '#F39800'],
+  // J2
+  sapporo:    ['st', '#C8102E', '#111111', null, '#111111'],
+  yokohamafc: ['dh', '#2BA6DE', '#FFFFFF', null, '#1D4FA0'],
+  shonan:     ['hf', '#7AB800', '#1F4E9C', null, '#FFFFFF'],
+  niigata:    ['so', '#F26B00', '#1F3C88'],
+  iwata:      ['ub', '#6DB6E6', '#1D3F8C', null, '#FFFFFF'],
+  tosu:       ['hf', '#5BA6DE', '#E7489B', null, '#FFFFFF'],
+  omiya:      ['qt', '#F37021', '#14224A', null, '#14224A'],
+  sendai:     ['bd', '#F5C400', '#1B2E5A', null, '#1B2E5A'],
+  tokushima:  ['sh', '#1B3A8C', '#78BE20', null, '#FFFFFF'],
+  oita:       ['cd', '#1D3C9C', '#F2C400', null, '#F2C400'],
+  kofu:       ['di', '#1D4E9C', '#A3203A', null, '#F2F2F2'],
+  yamagata:   ['pn', '#1D3F8C', '#F2C400', null, '#F2C400'],
+  iwaki:      ['sh', '#C8102E', '#1B2A4A', null, '#1B2A4A'],
+  imabari:    ['cs', '#1B2A4A', '#F2C400', '#FFFFFF', '#F2C400'],
+};
+function kitVars(cid, c) {
+  const e = EMB[cid];
+  if (!e) return { cls: '', st: c ? `--c1:${c.c1};--c2:${c.c2}` : '' };
+  return { cls: e[0] === 'so' ? '' : ' k-' + e[0], st: `--c1:${e[1]};--c2:${e[2]}${e[3] ? ';--c3:' + e[3] : ''}${e[4] ? ';--r:' + e[4] : ''}` };
+}
+function kitTag(cid, c, size, base) { const v = kitVars(cid, c); return `<span class="${base || 'kit'}${size ? ' ' + size : ''}${v.cls}" style="${v.st}" aria-hidden="true"></span>`; }
+function kit(cid, size) { const c = S && S.clubs[cid] || (PREVIEW && PREVIEW.clubs[cid]); if (!c) return '<span class="kit"></span>'; return kitTag(cid, c, size); }
 function oc(v) { return v >= 75 ? 'o-elite' : v >= 70 ? 'o-good' : v >= 64 ? 'o-mid' : 'o-low'; }
 function condBar(c) { const cls = c >= 85 ? '' : c >= 70 ? 'mid' : 'low'; return `<span class="bar" title="コンディション ${Math.round(c)}%"><i class="${cls}" style="width:${Math.round(c)}%"></i></span>`; }
 function formChips(arr) { return arr.length ? arr.map(r => `<span class="res res-${r}">${{ W: '勝', D: '分', L: '敗' }[r]}</span>`).join('') : '<span class="muted small">—</span>'; }
@@ -160,7 +207,7 @@ function viewTitle() {
   const sc = save && save.clubs[save.my];
   const pc = v => +(v * 100).toFixed(2) + '%';
   const mag = cls => ([x, y, n]) => `<span class="mag ${cls}" style="left:${pc(x / TB_W)};top:${pc(y / TB_H)}">${n}</span>`;
-  const cont = save ? `<button class="plate yellow" data-act="continue"><span class="mag-dot" style="--c1:${sc.c1};--c2:${sc.c2}" aria-hidden="true"></span><span><b>つづきから</b><small>${esc(sc.name)}　${E.seasonLabel(save.season)}・${jd(save.date)}${save === Cloud.cand ? '・クラウド' : ''}</small></span></button>` : '';
+  const cont = save ? `<button class="plate yellow" data-act="continue">${kitTag(save.my, sc, '', 'mag-dot')}<span><b>つづきから</b><small>${esc(sc.name)}　${E.seasonLabel(save.season)}・${jd(save.date)}${save === Cloud.cand ? '・クラウド' : ''}</small></span></button>` : '';
   const fresh = `<button class="plate ${save ? 'chalk' : 'yellow'}" data-act="toSelect"><span class="newmag" aria-hidden="true">NEW</span><b>新しく始める</b></button>`;
   return `<div class="tb-wrap"><main class="tboard">
     <div class="tb-pitch" aria-hidden="true">
@@ -185,7 +232,7 @@ function sheetAbout() {
     <p class="fine">選手と在籍クラブはJリーグ公式サイトの2026/27シーズン登録選手（2026年9月時点）をもとにしています。能力値は独自の推定です。クラブのエンブレムは使用していません。非商用のファンメイドゲームです。</p>`,
     '<button class="btn ghost block" data-act="closeSheet">閉じる</button>');
 }
-function kitFor(st, cid) { const c = st.clubs[cid]; return `<span class="kit lg" style="--c1:${c.c1};--c2:${c.c2}" aria-hidden="true"></span>`; }
+function kitFor(st, cid) { return kitTag(cid, st.clubs[cid], 'lg'); }
 function pickSave(a, b) { if (a && b) return (b.savedAt || 0) > (a.savedAt || 0) ? b : a; return a || b || null; }
 function presBadge(c) { const n = E.presStars(c.pres); return `<span class="stars" aria-label="クラブの格">${'★'.repeat(n)}${'☆'.repeat(5 - n)}</span>`; }
 function titlesText(c) {
@@ -201,7 +248,7 @@ function viewSelect() {
     <div class="select-head"><div class="eyebrow">2026/27 明治安田J1リーグ</div><h2>率いるクラブを選ぶ</h2><p class="fine">右の★はチーム力（選手の実力にクラブの格を加えたもの）。格はタイトル歴とJ1在籍年数から決まり、選手の集まりやすさやフロントの期待にも影響します。</p></div>
     <ul class="list">${ORDER.map(id => {
       const c = P.clubs[id];
-      return `<li><button class="crow" data-act="pickClub" data-id="${id}"><span class="kit lg" style="--c1:${c.c1};--c2:${c.c2}" aria-hidden="true"></span><span><b>${esc(c.name)}</b><span>${esc(c.area)}・資金 ${E.money(c.funds)}</span></span><span style="display:grid;justify-items:end;gap:2px"><span class="stars" aria-label="チーム力">${stars(c.pred)}</span><span class="small muted">格：${E.presLabel(c.pres)}</span></span></button></li>`;
+      return `<li><button class="crow" data-act="pickClub" data-id="${id}">${kitTag(id, c, 'lg')}<span><b>${esc(c.name)}</b><span>${esc(c.area)}・資金 ${E.money(c.funds)}</span></span><span style="display:grid;justify-items:end;gap:2px"><span class="stars" aria-label="チーム力">${stars(c.pred)}</span><span class="small muted">格：${E.presLabel(c.pres)}</span></span></button></li>`;
     }).join('')}</ul>
   </div>
   <div class="title-actions"><button class="btn ghost block" data-act="toTitle">戻る</button></div></div>`;
@@ -210,7 +257,7 @@ function sheetClub(id) {
   const P = PREVIEW, c = P.clubs[id];
   const top = E.squad(P, id).sort((a, b) => b.ovr - a.ovr).slice(0, 6);
   sheetState = { type: 'club', id };
-  openSheet(`<div class="row"><span class="kit lg" style="--c1:${c.c1};--c2:${c.c2}"></span><div><div class="eyebrow">${esc(c.area)}</div><h2>${esc(c.name)}</h2></div></div>
+  openSheet(`<div class="row">${kitTag(id, c, 'lg')}<div><div class="eyebrow">${esc(c.area)}</div><h2>${esc(c.name)}</h2></div></div>
     <dl class="kv"><dt>ホーム</dt><dd>${esc(c.stadium)}</dd><dt>収容</dt><dd>${c.cap.toLocaleString('ja-JP')}人</dd><dt>資金</dt><dd>${E.money(c.funds)}</dd><dt>スポンサー収入</dt><dd>月 ${E.money(c.spon)}</dd><dt>チーム力</dt><dd><span class="stars">${stars(c.pred)}</span>（${c.pred}番手）</dd><dt>クラブの格</dt><dd>${presBadge(c)} ${E.presLabel(c.pres)}</dd><dt>クラブの目標</dt><dd>${esc(c.target.jp)}</dd></dl>
     <p class="fine" style="margin:-6px 0 0">${titlesText(c)}${c.o10 ? '・Jリーグ創設メンバー' : ''}</p>
     <div><div class="eyebrow" style="margin-bottom:6px">主力選手</div><ul class="list">${top.map(p => `<li><div class="prow" style="grid-template-columns:30px 1fr auto">${posTag(p)}<span class="nm"><b>${esc(p.name)}</b><span>${E.age(p, P.date)}歳 ${natChip(p)}</span></span><span class="ovr ${oc(p.ovr)}">${E.ovr(p)}</span></div></li>`).join('')}</ul></div>`,
@@ -223,7 +270,7 @@ function sheetName(id, keep) {
   const kt = lum(c.c1) > 0.6 ? '#141414' : '#ffffff';
   openSheet(`<div class="mgr-card" style="--k1:${c.c1};--k2:${c.c2};--kt:${kt}">
       <div class="eyebrow">新監督の就任</div>
-      <div class="mgr-club"><span class="kit lg" style="--c1:${c.c1};--c2:${c.c2}" aria-hidden="true"></span><b>${esc(c.name)}</b></div>
+      <div class="mgr-club">${kitTag(id, c, 'lg')}<b>${esc(c.name)}</b></div>
       <label class="mgr-plate" for="mgr-name"><span class="mgr-plate-k">監督</span><input id="mgr-name" maxlength="12" placeholder="あなた" autocomplete="off" enterkeyhint="done" value="${esc(keep || '')}" aria-label="監督名"></label>
       <p class="fine" style="margin:0">あなたの名前を入れてください（12文字まで）。空欄のままなら「あなた」で始まります。</p>
       ${(() => { const n = carryPresets().length; return n ? `<p class="fine" style="margin:0">保存した戦術（${n}件）は新しいゲームでも使えます。</p>` : ''; })()}
@@ -876,7 +923,7 @@ function sheetTeam(cid, tab, back) {
   const t = E.table(S); const ri = t.findIndex(r => r.id === cid); const row = ri >= 0 ? t[ri] : null;
   const j1 = inJ1(cid);
   const kt = lum(c.c1) > 0.6 ? '#141414' : '#ffffff';
-  const head = `<div class="team-head"><span class="kit lg" style="--c1:${c.c1};--c2:${c.c2}" aria-hidden="true"></span><div style="min-width:0"><div class="eyebrow">${esc(c.area || '')}・${j1 ? 'J1' : c.ab ? esc(c.ab.lg) : 'J2'}${c.coach ? `・監督 ${esc(c.coach)}` : ''}</div><h2>${esc(c.name)}</h2></div></div>`;
+  const head = `<div class="team-head">${kitTag(cid, c, 'lg')}<div style="min-width:0"><div class="eyebrow">${esc(c.area || '')}・${j1 ? 'J1' : c.ab ? esc(c.ab.lg) : 'J2'}${c.coach ? `・監督 ${esc(c.coach)}` : ''}</div><h2>${esc(c.name)}</h2></div></div>`;
   const tabs = `<div class="seg" role="tablist">${[['info', '概要'], ['squad', `選手（${E.squad(S, cid).length}人）`]].map(([k, l]) => `<button data-act="teamTab" data-k="${k}" aria-pressed="${tab === k}">${l}</button>`).join('')}</div>`;
   let body = '';
   if (tab === 'squad') {
@@ -1248,7 +1295,7 @@ function sheetPresets() {
     const head = ui.edit === i
       ? `<div class="row" style="gap:8px"><input class="input" id="pr-name" maxlength="16" value="${esc(pr.name)}" autocomplete="off" style="flex:1"><button class="btn" data-act="presetRename" data-i="${i}">決定</button></div>`
       : `<div class="row"><b>${esc(pr.name)}</b><span class="spacer"></span><span class="small muted pr-when">${when}</span></div>`;
-    const club = pr.cn ? `<div class="pr-club"><span class="kit sm" style="--c1:${pr.k1};--c2:${pr.k2}" aria-hidden="true"></span><span>${esc(pr.cn)}</span>${st.other ? '<small>（ほかのクラブ）</small>' : ''}</div>` : '';
+    const club = pr.cn ? `<div class="pr-club">${kitTag(pr.club, { c1: pr.k1, c2: pr.k2 }, 'sm')}<span>${esc(pr.cn)}</span>${st.other ? '<small>（ほかのクラブ）</small>' : ''}</div>` : '';
     return `<li><div class="preset">${head}${club}
       <div class="small muted">${pr.form}・${esc(E.mentLabel(pr))}・プレス${esc((E.PRESS[pr.press] || E.PRESS.mid).jp)}${E.tacLabel(pr) ? '・' + esc(E.tacLabel(pr)) : ''}</div>
       ${chips ? `<div class="row wrap">${chips}</div>` : ''}
@@ -1270,7 +1317,7 @@ function sheetFired() {
   const F = S.fired; if (!F) return;
   sheetState = { type: 'fired' };
   openSheet(`<div class="eyebrow">解任</div><h2>${esc(S.clubs[F.from].name)}を去ることに</h2><p class="fine">${esc(F.reason)}。ほかのクラブから監督就任のオファーが届いています。</p>
-    <ul class="list">${F.offers.map(cid => { const c = S.clubs[cid]; return `<li><button class="crow" data-act="job" data-id="${cid}"><span class="kit lg" style="--c1:${c.c1};--c2:${c.c2}"></span><span><b>${esc(c.name)}</b><span>資金 ${E.money(c.funds)}・${E.position(S, cid)}位</span></span><span class="chip acc">就任</span></button></li>`; }).join('')}</ul>`,
+    <ul class="list">${F.offers.map(cid => { const c = S.clubs[cid]; return `<li><button class="crow" data-act="job" data-id="${cid}">${kitTag(cid, c, 'lg')}<span><b>${esc(c.name)}</b><span>資金 ${E.money(c.funds)}・${E.position(S, cid)}位</span></span><span class="chip acc">就任</span></button></li>`; }).join('')}</ul>`,
     '<button class="btn danger block" data-act="askReset">はじめからやり直す</button>');
 }
 /* ---------- save transfer (引き継ぎコード) ---------- */

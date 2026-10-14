@@ -83,11 +83,31 @@ h1, h2, h3 { text-wrap: balance; margin: 0; }
 .view:has(> .subnav) > * { flex-shrink: 0; }
 .view:has(> .subnav) > .subnav { margin-top: auto; }
 
-/* kit badge (no crests — kit colours only) */
-/* every club is a magnet in its kit colours */
-.kit { --c1: #888; --c2: #ddd; width: 24px; height: 24px; border-radius: 50%; flex: none; background: radial-gradient(circle at 34% 28%, rgba(255,255,255,.42) 0%, rgba(255,255,255,0) 46%), var(--c1); box-shadow: inset 0 0 0 3px var(--c2), inset 0 0 0 4px rgba(0,0,0,.18), 0 2px 0 rgba(0,0,0,.3); }
-.kit.lg { width: 44px; height: 44px; box-shadow: inset 0 0 0 5px var(--c2), inset 0 0 0 6px rgba(0,0,0,.18), 0 3px 0 rgba(0,0,0,.3); }
-.kit.sm { width: 16px; height: 16px; box-shadow: inset 0 0 0 2px var(--c2), 0 1px 0 rgba(0,0,0,.3); }
+/* club magnets: no real crests — the club colours and one simple pattern per club (EMB in app.js) */
+.kit, .mag-dot { --c1: #888; --c2: #ddd; --c3: var(--c2); --r: var(--c2); position: relative;
+  --gl: radial-gradient(circle at 34% 28%, rgba(255,255,255,.42) 0%, rgba(255,255,255,0) 46%);
+  background: var(--gl), var(--pat, var(--c1)); }
+.kit { width: 24px; height: 24px; border-radius: 50%; flex: none; box-shadow: inset 0 0 0 3px var(--r), inset 0 0 0 4px rgba(0,0,0,.18), 0 2px 0 rgba(0,0,0,.3); }
+.kit.lg { width: 44px; height: 44px; box-shadow: inset 0 0 0 5px var(--r), inset 0 0 0 6px rgba(0,0,0,.18), 0 3px 0 rgba(0,0,0,.3); }
+.kit.sm { width: 16px; height: 16px; box-shadow: inset 0 0 0 2px var(--r), 0 1px 0 rgba(0,0,0,.3); }
+/* patterns */
+.k-st { --pat: linear-gradient(90deg, var(--c1) 0 20%, var(--c2) 20% 40%, var(--c1) 40% 60%, var(--c2) 60% 80%, var(--c1) 80%); }   /* 縦じま */
+.k-hp { --pat: linear-gradient(180deg, var(--c1) 0 20%, var(--c2) 20% 40%, var(--c1) 40% 60%, var(--c2) 60% 80%, var(--c1) 80%); }  /* 横じま */
+.k-hf { --pat: linear-gradient(90deg, var(--c1) 50%, var(--c2) 50%); }                                                             /* 左右2色 */
+.k-dh { --pat: linear-gradient(135deg, var(--c1) 50%, var(--c2) 50%); }                                                            /* ななめ2色 */
+.k-tr { --pat: linear-gradient(90deg, var(--c1) 0 34%, var(--c2) 34% 66%, var(--c3) 66%); }                                        /* 縦の3色 */
+.k-bd { --pat: linear-gradient(180deg, var(--c1) 0 35%, var(--c2) 35% 65%, var(--c1) 65%); }                                       /* 横の帯 */
+.k-bd3 { --pat: linear-gradient(180deg, var(--c1) 0 31%, var(--c2) 31% 42%, var(--c3) 42% 58%, var(--c2) 58% 69%, var(--c1) 69%); } /* 横の帯（中に1本） */
+.k-sh { --pat: linear-gradient(135deg, var(--c1) 0 37%, var(--c2) 37% 63%, var(--c1) 63%); }                                       /* たすき */
+.k-sh3 { --pat: linear-gradient(135deg, var(--c1) 0 33%, var(--c2) 33% 43%, var(--c3) 43% 57%, var(--c2) 57% 67%, var(--c1) 67%); } /* たすき（中に1本） */
+.k-ub { --pat: linear-gradient(180deg, var(--c2) 0 27%, var(--c1) 27% 73%, var(--c2) 73%); }                                       /* 上下の帯 */
+.k-pn { --pat: linear-gradient(90deg, var(--c1) 0 26%, var(--c2) 26% 34%, var(--c1) 34% 46%, var(--c2) 46% 54%, var(--c1) 54% 66%, var(--c2) 66% 74%, var(--c1) 74%); } /* 細い3本線 */
+.k-cs { --pat: linear-gradient(90deg, var(--c1) 0 29%, var(--c2) 29% 39%, var(--c3) 39% 61%, var(--c2) 61% 71%, var(--c1) 71%); }  /* 真ん中のストライプ */
+.k-qt { --pat: conic-gradient(var(--c1) 0 25%, var(--c2) 0 50%, var(--c1) 0 75%, var(--c2) 0); }                                  /* 4分割 */
+.k-cd { --pat: radial-gradient(circle, var(--c2) 0 27%, transparent 28%), var(--c1); }                                             /* 真ん中に丸 */
+.k-tf { --pat: radial-gradient(ellipse 15% 15% at 50% 37%, var(--c2) 90%, transparent 100%), radial-gradient(ellipse 15% 15% at 37% 60%, var(--c2) 90%, transparent 100%), radial-gradient(ellipse 15% 15% at 63% 60%, var(--c2) 90%, transparent 100%), var(--c1); } /* 三つ葉 */
+.k-v { --pat: linear-gradient(to top right, var(--c1) 0 37%, var(--c2) 37% 63%, var(--c1) 63%) left top / 50% 78% no-repeat, linear-gradient(to top left, var(--c1) 0 37%, var(--c2) 37% 63%, var(--c1) 63%) right top / 50% 78% no-repeat, var(--c1); } /* V */
+.k-di::after { content: ''; position: absolute; left: 50%; top: 50%; width: 34%; height: 34%; background: var(--c2); transform: translate(-50%, -50%) rotate(45deg); border-radius: 1px; } /* 菱形 */
 
 /* dock — the thumb zone */
 .dock { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; padding: 10px 12px env(safe-area-inset-bottom, 0px); background: color-mix(in srgb, var(--bg) 92%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
@@ -416,7 +436,7 @@ button.apc:not(:disabled):active { transform: scale(.97); }
 /* manager's name: a nameplate under the club's magnet */
 .mgr-card { display: grid; gap: 14px; justify-items: center; text-align: center; padding: 6px 0 2px; }
 .mgr-club { display: grid; justify-items: center; gap: 8px; }
-.mgr-club .kit.lg { width: 64px; height: 64px; box-shadow: inset 0 0 0 7px var(--c2), inset 0 0 0 8px rgba(0,0,0,.18), 0 4px 0 rgba(0,0,0,.3); }
+.mgr-club .kit.lg { width: 64px; height: 64px; box-shadow: inset 0 0 0 7px var(--r), inset 0 0 0 8px rgba(0,0,0,.18), 0 4px 0 rgba(0,0,0,.3); }
 .mgr-club b { font-family: var(--f-display); font-weight: 400; font-size: 20px; letter-spacing: .02em; }
 .mgr-plate { position: relative; display: flex; align-items: stretch; width: 100%; max-width: 340px; min-height: 60px; border-radius: 12px; overflow: hidden; cursor: text;
   background: var(--surface2); box-shadow: inset 0 0 0 2px var(--k1), 0 3px 0 rgba(0,0,0,.25); }
@@ -467,7 +487,7 @@ button.apc:not(:disabled):active { transform: scale(.97); }
 .chip.abchip { background: color-mix(in srgb, var(--zone-top) 18%, transparent); color: var(--zone-top); }
 /* 他チーム情報 */
 .team-head { display: flex; align-items: center; gap: 12px; }
-.team-head .kit.lg { width: 52px; height: 52px; box-shadow: inset 0 0 0 6px var(--c2), inset 0 0 0 7px rgba(0,0,0,.18), 0 3px 0 rgba(0,0,0,.3); }
+.team-head .kit.lg { width: 52px; height: 52px; box-shadow: inset 0 0 0 6px var(--r), inset 0 0 0 7px rgba(0,0,0,.18), 0 3px 0 rgba(0,0,0,.3); }
 .team-rank { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; text-align: center; }
 .team-rank div { background: var(--surface2); border-radius: 10px; padding: 6px 2px 5px; }
 .team-rank small { display: block; font-size: 10px; color: var(--muted); font-weight: 700; }
@@ -613,7 +633,7 @@ html.ios-app { min-height: calc(var(--apph) + 1px); }
 .plate.chalk b { font-size: 16px; }
 .plate:active { transform: translateY(3px); }
 .plate.yellow:active { box-shadow: 0 1px 0 #A68319; } .plate.chalk:active { box-shadow: 0 1px 0 #B9B4A2; }
-.mag-dot { --c1: #888; --c2: #ddd; width: 24px; height: 24px; border-radius: 50%; flex: none; background: radial-gradient(circle at 34% 28%, rgba(255,255,255,.45) 0%, rgba(255,255,255,0) 48%), var(--c1); box-shadow: inset 0 0 0 3px var(--c2), inset 0 0 0 4px rgba(0,0,0,.18), 0 2px 0 rgba(0,0,0,.3); }
+.mag-dot { width: 24px; height: 24px; border-radius: 50%; flex: none; box-shadow: inset 0 0 0 3px var(--r), inset 0 0 0 4px rgba(0,0,0,.18), 0 2px 0 rgba(0,0,0,.3); }
 .newmag { display: inline-grid; place-items: center; flex: none; width: 38px; height: 24px; border-radius: 5px; background: linear-gradient(180deg, #4A86E6 0%, #2459B8 100%); color: #fff; font: 900 10px/1 var(--f-body); letter-spacing: .08em; box-shadow: 0 2px 0 rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.35); }
 .tb-links { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 0 2px; }
 .tb-links button { min-height: 40px; font-family: var(--f-chalk); font-size: 14px; color: #F4F1E6; text-shadow: 0 1px 3px rgba(0,0,0,.6); text-decoration: underline; text-underline-offset: 4px; text-decoration-color: rgba(244,241,230,.5); }
@@ -3802,7 +3822,54 @@ async function cloudWipe() {
 
 /* ---------- small renderers ---------- */
 function lum(hex) { const h = hex.replace('#', ''); const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16); return (0.299 * r + 0.587 * g + 0.114 * b) / 255; }
-function kit(cid, size) { const c = S && S.clubs[cid] || (PREVIEW && PREVIEW.clubs[cid]); if (!c) return '<span class="kit"></span>'; return `<span class="kit ${size || ''}" style="--c1:${c.c1};--c2:${c.c2}" aria-hidden="true"></span>`; }
+// club magnets: no real crests — the club's colours and one simple pattern each (.k-* in template.html), so that clubs in the
+// same colour still look different (2026-10-14). [pattern, colour 1, colour 2, colour 3, ring]; 'so' = plain colour 1 with a
+// colour-2 ring (the old look). Clubs not listed (海外組) keep the plain look in their kit colours.
+const EMB = {
+  // J1
+  kashima:    ['hp', '#A6192E', '#14234B', null, '#14234B'],
+  yokohamafm: ['tr', '#0B3B8C', '#FFFFFF', '#D7101F', '#FFFFFF'],
+  kashiwa:    ['so', '#F2CC0C', '#1A1A1A'],
+  kawasakif:  ['so', '#3BA2E0', '#111111'],
+  urawa:      ['so', '#D7000F', '#111111'],
+  machida:    ['so', '#0A3D91', '#C9A227'],
+  tokyov:     ['so', '#00843D', '#F3F3F3'],
+  fctokyo:    ['hf', '#123E8C', '#C8102E', null, '#0B1E44'],
+  mito:       ['tf', '#1D4FA0', '#FFFFFF', null, '#FFFFFF'],
+  chiba:      ['sh', '#F7D117', '#00753A', null, '#00753A'],
+  shimizu:    ['pn', '#F28A00', '#123A7A', null, '#123A7A'],
+  nagoya:     ['bd', '#D6271C', '#F2A900', null, '#F2A900'],
+  kyoto:      ['sh', '#6B2A8F', '#D7262E', null, '#E8E3EE'],
+  gosaka:     ['st', '#0A4AA6', '#111111', null, '#111111'],
+  cosaka:     ['so', '#E2187A', '#1B2A4A'],
+  kobe:       ['cs', '#8E1B2E', '#FFFFFF', '#111111', '#111111'],
+  okayama:    ['cd', '#8C1D3A', '#F2F2F2', null, '#F2F2F2'],
+  hiroshima:  ['pn', '#5A2D91', '#FFFFFF', null, '#FFFFFF'],
+  fukuoka:    ['hp', '#0D2C6C', '#B8BEC9', null, '#B8BEC9'],
+  nagasaki:   ['v', '#0F4C9C', '#F39800', null, '#F39800'],
+  // J2
+  sapporo:    ['st', '#C8102E', '#111111', null, '#111111'],
+  yokohamafc: ['dh', '#2BA6DE', '#FFFFFF', null, '#1D4FA0'],
+  shonan:     ['hf', '#7AB800', '#1F4E9C', null, '#FFFFFF'],
+  niigata:    ['so', '#F26B00', '#1F3C88'],
+  iwata:      ['ub', '#6DB6E6', '#1D3F8C', null, '#FFFFFF'],
+  tosu:       ['hf', '#5BA6DE', '#E7489B', null, '#FFFFFF'],
+  omiya:      ['qt', '#F37021', '#14224A', null, '#14224A'],
+  sendai:     ['bd', '#F5C400', '#1B2E5A', null, '#1B2E5A'],
+  tokushima:  ['sh', '#1B3A8C', '#78BE20', null, '#FFFFFF'],
+  oita:       ['cd', '#1D3C9C', '#F2C400', null, '#F2C400'],
+  kofu:       ['di', '#1D4E9C', '#A3203A', null, '#F2F2F2'],
+  yamagata:   ['pn', '#1D3F8C', '#F2C400', null, '#F2C400'],
+  iwaki:      ['sh', '#C8102E', '#1B2A4A', null, '#1B2A4A'],
+  imabari:    ['cs', '#1B2A4A', '#F2C400', '#FFFFFF', '#F2C400'],
+};
+function kitVars(cid, c) {
+  const e = EMB[cid];
+  if (!e) return { cls: '', st: c ? `--c1:${c.c1};--c2:${c.c2}` : '' };
+  return { cls: e[0] === 'so' ? '' : ' k-' + e[0], st: `--c1:${e[1]};--c2:${e[2]}${e[3] ? ';--c3:' + e[3] : ''}${e[4] ? ';--r:' + e[4] : ''}` };
+}
+function kitTag(cid, c, size, base) { const v = kitVars(cid, c); return `<span class="${base || 'kit'}${size ? ' ' + size : ''}${v.cls}" style="${v.st}" aria-hidden="true"></span>`; }
+function kit(cid, size) { const c = S && S.clubs[cid] || (PREVIEW && PREVIEW.clubs[cid]); if (!c) return '<span class="kit"></span>'; return kitTag(cid, c, size); }
 function oc(v) { return v >= 75 ? 'o-elite' : v >= 70 ? 'o-good' : v >= 64 ? 'o-mid' : 'o-low'; }
 function condBar(c) { const cls = c >= 85 ? '' : c >= 70 ? 'mid' : 'low'; return `<span class="bar" title="コンディション ${Math.round(c)}%"><i class="${cls}" style="width:${Math.round(c)}%"></i></span>`; }
 function formChips(arr) { return arr.length ? arr.map(r => `<span class="res res-${r}">${{ W: '勝', D: '分', L: '敗' }[r]}</span>`).join('') : '<span class="muted small">—</span>'; }
@@ -3833,7 +3900,7 @@ function viewTitle() {
   const sc = save && save.clubs[save.my];
   const pc = v => +(v * 100).toFixed(2) + '%';
   const mag = cls => ([x, y, n]) => `<span class="mag ${cls}" style="left:${pc(x / TB_W)};top:${pc(y / TB_H)}">${n}</span>`;
-  const cont = save ? `<button class="plate yellow" data-act="continue"><span class="mag-dot" style="--c1:${sc.c1};--c2:${sc.c2}" aria-hidden="true"></span><span><b>つづきから</b><small>${esc(sc.name)}　${E.seasonLabel(save.season)}・${jd(save.date)}${save === Cloud.cand ? '・クラウド' : ''}</small></span></button>` : '';
+  const cont = save ? `<button class="plate yellow" data-act="continue">${kitTag(save.my, sc, '', 'mag-dot')}<span><b>つづきから</b><small>${esc(sc.name)}　${E.seasonLabel(save.season)}・${jd(save.date)}${save === Cloud.cand ? '・クラウド' : ''}</small></span></button>` : '';
   const fresh = `<button class="plate ${save ? 'chalk' : 'yellow'}" data-act="toSelect"><span class="newmag" aria-hidden="true">NEW</span><b>新しく始める</b></button>`;
   return `<div class="tb-wrap"><main class="tboard">
     <div class="tb-pitch" aria-hidden="true">
@@ -3858,7 +3925,7 @@ function sheetAbout() {
     <p class="fine">選手と在籍クラブはJリーグ公式サイトの2026/27シーズン登録選手（2026年9月時点）をもとにしています。能力値は独自の推定です。クラブのエンブレムは使用していません。非商用のファンメイドゲームです。</p>`,
     '<button class="btn ghost block" data-act="closeSheet">閉じる</button>');
 }
-function kitFor(st, cid) { const c = st.clubs[cid]; return `<span class="kit lg" style="--c1:${c.c1};--c2:${c.c2}" aria-hidden="true"></span>`; }
+function kitFor(st, cid) { return kitTag(cid, st.clubs[cid], 'lg'); }
 function pickSave(a, b) { if (a && b) return (b.savedAt || 0) > (a.savedAt || 0) ? b : a; return a || b || null; }
 function presBadge(c) { const n = E.presStars(c.pres); return `<span class="stars" aria-label="クラブの格">${'★'.repeat(n)}${'☆'.repeat(5 - n)}</span>`; }
 function titlesText(c) {
@@ -3874,7 +3941,7 @@ function viewSelect() {
     <div class="select-head"><div class="eyebrow">2026/27 明治安田J1リーグ</div><h2>率いるクラブを選ぶ</h2><p class="fine">右の★はチーム力（選手の実力にクラブの格を加えたもの）。格はタイトル歴とJ1在籍年数から決まり、選手の集まりやすさやフロントの期待にも影響します。</p></div>
     <ul class="list">${ORDER.map(id => {
       const c = P.clubs[id];
-      return `<li><button class="crow" data-act="pickClub" data-id="${id}"><span class="kit lg" style="--c1:${c.c1};--c2:${c.c2}" aria-hidden="true"></span><span><b>${esc(c.name)}</b><span>${esc(c.area)}・資金 ${E.money(c.funds)}</span></span><span style="display:grid;justify-items:end;gap:2px"><span class="stars" aria-label="チーム力">${stars(c.pred)}</span><span class="small muted">格：${E.presLabel(c.pres)}</span></span></button></li>`;
+      return `<li><button class="crow" data-act="pickClub" data-id="${id}">${kitTag(id, c, 'lg')}<span><b>${esc(c.name)}</b><span>${esc(c.area)}・資金 ${E.money(c.funds)}</span></span><span style="display:grid;justify-items:end;gap:2px"><span class="stars" aria-label="チーム力">${stars(c.pred)}</span><span class="small muted">格：${E.presLabel(c.pres)}</span></span></button></li>`;
     }).join('')}</ul>
   </div>
   <div class="title-actions"><button class="btn ghost block" data-act="toTitle">戻る</button></div></div>`;
@@ -3883,7 +3950,7 @@ function sheetClub(id) {
   const P = PREVIEW, c = P.clubs[id];
   const top = E.squad(P, id).sort((a, b) => b.ovr - a.ovr).slice(0, 6);
   sheetState = { type: 'club', id };
-  openSheet(`<div class="row"><span class="kit lg" style="--c1:${c.c1};--c2:${c.c2}"></span><div><div class="eyebrow">${esc(c.area)}</div><h2>${esc(c.name)}</h2></div></div>
+  openSheet(`<div class="row">${kitTag(id, c, 'lg')}<div><div class="eyebrow">${esc(c.area)}</div><h2>${esc(c.name)}</h2></div></div>
     <dl class="kv"><dt>ホーム</dt><dd>${esc(c.stadium)}</dd><dt>収容</dt><dd>${c.cap.toLocaleString('ja-JP')}人</dd><dt>資金</dt><dd>${E.money(c.funds)}</dd><dt>スポンサー収入</dt><dd>月 ${E.money(c.spon)}</dd><dt>チーム力</dt><dd><span class="stars">${stars(c.pred)}</span>（${c.pred}番手）</dd><dt>クラブの格</dt><dd>${presBadge(c)} ${E.presLabel(c.pres)}</dd><dt>クラブの目標</dt><dd>${esc(c.target.jp)}</dd></dl>
     <p class="fine" style="margin:-6px 0 0">${titlesText(c)}${c.o10 ? '・Jリーグ創設メンバー' : ''}</p>
     <div><div class="eyebrow" style="margin-bottom:6px">主力選手</div><ul class="list">${top.map(p => `<li><div class="prow" style="grid-template-columns:30px 1fr auto">${posTag(p)}<span class="nm"><b>${esc(p.name)}</b><span>${E.age(p, P.date)}歳 ${natChip(p)}</span></span><span class="ovr ${oc(p.ovr)}">${E.ovr(p)}</span></div></li>`).join('')}</ul></div>`,
@@ -3896,7 +3963,7 @@ function sheetName(id, keep) {
   const kt = lum(c.c1) > 0.6 ? '#141414' : '#ffffff';
   openSheet(`<div class="mgr-card" style="--k1:${c.c1};--k2:${c.c2};--kt:${kt}">
       <div class="eyebrow">新監督の就任</div>
-      <div class="mgr-club"><span class="kit lg" style="--c1:${c.c1};--c2:${c.c2}" aria-hidden="true"></span><b>${esc(c.name)}</b></div>
+      <div class="mgr-club">${kitTag(id, c, 'lg')}<b>${esc(c.name)}</b></div>
       <label class="mgr-plate" for="mgr-name"><span class="mgr-plate-k">監督</span><input id="mgr-name" maxlength="12" placeholder="あなた" autocomplete="off" enterkeyhint="done" value="${esc(keep || '')}" aria-label="監督名"></label>
       <p class="fine" style="margin:0">あなたの名前を入れてください（12文字まで）。空欄のままなら「あなた」で始まります。</p>
       ${(() => { const n = carryPresets().length; return n ? `<p class="fine" style="margin:0">保存した戦術（${n}件）は新しいゲームでも使えます。</p>` : ''; })()}
@@ -4549,7 +4616,7 @@ function sheetTeam(cid, tab, back) {
   const t = E.table(S); const ri = t.findIndex(r => r.id === cid); const row = ri >= 0 ? t[ri] : null;
   const j1 = inJ1(cid);
   const kt = lum(c.c1) > 0.6 ? '#141414' : '#ffffff';
-  const head = `<div class="team-head"><span class="kit lg" style="--c1:${c.c1};--c2:${c.c2}" aria-hidden="true"></span><div style="min-width:0"><div class="eyebrow">${esc(c.area || '')}・${j1 ? 'J1' : c.ab ? esc(c.ab.lg) : 'J2'}${c.coach ? `・監督 ${esc(c.coach)}` : ''}</div><h2>${esc(c.name)}</h2></div></div>`;
+  const head = `<div class="team-head">${kitTag(cid, c, 'lg')}<div style="min-width:0"><div class="eyebrow">${esc(c.area || '')}・${j1 ? 'J1' : c.ab ? esc(c.ab.lg) : 'J2'}${c.coach ? `・監督 ${esc(c.coach)}` : ''}</div><h2>${esc(c.name)}</h2></div></div>`;
   const tabs = `<div class="seg" role="tablist">${[['info', '概要'], ['squad', `選手（${E.squad(S, cid).length}人）`]].map(([k, l]) => `<button data-act="teamTab" data-k="${k}" aria-pressed="${tab === k}">${l}</button>`).join('')}</div>`;
   let body = '';
   if (tab === 'squad') {
@@ -4921,7 +4988,7 @@ function sheetPresets() {
     const head = ui.edit === i
       ? `<div class="row" style="gap:8px"><input class="input" id="pr-name" maxlength="16" value="${esc(pr.name)}" autocomplete="off" style="flex:1"><button class="btn" data-act="presetRename" data-i="${i}">決定</button></div>`
       : `<div class="row"><b>${esc(pr.name)}</b><span class="spacer"></span><span class="small muted pr-when">${when}</span></div>`;
-    const club = pr.cn ? `<div class="pr-club"><span class="kit sm" style="--c1:${pr.k1};--c2:${pr.k2}" aria-hidden="true"></span><span>${esc(pr.cn)}</span>${st.other ? '<small>（ほかのクラブ）</small>' : ''}</div>` : '';
+    const club = pr.cn ? `<div class="pr-club">${kitTag(pr.club, { c1: pr.k1, c2: pr.k2 }, 'sm')}<span>${esc(pr.cn)}</span>${st.other ? '<small>（ほかのクラブ）</small>' : ''}</div>` : '';
     return `<li><div class="preset">${head}${club}
       <div class="small muted">${pr.form}・${esc(E.mentLabel(pr))}・プレス${esc((E.PRESS[pr.press] || E.PRESS.mid).jp)}${E.tacLabel(pr) ? '・' + esc(E.tacLabel(pr)) : ''}</div>
       ${chips ? `<div class="row wrap">${chips}</div>` : ''}
@@ -4943,7 +5010,7 @@ function sheetFired() {
   const F = S.fired; if (!F) return;
   sheetState = { type: 'fired' };
   openSheet(`<div class="eyebrow">解任</div><h2>${esc(S.clubs[F.from].name)}を去ることに</h2><p class="fine">${esc(F.reason)}。ほかのクラブから監督就任のオファーが届いています。</p>
-    <ul class="list">${F.offers.map(cid => { const c = S.clubs[cid]; return `<li><button class="crow" data-act="job" data-id="${cid}"><span class="kit lg" style="--c1:${c.c1};--c2:${c.c2}"></span><span><b>${esc(c.name)}</b><span>資金 ${E.money(c.funds)}・${E.position(S, cid)}位</span></span><span class="chip acc">就任</span></button></li>`; }).join('')}</ul>`,
+    <ul class="list">${F.offers.map(cid => { const c = S.clubs[cid]; return `<li><button class="crow" data-act="job" data-id="${cid}">${kitTag(cid, c, 'lg')}<span><b>${esc(c.name)}</b><span>資金 ${E.money(c.funds)}・${E.position(S, cid)}位</span></span><span class="chip acc">就任</span></button></li>`; }).join('')}</ul>`,
     '<button class="btn danger block" data-act="askReset">はじめからやり直す</button>');
 }
 /* ---------- save transfer (引き継ぎコード) ---------- */

@@ -83,11 +83,31 @@ h1, h2, h3 { text-wrap: balance; margin: 0; }
 .view:has(> .subnav) > * { flex-shrink: 0; }
 .view:has(> .subnav) > .subnav { margin-top: auto; }
 
-/* kit badge (no crests — kit colours only) */
-/* every club is a magnet in its kit colours */
-.kit { --c1: #888; --c2: #ddd; width: 24px; height: 24px; border-radius: 50%; flex: none; background: radial-gradient(circle at 34% 28%, rgba(255,255,255,.42) 0%, rgba(255,255,255,0) 46%), var(--c1); box-shadow: inset 0 0 0 3px var(--c2), inset 0 0 0 4px rgba(0,0,0,.18), 0 2px 0 rgba(0,0,0,.3); }
-.kit.lg { width: 44px; height: 44px; box-shadow: inset 0 0 0 5px var(--c2), inset 0 0 0 6px rgba(0,0,0,.18), 0 3px 0 rgba(0,0,0,.3); }
-.kit.sm { width: 16px; height: 16px; box-shadow: inset 0 0 0 2px var(--c2), 0 1px 0 rgba(0,0,0,.3); }
+/* club magnets: no real crests — the club colours and one simple pattern per club (EMB in app.js) */
+.kit, .mag-dot { --c1: #888; --c2: #ddd; --c3: var(--c2); --r: var(--c2); position: relative;
+  --gl: radial-gradient(circle at 34% 28%, rgba(255,255,255,.42) 0%, rgba(255,255,255,0) 46%);
+  background: var(--gl), var(--pat, var(--c1)); }
+.kit { width: 24px; height: 24px; border-radius: 50%; flex: none; box-shadow: inset 0 0 0 3px var(--r), inset 0 0 0 4px rgba(0,0,0,.18), 0 2px 0 rgba(0,0,0,.3); }
+.kit.lg { width: 44px; height: 44px; box-shadow: inset 0 0 0 5px var(--r), inset 0 0 0 6px rgba(0,0,0,.18), 0 3px 0 rgba(0,0,0,.3); }
+.kit.sm { width: 16px; height: 16px; box-shadow: inset 0 0 0 2px var(--r), 0 1px 0 rgba(0,0,0,.3); }
+/* patterns */
+.k-st { --pat: linear-gradient(90deg, var(--c1) 0 20%, var(--c2) 20% 40%, var(--c1) 40% 60%, var(--c2) 60% 80%, var(--c1) 80%); }   /* 縦じま */
+.k-hp { --pat: linear-gradient(180deg, var(--c1) 0 20%, var(--c2) 20% 40%, var(--c1) 40% 60%, var(--c2) 60% 80%, var(--c1) 80%); }  /* 横じま */
+.k-hf { --pat: linear-gradient(90deg, var(--c1) 50%, var(--c2) 50%); }                                                             /* 左右2色 */
+.k-dh { --pat: linear-gradient(135deg, var(--c1) 50%, var(--c2) 50%); }                                                            /* ななめ2色 */
+.k-tr { --pat: linear-gradient(90deg, var(--c1) 0 34%, var(--c2) 34% 66%, var(--c3) 66%); }                                        /* 縦の3色 */
+.k-bd { --pat: linear-gradient(180deg, var(--c1) 0 35%, var(--c2) 35% 65%, var(--c1) 65%); }                                       /* 横の帯 */
+.k-bd3 { --pat: linear-gradient(180deg, var(--c1) 0 31%, var(--c2) 31% 42%, var(--c3) 42% 58%, var(--c2) 58% 69%, var(--c1) 69%); } /* 横の帯（中に1本） */
+.k-sh { --pat: linear-gradient(135deg, var(--c1) 0 37%, var(--c2) 37% 63%, var(--c1) 63%); }                                       /* たすき */
+.k-sh3 { --pat: linear-gradient(135deg, var(--c1) 0 33%, var(--c2) 33% 43%, var(--c3) 43% 57%, var(--c2) 57% 67%, var(--c1) 67%); } /* たすき（中に1本） */
+.k-ub { --pat: linear-gradient(180deg, var(--c2) 0 27%, var(--c1) 27% 73%, var(--c2) 73%); }                                       /* 上下の帯 */
+.k-pn { --pat: linear-gradient(90deg, var(--c1) 0 26%, var(--c2) 26% 34%, var(--c1) 34% 46%, var(--c2) 46% 54%, var(--c1) 54% 66%, var(--c2) 66% 74%, var(--c1) 74%); } /* 細い3本線 */
+.k-cs { --pat: linear-gradient(90deg, var(--c1) 0 29%, var(--c2) 29% 39%, var(--c3) 39% 61%, var(--c2) 61% 71%, var(--c1) 71%); }  /* 真ん中のストライプ */
+.k-qt { --pat: conic-gradient(var(--c1) 0 25%, var(--c2) 0 50%, var(--c1) 0 75%, var(--c2) 0); }                                  /* 4分割 */
+.k-cd { --pat: radial-gradient(circle, var(--c2) 0 27%, transparent 28%), var(--c1); }                                             /* 真ん中に丸 */
+.k-tf { --pat: radial-gradient(ellipse 15% 15% at 50% 37%, var(--c2) 90%, transparent 100%), radial-gradient(ellipse 15% 15% at 37% 60%, var(--c2) 90%, transparent 100%), radial-gradient(ellipse 15% 15% at 63% 60%, var(--c2) 90%, transparent 100%), var(--c1); } /* 三つ葉 */
+.k-v { --pat: linear-gradient(to top right, var(--c1) 0 37%, var(--c2) 37% 63%, var(--c1) 63%) left top / 50% 78% no-repeat, linear-gradient(to top left, var(--c1) 0 37%, var(--c2) 37% 63%, var(--c1) 63%) right top / 50% 78% no-repeat, var(--c1); } /* V */
+.k-di::after { content: ''; position: absolute; left: 50%; top: 50%; width: 34%; height: 34%; background: var(--c2); transform: translate(-50%, -50%) rotate(45deg); border-radius: 1px; } /* 菱形 */
 
 /* dock — the thumb zone */
 .dock { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; padding: 10px 12px env(safe-area-inset-bottom, 0px); background: color-mix(in srgb, var(--bg) 92%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
@@ -416,7 +436,7 @@ button.apc:not(:disabled):active { transform: scale(.97); }
 /* manager's name: a nameplate under the club's magnet */
 .mgr-card { display: grid; gap: 14px; justify-items: center; text-align: center; padding: 6px 0 2px; }
 .mgr-club { display: grid; justify-items: center; gap: 8px; }
-.mgr-club .kit.lg { width: 64px; height: 64px; box-shadow: inset 0 0 0 7px var(--c2), inset 0 0 0 8px rgba(0,0,0,.18), 0 4px 0 rgba(0,0,0,.3); }
+.mgr-club .kit.lg { width: 64px; height: 64px; box-shadow: inset 0 0 0 7px var(--r), inset 0 0 0 8px rgba(0,0,0,.18), 0 4px 0 rgba(0,0,0,.3); }
 .mgr-club b { font-family: var(--f-display); font-weight: 400; font-size: 20px; letter-spacing: .02em; }
 .mgr-plate { position: relative; display: flex; align-items: stretch; width: 100%; max-width: 340px; min-height: 60px; border-radius: 12px; overflow: hidden; cursor: text;
   background: var(--surface2); box-shadow: inset 0 0 0 2px var(--k1), 0 3px 0 rgba(0,0,0,.25); }
@@ -467,7 +487,7 @@ button.apc:not(:disabled):active { transform: scale(.97); }
 .chip.abchip { background: color-mix(in srgb, var(--zone-top) 18%, transparent); color: var(--zone-top); }
 /* 他チーム情報 */
 .team-head { display: flex; align-items: center; gap: 12px; }
-.team-head .kit.lg { width: 52px; height: 52px; box-shadow: inset 0 0 0 6px var(--c2), inset 0 0 0 7px rgba(0,0,0,.18), 0 3px 0 rgba(0,0,0,.3); }
+.team-head .kit.lg { width: 52px; height: 52px; box-shadow: inset 0 0 0 6px var(--r), inset 0 0 0 7px rgba(0,0,0,.18), 0 3px 0 rgba(0,0,0,.3); }
 .team-rank { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; text-align: center; }
 .team-rank div { background: var(--surface2); border-radius: 10px; padding: 6px 2px 5px; }
 .team-rank small { display: block; font-size: 10px; color: var(--muted); font-weight: 700; }
@@ -613,7 +633,7 @@ html.ios-app { min-height: calc(var(--apph) + 1px); }
 .plate.chalk b { font-size: 16px; }
 .plate:active { transform: translateY(3px); }
 .plate.yellow:active { box-shadow: 0 1px 0 #A68319; } .plate.chalk:active { box-shadow: 0 1px 0 #B9B4A2; }
-.mag-dot { --c1: #888; --c2: #ddd; width: 24px; height: 24px; border-radius: 50%; flex: none; background: radial-gradient(circle at 34% 28%, rgba(255,255,255,.45) 0%, rgba(255,255,255,0) 48%), var(--c1); box-shadow: inset 0 0 0 3px var(--c2), inset 0 0 0 4px rgba(0,0,0,.18), 0 2px 0 rgba(0,0,0,.3); }
+.mag-dot { width: 24px; height: 24px; border-radius: 50%; flex: none; box-shadow: inset 0 0 0 3px var(--r), inset 0 0 0 4px rgba(0,0,0,.18), 0 2px 0 rgba(0,0,0,.3); }
 .newmag { display: inline-grid; place-items: center; flex: none; width: 38px; height: 24px; border-radius: 5px; background: linear-gradient(180deg, #4A86E6 0%, #2459B8 100%); color: #fff; font: 900 10px/1 var(--f-body); letter-spacing: .08em; box-shadow: 0 2px 0 rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.35); }
 .tb-links { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 0 2px; }
 .tb-links button { min-height: 40px; font-family: var(--f-chalk); font-size: 14px; color: #F4F1E6; text-shadow: 0 1px 3px rgba(0,0,0,.6); text-decoration: underline; text-underline-offset: 4px; text-decoration-color: rgba(244,241,230,.5); }
