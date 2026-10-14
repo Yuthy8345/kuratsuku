@@ -342,8 +342,9 @@ function offerCard(it) {
   const v = E.value(p, S.date);
   return `<article class="card" style="display:grid;gap:10px">
     <div class="row">${kit(it.from)}<div style="min-width:0"><b>${esc(S.clubs[it.from].name)}</b><div class="small muted">${jd(it.d)}着・${jd(it.exp)}まで有効</div></div></div>
-    <div>${esc(p.name)}（${p.pos}・${E.ovr(p)}）に <b>${E.money(it.fee)}</b> を提示。<span class="small muted">市場価値 ${E.money(v)}</span></div>
+    <div>${esc(p.name)}（${p.pos}・${E.ovr(p)}）に <b>${E.money(it.fee)}</b> を提示。${it.raised ? `<span class="chip ok" style="margin-right:6px">増額（+${E.money(it.fee - it.fee0)}）</span>` : ''}<span class="small muted">市場価値 ${E.money(v)}</span></div>
     <div class="grid2"><button class="btn ghost" data-act="offerNo" data-id="${it.id}">断る</button><button class="btn primary" data-act="offerYes" data-id="${it.id}">受ける</button></div>
+    ${it.raised ? '' : `<button class="btn ghost block" data-act="offerUp" data-id="${it.id}">増額を求める</button><p class="fine">1回だけ。上乗せしてくるか、手を引くかのどちらか。${(it.walk != null ? it.walk >= E.OFFER_UP.walk.listed : p.listed) ? '放出リストを見て来たオファーなので、手を引かれやすい。' : '向こうから来たオファーなので、応じてもらいやすい。'}</p>`}
   </article>`;
 }
 function viewHome() {
@@ -397,7 +398,7 @@ function prow(p, ctx) {
   if (p.sus > 0) chips.push('<span class="chip warn">出場停止</span>');
   if (p.hot) chips.push('<span class="chip fire">燃えている</span>');
   if (p.reborn) chips.push('<span class="chip rbchip">転生</span>');
-  if (ctx === 'market' && E.shortEntry(S, p.id)) chips.push('<span class="chip acc">入札済み</span>');
+  if (ctx === 'market' && E.shortEntry(S, p.id)) chips.push(`<span class="chip acc">${E.negoOf(S, p.id) ? '交渉中' : '入札済み'}</span>`);
   const lead = ctx === 'market' ? (S.clubs[p.club] ? kit(p.club) : '<span class="chip">FA</span>') : `<span class="no">${p.num}</span>`;
   const abc = ctx === 'market' && E.abroadOf(S, p);
   const sub = ctx === 'market' ? `${S.clubs[p.club] ? esc(S.clubs[p.club].short) : 'フリー'}・${a}歳・${E.money(E.price(S, p))}${abc ? ` <span class="chip abchip">${esc(abc.lg)}</span>` : ''}` : `${a}歳`;
@@ -564,12 +565,12 @@ function sheetPlayer(id, back) {
     foot = `${se ? `<div class="small muted">${shortStatus(se, p)}</div>` : ''}<button class="btn primary block" data-act="sign" data-id="${p.id}">契約する（契約金 ${E.money(sign)}）</button>${shortFoot(se, p)}`;
   } else {
     const open = E.inWindow(S.date);
-    const mults = [0.9, 1.0, 1.2, 1.5];
     const blk = E.bidBlock(S, p.id);
+    const ng = open && E.negoOf(S, p.id);
     const last = se ? `<div class="small muted">${shortStatus(se, p)}</div>` : '';
     foot = !open ? `${last}<div class="small muted">移籍期間外です。次の移籍期間は ${jd(E.nextWindowStart(S.date))} から。</div>${shortFoot(se, p)}`
       : blk && blk.why === 'player' ? `${last}${shortFoot(se, p)}`
-      : `${last}<div class="small muted">移籍金を提示（${club ? esc(club.short) : ''}・〜${jd(E.windowEnd(S.date))}）${blk ? '・同じ日の再入札はできません' : ''}${abc ? '<br>海外クラブは移籍金が高く、本人がJリーグ復帰に前向きとは限りません' : ''}</div><div class="grid2">${mults.map(m => `<button class="btn ${m === 1.2 ? 'primary' : ''}" data-act="bid" data-id="${p.id}" data-m="${m}" ${blk ? 'disabled' : ''}>${E.money(Math.round(E.price(S, p) * m / 100) * 100)}</button>`).join('')}</div>${shortFoot(se, p)}`;
+      : `${last}<div class="small muted">移籍金の交渉（${club ? esc(club.short) : ''}・〜${jd(E.windowEnd(S.date))}）${abc ? '<br>海外クラブは移籍金が高く、本人がJリーグ復帰に前向きとは限りません' : ''}</div><button class="btn primary block" data-act="nego" data-id="${p.id}">${ng ? `交渉を続ける（要求額 ${E.money(ng.ask)}）` : '交渉する'}</button>${shortFoot(se, p)}`;
   }
   if (back && back.type === 'team' && S.clubs[back.id]) foot = `<button class="btn ghost block" data-act="playerBack">← ${esc(S.clubs[back.id].short)}の情報に戻る</button>` + foot;
   const numTag = mine && !p.retire ? `<button class="numbtn" data-act="numSheet" data-id="${p.id}" aria-label="背番号${p.num}を変更"><b>${p.num}</b><span>変更</span></button>` : '';
@@ -1054,11 +1055,56 @@ function viewClub() {
   }
   return `${body}<div class="subnav"><div class="seg">${[['main', '経営'], ['market', '移籍市場'], ['records', '記録']].map(([k, l]) => `<button data-act="clView" data-k="${k}" aria-pressed="${v === k}">${l}</button>`).join('')}</div></div>`;
 }
+/* 移籍交渉 (2026-10-14): the club's asking price (要求額), their situation, their patience (3 magnets), what was said,
+   my offer (− / ＋ and three quick amounts), then 提示 or agree at the asking price. */
+function ngStepOf(pr) { const t = pr * 0.05; return [10000, 5000, 3000, 2000, 1000, 500, 300, 200, 100].find(x => x <= t) || 100; }
+const ngRound = (v, step) => Math.max(step, Math.round(v / step) * step);
+// what my offer starts at: 90% of the asking price, after a counter halfway between my last offer and the new ask
+function ngSuggest(n, step) {
+  const mine = n.log.filter(x => x[0] === 'me'); const lastMe = mine.length ? mine[mine.length - 1][1] : null;
+  const v = lastMe != null && n.log.length && n.log[n.log.length - 1][0] === 'club' ? (lastMe + n.ask) / 2 : n.ask * 0.9;
+  return Math.min(n.ask, ngRound(v, step));
+}
+function ngLog(n, club) {
+  const rows = n.log.slice(-6).map(([who, fee, d, kind]) => {
+    const when = d !== S.date ? `<small>${jd(d)}</small>` : '';
+    return who === 'me' ? `<li><span class="who">あなた</span><span>${E.money(fee)}を提示${when}</span></li>`
+      : `<li><span class="who">${esc(club.short)}</span><span>${kind === 'low' ? `「話にならない」要求額 ${E.money(fee)}` : `「${E.money(fee)}なら応じる」`}${when}</span></li>`;
+  });
+  return rows.length ? `<ul class="ng-log">${rows.join('')}</ul>` : '<p class="fine">まだ提示していません。</p>';
+}
+function sheetNego(id, back) {
+  const p = S.players[id]; if (!p) return closeSheet();
+  const n = E.negoOf(S, id); if (!n) return sheetPlayer(id, back);
+  sheetState = { type: 'nego', id, back: back || null };
+  const club = S.clubs[p.club], pr = E.price(S, p), info = E.negoInfo(S, p), will = E.negoWill(S, p), step = ngStepOf(pr);
+  if (!UI.ng || UI.ng.pid !== id) UI.ng = { pid: id, fee: ngSuggest(n, step) };
+  const fee = UI.ng.fee = Math.min(n.ask, Math.max(step, UI.ng.fee));
+  const chips = [info.role ? `<span class="chip">${info.role}</span>` : '', ...info.tags.map(t => `<span class="chip ${t.d > 0 ? 'acc' : 'ok'}">${esc(t.t)}</span>`),
+    `<span class="chip ${['warn', '', 'ok'][will.lv]}">本人：${will.jp}</span>`].join('');
+  const pat = Array.from({ length: E.NEGO.pat }, (_, i) => `<i class="${i < n.pat ? '' : 'off'}"></i>`).join('');
+  const atAsk = fee >= n.ask;
+  const body = `<div class="row">${kit(p.club, 'lg')}<div style="min-width:0"><div class="eyebrow">移籍交渉・${esc(club.name)}・〜${jd(n.until)}</div><h2>${esc(p.name)}</h2></div></div>
+    <div class="card ng-card">
+      <div class="ng-ask"><span class="eyebrow">${esc(club.short)}の要求額</span><span>${n.ask < n.ask0 ? `<s>${E.money(n.ask0)}</s>` : n.ask > n.ask0 ? `<small>（最初 ${E.money(n.ask0)}）</small>` : ''}<b>${E.money(n.ask)}</b></span></div>
+      <dl class="kv"><dt>相場（市場価値）</dt><dd>${E.money(pr)}</dd><dt>使える資金</dt><dd>${E.money(S.clubs[S.my].funds)}</dd><dt>相手の我慢</dt><dd><span class="ng-pat" role="img" aria-label="我慢 ${n.pat}/${E.NEGO.pat}">${pat}</span></dd></dl>
+      <div class="row wrap">${chips}</div>
+    </div>
+    <div><div class="eyebrow" style="margin-bottom:6px">やりとり</div>${ngLog(n, club)}</div>
+    ${n.fin ? `<p class="ng-fin">今日はこれ以上下がらない（最終提示 ${E.money(n.ask)}）。合意するか、明日あらためて交渉できます。</p>`
+      : `<div class="ng-step"><button class="btn" data-act="ngStep" data-d="-1" aria-label="${E.money(step)}下げる" ${fee <= step ? 'disabled' : ''}>−</button><div class="amt"><b>${E.money(fee)}</b><span>あなたの提示（相場の${(fee / pr).toFixed(2)}倍）</span></div><button class="btn" data-act="ngStep" data-d="1" aria-label="${E.money(step)}上げる" ${atAsk ? 'disabled' : ''}>＋</button></div>
+      <div class="ng-quick">${[['v', '相場'], ['90', '要求額の90%'], ['95', '要求額の95%']].map(([k, l]) => `<button class="btn ghost" data-act="ngSet" data-k="${k}">${l}</button>`).join('')}</div>
+      <p class="fine">要求額より低い額を出すと、相手は歩み寄るか据え置く。低すぎると我慢が2つ減り、要求額が上がる。我慢がなくなると、その日の要求額が最終提示（翌日に戻る）。</p>`}`;
+  const nav = `<div class="grid2"><button class="btn ghost" data-act="ngBack" data-id="${id}">← 選手の情報</button><button class="btn ghost" data-act="closeSheet">閉じる</button></div>`;
+  const foot = n.fin || atAsk ? `<button class="btn primary block" data-act="ngAgree" data-id="${id}">${E.money(n.ask)}で合意する</button>${nav}`
+    : `<div class="grid2"><button class="btn ghost" data-act="ngAgree" data-id="${id}">${E.money(n.ask)}で合意</button><button class="btn primary" data-act="ngOffer" data-id="${id}">${E.money(fee)}を提示</button></div>${nav}`;
+  openSheet(body, foot);
+}
 /* shortlist (players I bid on) */
 function shortStatus(e, p, row) {  // row: the list shows the guide fee as a chip, so leave it out of the line
   const blk = E.bidBlock(S, p.id);
   const cl = S.clubs[e.club] ? S.clubs[e.club].short : 'クラブ';
-  const res = e.res === 'club' ? (row ? `${esc(cl)}が拒否` : `${esc(cl)}が拒否（目安 ${E.money(e.guide)}前後）`)
+  const res = e.res === 'club' ? (row || !e.guide ? `${esc(cl)}と交渉中` : `${esc(cl)}の要求額 ${E.money(e.guide)}`)
     : e.res === 'player' ? (blk && blk.why === 'player' ? `本人が移籍を断った（${jd(blk.until)}まで交渉不可）` : '本人が移籍を断った（今は再交渉できます）')
     : e.res === 'thin' ? `${esc(cl)}が放出を拒否（選手層が薄い）`
     : e.res === 'funds' ? '資金が足りず提示できなかった'
@@ -1076,7 +1122,7 @@ function shortRow(e) {
   const moved = e.club && e.club !== p.club ? `<span class="chip">${club ? esc(club.short) + 'へ移籍' : 'フリーに'}</span>` : '';
   const state = p.retire ? '<span class="chip">今季限りで引退</span>'
     : blk && blk.why === 'player' ? `<span class="chip warn">交渉不可〜${jd(blk.until)}</span>`
-    : e.res === 'club' ? `<span class="chip acc">目安 ${E.money(e.guide)}</span>` : '';
+    : e.res === 'club' && e.guide ? `<span class="chip acc">要求額 ${E.money(e.guide)}</span>` : '';
   const lead = club ? kit(p.club) : '<span class="chip">FA</span>';
   return `<li><button class="prow" data-act="player" data-id="${p.id}">${lead}${posTag(p)}<span class="nm"><b>${esc(p.name)}</b><span>${club ? esc(club.short) : 'フリー'}・${a}歳・${E.money(E.value(p, S.date))} ${state}${moved}</span><span class="sl-last">${shortStatus(e, p, true)}</span></span><span class="rt"><span class="ovr ${oc(p.ovr)}">${E.ovr(p)}</span></span></button></li>`;
 }
@@ -1412,6 +1458,7 @@ function planRefresh() { render(); if (sheetState && sheetState.type === 'plan')
 function refreshSheet() {
   if (!sheetState) return;
   const s = sheetState;
+  if (s.type === 'nego') return sheetNego(s.id, s.back);
   if (s.type === 'presets') return sheetPresets();
   if (s.type === 'reborn') return sheetReborn(s.id, true);
   if (s.type === 'loan') return S.players[s.id] && S.players[s.id].club === S.my ? sheetLoan(s.id) : sheetPlayer(s.id);
@@ -1420,6 +1467,16 @@ function refreshSheet() {
   if (s.type === 'team') return sheetTeam(s.id, s.tab, s.back);
   if (s.type === 'cele') return sheetCele();
   if (s.type === 'player') sheetPlayer(s.id, s.back); else if (s.type === 'train') sheetTrain(s.id); else if (s.type === 'bench') sheetBench(s.id); else if (s.type === 'slot') sheetSlot(s.i); else if (s.type === 'pre') sheetPrematch(s.id); else if (s.type === 'msub') sheetMatchTactics();
+}
+// after an offer: signed → close; the player said no → back to his sheet; otherwise stay with the next suggestion
+function ngResult(id, r) {
+  toast(r.msg);
+  const back = sheetState && sheetState.back;
+  if (r.ok) { persist(true); closeSheet(); render(); return; }
+  persist(r.kind === 'player');
+  if (r.kind === 'player' || !E.negoOf(S, id)) { sheetPlayer(id, back); render(); return; }
+  const n = E.negoOf(S, id); UI.ng = { pid: id, fee: ngSuggest(n, ngStepOf(E.price(S, S.players[id]))) };
+  refreshSheet(); render();
 }
 let toastT = null;
 // spaces become no-break spaces so a name (山田 太郎) stays on one line
@@ -1756,7 +1813,22 @@ const ACT = {
   training(d) { S.training = d.k; persist(false); render(); },
   toggleList(d) { const p = S.players[d.id]; const r = E.setListed(S, p.id, !p.listed); if (!r.ok) return; persist(false); toast(p.listed ? `${r.wasKeep ? '放出不可を解除し、' : ''}${E.inWindow(S.date) ? '放出リストに載せました。オファーを待ちます' : '放出リストに載せました。移籍期間に入るとオファーが届きます'}` : '放出リストから外しました'); refreshSheet(); render(); },
   toggleKeep(d) { const p = S.players[d.id]; const r = E.setKeep(S, p.id, !p.keep); if (!r.ok) return; persist(false); toast(p.keep ? `${r.wasListed ? '放出リストから外し、' : ''}放出不可にしました。他クラブのオファーは断ります${r.n ? '（届いていたオファーも断りました）' : ''}` : '放出不可を解除しました'); refreshSheet(); render(); },
-  bid(d) { const r = E.bid(S, Number(d.id), Number(d.m)); toast(r.msg); if (r.ok) { persist(true); closeSheet(); render(); } else { persist(false); refreshSheet(); render(); } },
+  nego(d) {
+    const id = Number(d.id), back = sheetState && sheetState.type === 'player' ? sheetState.back : null;
+    const r = E.negoStart(S, id); persist(false);
+    if (!r.ok) { toast(r.msg); refreshSheet(); render(); return; }
+    UI.ng = null; sheetNego(id, back); render();
+  },
+  ngStep(d) { const s = sheetState; const p = S.players[s.id]; const step = ngStepOf(E.price(S, p)); UI.ng.fee = ngRound(UI.ng.fee + Number(d.d) * step, step); refreshSheet(); },
+  ngSet(d) {
+    const s = sheetState; const p = S.players[s.id]; const n = E.negoOf(S, s.id); if (!n) return refreshSheet();
+    const pr = E.price(S, p), step = ngStepOf(pr);
+    UI.ng.fee = ngRound(d.k === 'v' ? pr : n.ask * Number(d.k) / 100, step); refreshSheet();
+  },
+  ngOffer(d) { ngResult(Number(d.id), E.negoOffer(S, Number(d.id), UI.ng ? UI.ng.fee : 0)); },
+  ngAgree(d) { ngResult(Number(d.id), E.negoAgree(S, Number(d.id))); },
+  ngBack(d) { sheetPlayer(Number(d.id), sheetState && sheetState.back); },
+  offerUp(d) { const r = E.raiseOffer(S, Number(d.id)); toast(r.msg); persist(true); render(); },
   sign(d) { const r = E.bid(S, Number(d.id), 1); toast(r.msg); if (r.ok) { persist(true); closeSheet(); render(); } else { persist(false); refreshSheet(); render(); } },
   offerYes(d) { const r = E.acceptOffer(S, Number(d.id)); toast(r.ok ? '移籍が成立しました' : r.msg); persist(true); render(); },
   offerNo(d) { E.rejectOffer(S, Number(d.id)); toast('オファーを断りました'); persist(false); render(); },

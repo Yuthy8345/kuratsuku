@@ -46,17 +46,20 @@ async def main():
             row = page.locator('#mk-list .prow').nth(i)
             names.append(await row.locator('.nm b').inner_text())
             await row.click(); await page.wait_for_timeout(350)
-            await page.click('#sheet [data-act="bid"][data-m="0.9"]'); await page.wait_for_timeout(350)
+            await page.click('#sheet [data-act="nego"]'); await page.wait_for_timeout(300)
+            await page.click('#sheet [data-act="ngSet"][data-k="v"]'); await page.wait_for_timeout(150)   # offer the market price
+            await page.click('#sheet [data-act="ngOffer"]'); await page.wait_for_timeout(350)
+            await page.click('#sheet [data-act="ngBack"]'); await page.wait_for_timeout(300)
             sheet = await page.locator('#sheet').inner_text()
             if i == 0:
                 await page.wait_for_timeout(2600)  # let the toast fade
                 await page.screenshot(path=str(OUT/'sl-sheet.png'))
             last = re.search(r'前回[^\n]*', sheet)
-            print(f'bid on {names[-1]}:', last.group(0) if last else '(no status)', '| chip', 'ショートリスト' in sheet, '| re-bid disabled', await page.locator('#sheet [data-act="bid"][disabled]').count() == 4 or '交渉不可' in sheet)
+            print(f'offer to {names[-1]}:', last.group(0) if last else '(no status)', '| chip', 'ショートリスト' in sheet, '| continue', '交渉を続ける' in sheet or '交渉不可' in sheet)
             if not last or 'ショートリスト' not in sheet: bad.append(f'sheet {i}')
             await page.click('#sheet [data-act="closeSheet"]'); await page.wait_for_timeout(300)
-        marked = await page.locator('#mk-list .chip:text("入札済み")').count()
-        print('market rows marked 入札済み:', marked); bad += [] if marked == 3 else ['marked']
+        marked = await page.locator('#mk-list .chip:text("交渉中")').count()
+        print('market rows marked 交渉中:', marked); bad += [] if marked == 3 else ['marked']
         await page.click('[data-act="mkView"][data-k="short"]'); await page.wait_for_timeout(250)
         rows = await page.locator('.list .prow').all_inner_texts()
         tab = await page.locator('[data-act="mkView"][data-k="short"]').inner_text()

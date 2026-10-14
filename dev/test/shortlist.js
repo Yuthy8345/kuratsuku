@@ -17,12 +17,14 @@ let L = E.shortlist(S);
 ok(L.length === 4, `4 refused bids -> 4 on the list (${L.length})`);
 ok(L.every(e => ['club', 'player', 'thin'].includes(e.res)), 'each has a result: ' + L.map(e => e.res).join(','));
 const clubRef = L.find(e => e.res === 'club');
-ok(!clubRef || clubRef.guide > 0, 'club refusal keeps the guide fee');
-// same day again: not a new bid
-const n0 = L[0].n; E.bid(S, L[0].pid, 0.5); ok(E.shortEntry(S, L[0].pid).n === n0, 'same-day re-bid is not counted');
-nextDay(); E.bid(S, stars[0].id, 0.5);
-const e0 = E.shortEntry(S, stars[0].id);
-ok(e0.n === 2 || E.bidBlock(S, stars[0].id), `next day the count goes up (n=${e0.n}) unless the player refused`);
+ok(!clubRef || clubRef.guide > 0, "the club's answer keeps its asking price (要求額)");
+// a lowball costs the club 2 of its 3 patience: one more offer that day counts, then today's ask is final
+const st = clubRef || L[0]; const n0 = st.n;
+E.bid(S, st.pid, 0.5); const n1 = E.shortEntry(S, st.pid).n;
+E.bid(S, st.pid, 0.5); const n2 = E.shortEntry(S, st.pid).n;
+ok(n1 === n0 + 1 && n2 === n1, `offers count while the club still listens (${n0} → ${n1}), not after its final word (${n2})`);
+nextDay(); E.bid(S, st.pid, 0.5);
+ok(E.shortEntry(S, st.pid).n === n1 + 1, `next day the club listens again (n=${E.shortEntry(S, st.pid).n})`);
 
 // 2) sign a listed player: first a refused low bid, then a big one the next day -> off the list
 const weak = S.order.filter(c => c !== S.my && E.squad(S, c).length > 24)
@@ -57,6 +59,7 @@ S.clubs[S.my].funds = funds; E.bid(S, fa.id, 1); ok(!E.shortEntry(S, fa.id), 'fr
 
 // 6) old save (v5): seeded from the bids it already made
 const old = JSON.parse(JSON.stringify(S)); delete old.shortlist; old.v = 5;
+old._bids = Object.fromEntries(E.shortlist(S).map(e => [e.pid, { date: e.last, until: '2026-08-28' }]));  // what v5 saves kept for every bid
 const bids = Object.keys(old._bids).filter(pid => old.players[pid] && old.players[pid].club !== old.my);
 E.migrate(old, DATA);
 ok(old.v >= 6 && Array.isArray(old.shortlist), 'migrated to v' + old.v);

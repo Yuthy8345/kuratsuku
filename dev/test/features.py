@@ -146,9 +146,13 @@ async def main(vw=390, vh=844, tag=''):
         txt = await sheet.inner_text(); print('overseas sheet:', fname, '|', ' '.join(l for l in txt.split('\n') if '相場' in l or '海外組' in l)[:80])
         bad += [] if '移籍金の相場' in txt and '海外組' in txt else ['overseas player sheet']
         await shot('player-ab')
-        for i in range(4):
-            bb = await sheet.locator('[data-act="bid"]').nth(i).bounding_box()
-            if not fits(bb): bad.append(f'bid button {i} off screen')
+        if not fits(await sheet.locator('[data-act="nego"]').bounding_box()): bad.append('negotiate button off screen')
+        await sheet.locator('[data-act="nego"]').click(); await page.wait_for_timeout(400)
+        txt = await sheet.inner_text(); print('overseas negotiation:', ' '.join(l for l in txt.split('\n') if '要求額' in l or '本人' in l)[:80])
+        bad += [] if 'の要求額' in txt and '本人：' in txt else ['overseas negotiation']
+        for a in ('ngAgree', 'ngOffer'):
+            if not fits(await sheet.locator(f'[data-act="{a}"]').bounding_box()): bad.append(f'{a} off screen')
+        await shot('nego-ab')
         await page.keyboard.press('Escape'); await page.wait_for_timeout(350)
 
         # ---------- ⑥ celebrations ----------

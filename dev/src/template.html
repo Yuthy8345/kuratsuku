@@ -206,6 +206,27 @@ h1, h2, h3 { text-wrap: balance; margin: 0; }
 .prow .no small { color: var(--muted); }
 .prow[disabled] { cursor: not-allowed; }
 .prow .nm .sl-last { display: block; margin-top: 4px; font-size: 12px; line-height: 1.45; color: var(--ink); opacity: .82; } /* shortlist: last bid and how it went */
+/* 移籍交渉: asking price, patience magnets, what was said, my offer (− amount ＋) */
+.ng-card { display: grid; gap: 10px; }
+.ng-ask { display: flex; align-items: baseline; justify-content: space-between; gap: 4px 10px; flex-wrap: wrap; }
+.ng-ask > span:last-child { display: inline-flex; align-items: baseline; gap: 8px; margin-left: auto; }
+.ng-ask b { font-family: var(--f-display); font-weight: 400; font-size: 30px; line-height: 1.1; }
+.ng-ask s, .ng-ask small { color: var(--muted); font-size: 13px; }
+.ng-pat { display: inline-flex; gap: 5px; vertical-align: middle; }
+.ng-pat i { width: 14px; height: 14px; border-radius: 50%; background: #E0533F; box-shadow: var(--mag-shadow); }
+.ng-pat i.off { background: transparent; border: 1.5px dashed var(--line); box-shadow: none; }
+.ng-log { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 13px; }
+.ng-log li { display: grid; grid-template-columns: 56px 1fr; gap: 8px; align-items: baseline; }
+.ng-log .who { font-family: var(--f-chalk); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ng-log small { color: var(--muted); margin-left: 6px; }
+.ng-step { display: grid; grid-template-columns: 58px 1fr 58px; align-items: center; gap: 10px; }
+.ng-step .btn { min-height: 58px; height: 58px; font-size: 26px; border-radius: 50%; padding: 0; }
+.ng-step .amt { text-align: center; min-width: 0; }
+.ng-step .amt b { display: block; font-family: var(--f-display); font-weight: 400; font-size: 28px; line-height: 1.15; color: var(--accent); }
+.ng-step .amt span { font-size: 12px; color: var(--muted); }
+.ng-quick { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
+.ng-quick .btn { min-height: 34px; font-size: 12px; padding: 0 10px; }
+.ng-fin { margin: 0; padding: 8px 12px; border-left: 3px solid #E0533F; font-size: 13px; }
 .prow .rt .bar { width: 44px; }
 .news { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
 .news li { display: grid; grid-template-columns: 42px 1fr; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 13px; }

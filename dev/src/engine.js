@@ -1477,7 +1477,7 @@ function nextDay(S) {
   S.date = D.add(S.date, 1); S.tick++;
   const wasIn = inWindow(prev), isIn = inWindow(S.date);
   if (!wasIn && isIn) { news(S, `移籍期間がオープン（〜${jdate(windowEnd(S.date))}）。`, 'transfer'); S._stopNote = '移籍期間がオープンしました'; }
-  if (wasIn && !isIn) { news(S, '移籍期間が終了。', 'transfer'); for (const p of Object.values(S.players)) if (p.listed && p.club === S.my) p.listed = false; }
+  if (wasIn && !isIn) { news(S, '移籍期間が終了。', 'transfer'); for (const p of Object.values(S.players)) if (p.listed && p.club === S.my) p.listed = false; delete S.nego; }
   // recovery
   for (const p of Object.values(S.players)) {
     const c = S.clubs[p.club]; if (!c) continue;
@@ -1572,7 +1572,29 @@ function makeOffer(S, p, mult) {
   if (!buyers.length) return;
   const from = pick(buyers);
   const fee = Math.round(v * mult / 100) * 100;
-  S.inbox.unshift({ id: S.nextInboxId++, type: 'offer', pid: p.id, from, fee, d: S.date, exp: D.add(S.date, 5), seen: false, done: false });
+  S.inbox.unshift({ id: S.nextInboxId++, type: 'offer', pid: p.id, from, fee, top: offerTop(fee), walk: offerWalk(p), d: S.date, exp: D.add(S.date, 5), seen: false, done: false });
+}
+/* 増額を求める (2026-10-14): once per offer for my player, the buyer either raises (part of the way to the most he would
+   pay, top = fee × 1.08〜1.30) or walks away. A bid for a listed player walks away more easily (they know I want to sell). */
+const OFFER_UP = { top: [1.08, 0.22], walk: { listed: 0.3, ask: 0.18 }, meet: [0.6, 0.4] };
+function offerTop(fee) { return r100(fee * (OFFER_UP.top[0] + R() * OFFER_UP.top[1])); }
+function offerWalk(p) { return p.listed ? OFFER_UP.walk.listed : OFFER_UP.walk.ask; }
+function raiseOffer(S, iid) {
+  const it = S.inbox.find(x => x.id === iid);
+  if (!it || it.type !== 'offer' || it.done) return { ok: false, msg: 'このオファーは無効です' };
+  if (it.raised) return { ok: false, msg: '増額はすでに求めました' };
+  const p = S.players[it.pid], buyer = S.clubs[it.from];
+  if (!p || p.club !== S.my) { it.done = true; return { ok: false, msg: '選手はすでにクラブにいません' }; }
+  if (it.top == null) it.top = offerTop(it.fee);   // offers made before this existed
+  const walk = it.walk != null ? it.walk : offerWalk(p);
+  it.raised = true; it.fee0 = it.fee;
+  if (R() < walk) {
+    it.done = true; it.result = 'withdrawn';
+    news(S, `${buyer.short}は${p.name}へのオファーを取り下げた（増額の要求に応じず）。`, 'transfer');
+    return { ok: false, walked: true, msg: `${buyer.short}はオファーを取り下げた` };
+  }
+  it.fee = Math.max(it.fee + 100, r100(it.fee + (it.top - it.fee) * (OFFER_UP.meet[0] + R() * OFFER_UP.meet[1])));
+  return { ok: true, fee: it.fee, msg: `${buyer.short}が${money(it.fee)}に増額した（+${money(it.fee - it.fee0)}）` };
 }
 function acceptOffer(S, iid) {
   const it = S.inbox.find(x => x.id === iid); if (!it || it.done) return { ok: false, msg: 'このオファーは無効です' };
@@ -1675,7 +1697,123 @@ function marketList(S, filter) {
     .filter(p => !f.q || p.name.replace(/\s/g, '').includes(f.q.replace(/\s/g, '')) || (S.clubs[p.club] && (S.clubs[p.club].short.includes(f.q) || S.clubs[p.club].name.includes(f.q) || (S.clubs[p.club].ab && S.clubs[p.club].ab.lg.includes(f.q)))))
     .sort((a, b) => b.ovr - a.ovr);
 }
-// Try to buy. mult: offer as multiple of value. Returns {ok, msg}
+/* ---------- 移籍交渉 (2026-10-14) ----------
+   Buying a player from another club is a negotiation (AI clubs never negotiate, so the league is unchanged).
+   The selling club has a bottom line (floor, hidden) = price × his place in their squad (主力 1.15 / 準主力 0.95 /
+   控え 0.78; overseas: their old demand − 0.15) ± their situation (事情: depth at his position, money, his age, the last
+   week of the window) × a little noise, and opens with a higher asking price (要求額 = floor × 1.08〜1.24, so 90% of
+   it is not always enough).
+   I offer an amount: at or above the floor they agree. A little below, they come part of the way down (new ask =
+   x + (ask − x) × meet, never below the floor) and lose one patience; far below (< floor × low) they lose two and the
+   ask goes up 5% (at most ask0 × upMax). Patience (pat = 3) comes back each day; when it runs out, today's ask is final.
+   Once the clubs agree, the player decides as before (本人の気持ち is shown up front). A negotiation lasts until the
+   end of the window or until he leaves that club. The opening ask is about the old guide fee (1.35 / 1.12 / 0.92 ×
+   price), so agreeing at once costs a little less than the old buttons (top players always took the 1.5× one) and a
+   good negotiation saves another 10〜15%. */
+const NEGO = { pat: 3, meet: 0.55, low: 0.85, up: 1.05, upMax: 1.15, open: [1.08, 0.16], nz: 0.04,
+  role: [1.15, 0.95, 0.78], typ: { GK: 4, DF: 11, MF: 14, FW: 7 }, thick: -0.06, thin: 0.08,
+  poor: [50000, -0.06], rich: [180000, 0.04], vet: [31, -0.06], young: [22, 8, 0.08], late: [7, -0.06] };
+const r100 = v => Math.round(v / 100) * 100;
+// his place in the selling club and their situation: k (× price) and the chips that explain it (+ raises, − lowers)
+function negoInfo(S, p) {
+  const c = S.clubs[p.club], ab = c && c.ab, a = age(p, S.date), tags = [];
+  let k, role;
+  if (ab) {
+    k = 0.95 + (p.ovr >= 80 ? 0.2 : p.ovr >= 75 ? 0.1 : 0) + (a <= 23 ? 0.1 : 0);
+    role = p.ovr >= 80 ? '中心選手' : p.ovr >= 75 ? '主力' : '';
+    if (a <= 23) tags.push({ t: '若手は手放したくない', d: 1 });
+  } else {
+    const sq = squad(S, p.club), rank = sq.sort((x, y) => y.ovr - x.ovr).findIndex(x => x.id === p.id);
+    const ri = rank < 6 ? 0 : rank < 14 ? 1 : 2; k = NEGO.role[ri]; role = ['主力', '準主力', '控え'][ri];
+    const n = sq.filter(x => x.pos === p.pos).length, typ = NEGO.typ[p.pos], w = p.pos === 'GK' ? 1 : 3;
+    if (n >= typ + w) { k += NEGO.thick; tags.push({ t: `${p.pos}の層が厚い（${n}人）`, d: -1 }); }
+    else if (n <= typ - w) { k += NEGO.thin; tags.push({ t: `${p.pos}の層が薄い（${n}人）`, d: 1 }); }
+    if (c.funds <= NEGO.poor[0]) { k += NEGO.poor[1]; tags.push({ t: '資金難', d: -1 }); }
+    else if (c.funds >= NEGO.rich[0]) { k += NEGO.rich[1]; tags.push({ t: '資金に余裕', d: 1 }); }
+    const we = windowEnd(S.date);
+    if (ri > 0 && we && D.diff(we, S.date) <= NEGO.late[0]) { k += NEGO.late[1]; tags.push({ t: '期限間近', d: -1 }); }
+  }
+  if (a >= NEGO.vet[0]) { k += NEGO.vet[1]; tags.push({ t: 'ベテラン', d: -1 }); }
+  else if (!ab && a <= NEGO.young[0] && p.pot - p.ovr >= NEGO.young[1]) { k += NEGO.young[2]; tags.push({ t: '期待の若手', d: 1 }); }
+  return { k, role, tags };
+}
+// how likely he is to say no once the clubs agree (the same rule as before), and the label shown up front
+function negoWill(S, p) {
+  const my = S.clubs[S.my], ab = abroadOf(S, p);
+  const r = ab ? abroadReluct(S, p) : clamp((strength(S, p.club) - strength(S, S.my)) * 0.06 + (p.ovr - strength(S, S.my) - 4) * 0.04 + ((S.clubs[p.club].pres || 2) - (my.pres || 2)) * 0.1, 0, 0.75);
+  return { r, jp: r < 0.15 ? '前向き' : r < 0.4 ? '迷っている' : '消極的', lv: r < 0.15 ? 2 : r < 0.4 ? 1 : 0 };
+}
+function negoFloor(S, p, n) { return price(S, p) * negoInfo(S, p).k * n.nz; }
+// the current negotiation for him (patience back each day, gone after the window or if he left that club)
+function negoOf(S, pid) {
+  const n = S.nego && S.nego[pid]; const p = S.players[pid];
+  if (!n) return null;
+  if (!p || p.club !== n.club || !n.until || S.date > n.until) { delete S.nego[pid]; return null; }
+  if (n.day !== S.date) { n.day = S.date; n.pat = NEGO.pat; n.fin = false; }
+  const fl = Math.ceil(negoFloor(S, p, n) / 100) * 100; if (n.ask < fl) n.ask = fl;  // his price went up
+  return n;
+}
+// can I talk to his club? {ok:false,msg} or {ok:true, n} (starts the negotiation if needed)
+function negoStart(S, pid) {
+  const p = S.players[pid]; if (!p) return { ok: false, msg: '選手が見つかりません' };
+  if (p.retire) return { ok: false, msg: `${p.name}は今季限りでの引退が決まっています` };
+  if (p.loan) return { ok: false, msg: `${p.name}は期限付き移籍中の選手です` };
+  if (p.club === S.my || !S.clubs[p.club]) return { ok: false, msg: '交渉できない選手です' };
+  if (!inWindow(S.date)) return { ok: false, msg: `移籍期間外です（次は${jdate(nextWindowStart(S.date))}から）` };
+  const blk = bidBlock(S, pid); if (blk) return { ok: false, msg: `${p.name}は今回の移籍期間中は移籍しない意向です` };
+  const seller = S.clubs[p.club];
+  if (!seller.ab && squad(S, p.club).length <= 22) { noteBid(S, p, 0, 'thin'); return { ok: false, msg: `${seller.short}は選手層が薄く、放出を拒否しました` }; }
+  S.nego = S.nego || {};
+  let n = negoOf(S, pid);
+  if (!n) {
+    n = { club: p.club, until: windowEnd(S.date), nz: 1 - NEGO.nz + R() * NEGO.nz * 2, day: S.date, pat: NEGO.pat, fin: false, log: [] };
+    n.ask = n.ask0 = r100(negoFloor(S, p, n) * (NEGO.open[0] + R() * NEGO.open[1]));
+    S.nego[pid] = n;
+  }
+  return { ok: true, n };
+}
+// offer `fee` (万円). {ok:true} = signed; otherwise kind: counter / low / player / funds / full / final (and msg)
+function negoOffer(S, pid, fee) {
+  const st = negoStart(S, pid); if (!st.ok) return st;
+  const n = st.n, p = S.players[pid], seller = S.clubs[p.club], my = S.clubs[S.my];
+  fee = Math.min(r100(fee), n.ask);
+  if (!(fee > 0)) return { ok: false, msg: '金額が正しくありません' };
+  if (squad(S, S.my).length >= 40) { noteBid(S, p, fee, 'full'); return { ok: false, kind: 'full', msg: '登録上限（40人）に達しています' }; }
+  if (my.funds < fee) { noteBid(S, p, fee, 'funds'); return { ok: false, kind: 'funds', msg: `資金が足りません（必要 ${money(fee)}）` }; }
+  if (fee < n.ask && n.fin) return { ok: false, kind: 'final', msg: `今日はこれ以上下がりません（${seller.short}の最終提示 ${money(n.ask)}）` };
+  n.log.push(['me', fee, S.date]);
+  const floor = negoFloor(S, p, n);
+  if (fee >= n.ask || fee >= floor) return negoDeal(S, p, fee);
+  let kind;
+  if (fee < floor * NEGO.low) { kind = 'low'; n.pat -= 2; n.ask = Math.max(n.ask, Math.min(r100(n.ask * NEGO.up), r100(n.ask0 * NEGO.upMax))); }
+  else { kind = 'counter'; n.pat -= 1; n.ask = Math.max(Math.ceil(floor / 100) * 100, r100(fee + (n.ask - fee) * NEGO.meet)); }
+  if (n.pat <= 0) { n.pat = 0; n.fin = true; }
+  n.log.push(['club', n.ask, S.date, kind]);
+  if (n.log.length > 12) n.log = n.log.slice(-12);
+  noteBid(S, p, fee, 'club', n.ask);
+  const say = kind === 'low' ? `${seller.short}「話にならない」要求額 ${money(n.ask)}` : `${seller.short}「${money(n.ask)}なら応じる」`;
+  return { ok: false, kind, ask: n.ask, fin: n.fin, msg: say + (n.fin ? '（今日の最終提示）' : '') };
+}
+function negoAgree(S, pid) { const n = negoOf(S, pid); return n ? negoOffer(S, pid, n.ask) : { ok: false, msg: '交渉が始まっていません' }; }
+// the clubs agree at `fee`: now the player decides
+function negoDeal(S, p, fee) {
+  const ab = abroadOf(S, p), seller = S.clubs[p.club];
+  if (S.nego) delete S.nego[p.id];
+  if (R() < negoWill(S, p).r) {
+    S._bids = S._bids || {}; S._bids[p.id] = { date: S.date, until: windowEnd(S.date), refused: true };
+    noteBid(S, p, fee, 'player');
+    return { ok: false, kind: 'player', msg: ab ? `クラブ間で合意したが、${p.name}本人が${seller.short}でのプレー継続を望み、断った（今期間中は交渉不可）` : `クラブ間で合意したが、${p.name}本人が移籍を断った（今期間中は交渉不可）` };
+  }
+  moveP(S, p, S.my, fee);
+  if (ab) {
+    p.abFrom = { name: seller.name, lg: ab.lg, cc: ab.cc, s: seasonLabel(S.season), d: S.date };
+    news(S, `【海外から加入】${p.name}（${seller.name}・${ab.lg}）を獲得！ 移籍金 ${money(fee)}。`, 'big');
+    return { ok: true, kind: 'deal', fee, msg: `${p.name}が${seller.short}から加入！（移籍金 ${money(fee)}）` };
+  }
+  news(S, `${p.name}（${seller.short}）を獲得！ 移籍金 ${money(fee)}。`, 'transfer');
+  return { ok: true, kind: 'deal', fee, msg: `${p.name}を獲得しました（移籍金 ${money(fee)}）` };
+}
+// free agents: sign for a fee (half a year's wage). Club players: one offer of price × mult in the negotiation.
 function bid(S, pid, mult) {
   const p = S.players[pid]; if (!p) return { ok: false, msg: '選手が見つかりません' };
   if (p.retire) return { ok: false, msg: `${p.name}は今季限りでの引退が決まっています` };
@@ -1690,37 +1828,7 @@ function bid(S, pid, mult) {
     news(S, `フリーの${p.name}と契約（契約金 ${money(sign)}）。`, 'transfer');
     return { ok: true, msg: `${p.name}と契約しました` };
   }
-  if (!inWindow(S.date)) return { ok: false, msg: `移籍期間外です（次は${jdate(nextWindowStart(S.date))}から）` };
-  const ab = abroadOf(S, p);
-  const v = price(S, p); const fee = Math.round(v * mult / 100) * 100;
-  if (squad(S, S.my).length >= 40) { noteBid(S, p, fee, 'full'); return { ok: false, msg: '登録上限（40人）に達しています' }; }
-  if (my.funds < fee) { noteBid(S, p, fee, 'funds'); return { ok: false, msg: `資金が足りません（必要 ${money(fee)}）` }; }
-  const seller = S.clubs[p.club];
-  const rank = squad(S, p.club).sort((a, b) => b.ovr - a.ovr).findIndex(x => x.id === p.id);
-  // overseas clubs ask more for their regulars and young players (on top of the overseas price)
-  const demand = ab ? 1.1 + (p.ovr >= 80 ? 0.2 : p.ovr >= 75 ? 0.1 : 0) + (age(p, S.date) <= 23 ? 0.1 : 0) : rank < 6 ? 1.35 : rank < 14 ? 1.12 : 0.92;
-  if (!ab && squad(S, p.club).length <= 22) { noteBid(S, p, fee, 'thin'); return { ok: false, msg: `${seller.short}は選手層が薄く、放出を拒否しました` }; }
-  S._bids = S._bids || {};
-  const we = windowEnd(S.date);
-  const prev = S._bids[pid];
-  if (prev && prev.until >= S.date && prev.refused) return { ok: false, msg: `${p.name}は今回の移籍期間中は移籍しない意向です` };
-  if (prev && prev.date === S.date) return { ok: false, msg: '同じ日に同じ選手へ再オファーはできません' };
-  S._bids[pid] = { date: S.date, until: we };
-  if (mult < demand * (0.94 + R() * 0.08)) { const guide = Math.round(v * demand / 100) * 100; noteBid(S, p, fee, 'club', guide); return { ok: false, msg: `${seller.short}がオファーを拒否（目安：${money(guide)}前後）` }; }
-  // player willingness
-  const myLvl = strength(S, S.my), theirLvl = strength(S, p.club);
-  // players are drawn to bigger, more storied clubs
-  const reluct = ab ? abroadReluct(S, p) : clamp((theirLvl - myLvl) * 0.06 + (p.ovr - myLvl - 4) * 0.04 + ((S.clubs[p.club].pres || 2) - (my.pres || 2)) * 0.1, 0, 0.75);
-  if (R() < reluct) { S._bids[pid].refused = true; noteBid(S, p, fee, 'player'); return { ok: false, msg: ab ? `クラブ間で合意したが、${p.name}本人が${seller.short}でのプレー継続を望み、断った（今期間中は交渉不可）` : `クラブ間で合意したが、${p.name}本人が移籍を断った（今期間中は交渉不可）` }; }
-  const fromName = seller.short;
-  moveP(S, p, S.my, fee);
-  if (ab) {
-    p.abFrom = { name: seller.name, lg: ab.lg, cc: ab.cc, s: seasonLabel(S.season), d: S.date };
-    news(S, `【海外から加入】${p.name}（${seller.name}・${ab.lg}）を獲得！ 移籍金 ${money(fee)}。`, 'big');
-    return { ok: true, msg: `${p.name}が${seller.short}から加入！` };
-  }
-  news(S, `${p.name}（${fromName}）を獲得！ 移籍金 ${money(fee)}。`, 'transfer');
-  return { ok: true, msg: `${p.name}を獲得しました` };
+  return negoOffer(S, pid, price(S, p) * mult);
 }
 /* ---------- 転生選手: a legend of the club I manage comes back as a 16-year-old ----------
    From my 2nd season at a club, at the start of each season: REBORN.base, more after a season that met the target
@@ -1970,11 +2078,10 @@ function shortlist(S) {
   return S.shortlist.slice().sort((a, b) => (a.last < b.last ? 1 : a.last > b.last ? -1 : b.n - a.n));
 }
 function shortEntry(S, pid) { return (S.shortlist || []).find(x => x.pid === pid) || null; }
-// can I bid on him again right now? (player refusals last until the end of that window)
+// can I talk to his club? (a player's refusal lasts until the end of that window)
 function bidBlock(S, pid) {
   const b = (S._bids || {})[pid];
   if (b && b.refused && b.until >= S.date) return { why: 'player', until: b.until };
-  if (b && b.date === S.date) return { why: 'today' };
   return null;
 }
 function genPlayer(S, cid, opts) {
@@ -2029,7 +2136,7 @@ function fire(S, reason) {
 function takeJob(S, cid) {
   const from = S.my;
   S.my = cid; S.fired = null; S.board = 55; S.boardWarn = 0;
-  S.inbox = S.inbox.filter(x => x.done);
+  S.inbox = S.inbox.filter(x => x.done); delete S.nego;  // the old club's negotiations end with the job
   for (const p of Object.values(S.players)) { if (p.club === from) { p.listed = false; delete p.keep; } if (p.club === from || (p.loan && p.loan.from === from)) delete p.trk; if (p.club === cid) track(S, p); }
   autoLineup(S, cid);
   if (S.clubs[from]) autoLineup(S, from);
@@ -2546,7 +2653,7 @@ const API = {
   autoLineup, autoBench, benchSwap, benchRemove, lineupIssues, BENCH_SIZE, PRESET_MAX, savePreset, loadPreset, presetStatus, renamePreset, deletePreset, presetsOf, fillEmpty, clubRating, validateLineup, effective, posPenalty, available, teamRating,
   createMatch, stepMatch, simulateFull, finishMatch, doSub, benchOptions, onPitch, setMentality, bestSubFor, setCounter, mentLabel,
   advance, nextDay, simAIToday, myFixtureToday, nextMyFixture, todaysFixtures, inWindow, windowEnd, nextWindowStart,
-  acceptOffer, rejectOffer, setListed, setKeep, transferDay, bid, decideRetirements, shortlist, shortEntry, unshort, bidBlock,
+  acceptOffer, rejectOffer, raiseOffer, OFFER_UP, setListed, setKeep, transferDay, bid, NEGO, negoInfo, negoWill, negoOf, negoStart, negoOffer, negoAgree, decideRetirements, shortlist, shortEntry, unshort, bidBlock,
   FORM_DESC, LINE, BUILD, WIDTH, MARK, KILL, CLOSE, setCloseOut, TAC_DEF, tacX, tacLabel, setTac, aiPlan, aiMentality, CLUB_STYLE, widthFit, markTarget,
   NUM_MAX, numOpen, numNext, setNum, checkTitle, leagueLeft, progressCups,
   ABROAD, abroadOf, isAbroadClub, price, addAbroad, abroadReluct,
