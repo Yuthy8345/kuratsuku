@@ -395,7 +395,7 @@ function prow(p, ctx) {
   }
   const sp = subPos(p); if (sp.length) chips.push(`<span class="chip">+${sp.slice(0, 3).join('/')}</span>`);
   if (p.inj > 0) chips.push(`<span class="chip warn">負傷 ${p.inj}日</span>`);
-  if (p.sus > 0) chips.push('<span class="chip warn">出場停止</span>');
+  chips.push(susChip(p));
   if (p.hot) chips.push('<span class="chip fire">燃えている</span>');
   if (p.reborn) chips.push('<span class="chip rbchip">転生</span>');
   if (ctx === 'market' && E.shortEntry(S, p.id)) chips.push(`<span class="chip acc">${E.negoOf(S, p.id) ? '交渉中' : '入札済み'}</span>`);
@@ -414,8 +414,14 @@ function storyChips(f) {
   if (f.hype && f.hype.rev && f.hype.rev.includes(S.my)) tags.push('リベンジマッチ');
   return tags.map(t => `<span class="chip story">${esc(t)}</span>`).join('');
 }
-// why a player can't play, e.g. 出場停止（あと1試合） / 負傷（あと5日）
-const outText = p => p.inj > 0 ? `負傷（あと${p.inj}日）` : `出場停止（あと${p.sus}試合）`;
+// can he play his club's next match? (a ban only counts in the competition it was given in: league, 天皇杯, Lカップ)
+const avail = p => E.available(p, E.nextComp(S, p.club));
+// every ban he has, e.g. 出場停止（リーグ） / 出場停止（リーグ・天皇杯）
+const susChip = p => { const l = E.susList(p); return l.length ? `<span class="chip warn">出場停止（${l.map(([k]) => E.COMP_JP[k]).join('・')}）</span>` : ''; };
+// fit for the next match but banned in another competition, e.g. リーグは出場停止 before a cup tie
+const susElse = p => E.susList(p).filter(([k]) => k !== E.nextComp(S, p.club)).map(([k]) => `<span class="chip">${E.COMP_JP[k]}は出場停止</span>`).join('');
+// why a player can't play his club's next match, e.g. 出場停止（リーグであと1試合） / 負傷（あと5日）
+const outText = p => { if (p.inj > 0) return `負傷（あと${p.inj}日）`; const k = E.nextComp(S, p.club); return `出場停止（${E.COMP_JP[k]}であと${E.susIn(p, k)}試合）`; };
 const outShort = p => p.inj > 0 ? '負傷' : '出場停止';
 function issueLines(iss) {
   const c = S.clubs[S.my]; const F = E.FORMATIONS[c.tac.form];
@@ -536,7 +542,7 @@ function sheetPlayer(id, back) {
   const avgR = p.st.apps ? (p.st.rt / p.st.apps).toFixed(2) : '—';
   const status = [];
   if (p.inj > 0) status.push(`<span class="chip warn">負傷中（あと${p.inj}日）</span>`);
-  if (p.sus > 0) status.push('<span class="chip warn">出場停止</span>');
+  { const l = E.susList(p); if (l.length) status.push(`<span class="chip warn">出場停止（${l.map(([k, n]) => `${E.COMP_JP[k]} あと${n}試合`).join('・')}）</span>`); }
   if (p.listed) status.push('<span class="chip acc">放出リスト登録中</span>');
   if (p.keep && mine) status.push('<span class="chip ok">放出不可（オファーはすべて断る）</span>');
   if (p.retire) status.push('<span class="chip">今季限りで引退</span>');
@@ -747,7 +753,7 @@ function viewTactics() {
     const k1 = c.c1, k2 = c.c2, kt = lum(c.c1) > 0.6 ? '#141414' : '#ffffff';
     const style = `left:${s[1]}%;top:${88 - (s[2] - 7) * 1.04}%;--k1:${k1};--k2:${k2};--kt:${kt}`;
     if (!p) return `<button class="tok empty" style="${style}" data-act="slot" data-i="${i}"><span class="shirt">+</span><span class="lbl">${E.ROLE[s[0]].jp}</span></button>`;
-    if (!E.available(p)) return `<button class="tok out" style="${style}" data-act="slot" data-i="${i}" aria-label="${E.ROLE[s[0]].jp} ${esc(p.name)} ${outShort(p)}"><span class="shirt">${p.num}</span><span class="lbl">${esc(p.short)}</span><span class="ov">${outShort(p)}</span></button>`;
+    if (!avail(p)) return `<button class="tok out" style="${style}" data-act="slot" data-i="${i}" aria-label="${E.ROLE[s[0]].jp} ${esc(p.name)} ${outShort(p)}"><span class="shirt">${p.num}</span><span class="lbl">${esc(p.short)}</span><span class="ov">${outShort(p)}</span></button>`;
     const warn = E.posPenalty(p, s[0]) <= -1.5 || p.cond < 70;
     return `<button class="tok ${p.hot ? 'hot' : ''}" style="${style}" data-act="slot" data-i="${i}" aria-label="${E.ROLE[s[0]].jp} ${esc(p.name)}${p.hot ? ' 燃えている' : ''}"><span class="shirt ${warn ? 'warn' : ''}">${p.num}</span><span class="lbl">${esc(p.short)}</span><span class="ov">${E.ROLE[s[0]].jp}・${E.ovr(p)}</span></button>`;
   }).join('');
@@ -759,7 +765,7 @@ function viewTactics() {
     ${formSelect(c)}
     <p class="fine" style="margin:-6px 0 0">${esc(E.FORM_DESC[c.tac.form] || '')}</p>
     <div class="pitch">${PITCH_SVG}${toks}</div>
-    <p class="fine" style="margin:-4px 0 0">選手をタップすると入れ替えられます。「!」は適性が低いポジションか疲れている選手、「×」はケガや出場停止で出られない選手です。</p>
+    <p class="fine" style="margin:-4px 0 0">選手をタップすると入れ替えられます。「!」は適性が低いポジションか疲れている選手、「×」はケガや出場停止で次の試合に出られない選手です（出場停止はリーグ・天皇杯・Lカップそれぞれの試合で消化）。</p>
     ${planCard(c)}
     <button class="btn ghost block" data-act="presets">戦術の保存・読み込み<span class="small muted">　${(S.presets || []).length}/${E.PRESET_MAX}</span></button>
     <h3 class="sec-h">ベンチ（${c.tac.bench.length}/${E.BENCH_SIZE}人）<small>自動では入れ替わりません</small></h3>
@@ -808,7 +814,7 @@ function sheetPlan() {
 // condition; × = can't play (injury / suspension), ! = tired
 function benchTile(p, c) {
   const kt = lum(c.c1) > 0.6 ? '#141414' : '#ffffff';
-  const out = !E.available(p), tired = !out && p.cond < 70;
+  const out = !avail(p), tired = !out && p.cond < 70;
   const st = out ? `<span class="chip warn">${p.inj > 0 ? `負傷 ${p.inj}日` : '出場停止'}</span>` : p.hot ? '<span class="chip fire">燃えている</span>' : p.reborn ? '<span class="chip rbchip">転生</span>' : '';
   return `<button class="btile${out ? ' out' : ''}${p.hot ? ' hot' : ''}" role="listitem" data-act="benchPick" data-id="${p.id}" aria-label="ベンチ ${esc(p.name)} ${dpOf(p)} 能力${E.ovr(p)}${out ? ' ' + outShort(p) : ''}">
     <span class="bt-ovr ${oc(p.ovr)}">${E.ovr(p)}</span>
@@ -822,13 +828,13 @@ function sheetBench(outId) {
   const c = S.clubs[S.my]; const o = S.players[outId];
   sheetState = { type: 'bench', id: outId || 0 };
   const reserves = E.squad(S, S.my).filter(p => !c.tac.xi.includes(p.id) && !c.tac.bench.includes(p.id))
-    .sort((a, b) => (E.available(b) - E.available(a)) || (POS_ORD[a.pos] - POS_ORD[b.pos]) || b.ovr - a.ovr);
+    .sort((a, b) => (avail(b) - avail(a)) || (POS_ORD[a.pos] - POS_ORD[b.pos]) || b.ovr - a.ovr);
   const row = p => {
-    const av = E.available(p);
-    const st = !av ? (p.inj > 0 ? `<span class="chip warn">負傷 ${p.inj}日</span>` : '<span class="chip warn">出場停止</span>') : '';
+    const av = avail(p);
+    const st = !av ? (p.inj > 0 ? `<span class="chip warn">負傷 ${p.inj}日</span>` : '<span class="chip warn">出場停止</span>') : susElse(p);
     return `<li><button class="prow" data-act="benchIn" data-id="${p.id}" ${av ? '' : 'disabled style="opacity:.5"'}><span class="no">${p.num}</span>${posTag(p)}<span class="nm"><b>${esc(p.name)}</b><span>${E.age(p, S.date)}歳・${Math.round(p.cond)}% ${st}</span></span><span class="rt"><span class="ovr ${oc(p.ovr)}">${E.ovr(p)}</span>${condBar(p.cond)}</span></button></li>`;
   };
-  const head = o ? `<div class="eyebrow">ベンチの入れ替え</div><h2>${esc(o.name)}（${dpOf(o)}・${E.ovr(o)}）と入れ替える選手</h2>${E.available(o) ? '' : `<p class="small" style="color:var(--loss);margin:0">${esc(o.short)}は${outText(o)}のため、この試合には出られません。</p>`}`
+  const head = o ? `<div class="eyebrow">ベンチの入れ替え</div><h2>${esc(o.name)}（${dpOf(o)}・${E.ovr(o)}）と入れ替える選手</h2>${avail(o) ? '' : `<p class="small" style="color:var(--loss);margin:0">${esc(o.short)}は${outText(o)}のため、この試合には出られません。</p>`}`
     : `<div class="eyebrow">ベンチの空き枠</div><h2>ベンチに加える選手</h2>`;
   openSheet(`${head}
     <p class="fine">ベンチ外の選手です。</p>
@@ -862,14 +868,15 @@ function sheetSlot(i) {
   const c = S.clubs[S.my]; const role = E.FORMATIONS[c.tac.form][i][0];
   sheetState = { type: 'slot', i };
   const cands = E.squad(S, S.my).map(p => ({ p, e: E.effective(p, role) }))
-    .sort((a, b) => (E.available(b.p) - E.available(a.p)) || b.e - a.e);
+    .sort((a, b) => (avail(b.p) - avail(a.p)) || b.e - a.e);
   const cur = c.tac.xi[i];
   openSheet(`<div class="eyebrow">ポジション</div><h2>${E.ROLE[role].jp} に起用する選手</h2>
     <p class="fine">右の数字はこの位置での実力（能力・適性・疲労・調子を反映）。適性は本職=100。</p>
     <ul class="list">${cands.map(({ p, e }) => {
-      const j = c.tac.xi.indexOf(p.id); const av = E.available(p);
+      const j = c.tac.xi.indexOf(p.id); const av = avail(p);
       const st = !av ? (p.inj > 0 ? `<span class="chip warn">負傷 ${p.inj}日</span>` : '<span class="chip warn">出場停止</span>') : j >= 0 ? `<span class="chip ok">${E.ROLE[E.FORMATIONS[c.tac.form][j][0]].jp}で先発</span>` : c.tac.bench.includes(p.id) ? '<span class="chip">ベンチ</span>' : '';
-      return `<li><button class="prow" data-act="assign" data-i="${i}" data-id="${p.id}" ${av ? '' : 'disabled'} style="${p.id === cur ? 'background:color-mix(in srgb,var(--accent-bg) 14%,transparent)' : ''}${av ? '' : ';opacity:.5'}"><span class="no">${p.num}</span>${posTag(p)}<span class="nm"><b>${esc(p.name)}</b><span>能力 ${E.ovr(p)}・適性 ${Math.round(E.roleApt(p, role))}・${Math.round(p.cond)}% ${p.hot ? '<span class="chip fire">燃えている</span>' : ''}${st}</span></span><span class="rt"><span class="ovr ${oc(e)}">${Math.round(e)}</span></span></button></li>`;
+      const st2 = av ? susElse(p) : '';
+      return `<li><button class="prow" data-act="assign" data-i="${i}" data-id="${p.id}" ${av ? '' : 'disabled'} style="${p.id === cur ? 'background:color-mix(in srgb,var(--accent-bg) 14%,transparent)' : ''}${av ? '' : ';opacity:.5'}"><span class="no">${p.num}</span>${posTag(p)}<span class="nm"><b>${esc(p.name)}</b><span>能力 ${E.ovr(p)}・適性 ${Math.round(E.roleApt(p, role))}・${Math.round(p.cond)}% ${p.hot ? '<span class="chip fire">燃えている</span>' : ''}${st}${st2}</span></span><span class="rt"><span class="ovr ${oc(e)}">${Math.round(e)}</span></span></button></li>`;
     }).join('')}</ul>`, '<button class="btn ghost block" data-act="closeSheet">閉じる</button>');
 }
 
@@ -973,7 +980,7 @@ function sheetTeam(cid, tab, back) {
     const sq = E.squad(S, cid);
     const scorers = sq.filter(p => p.st.g > 0).sort((a, b) => b.st.g - a.st.g || b.st.a - a.st.a).slice(0, 3);
     const best = sq.slice().sort((a, b) => b.ovr - a.ovr).slice(0, 5);
-    const prow2 = (p, note) => `<li><button class="prow" data-act="teamPlayer" data-id="${p.id}"><span class="no">${p.num}</span>${posTag(p)}<span class="nm"><b>${esc(p.name)}</b><span>${note}${p.hot ? '<span class="chip fire">燃えている</span>' : ''}${p.inj > 0 ? `<span class="chip warn">負傷 ${p.inj}日</span>` : ''}${p.sus > 0 ? '<span class="chip warn">出場停止</span>' : ''}</span></span><span class="rt"><span class="ovr ${oc(p.ovr)}">${E.ovr(p)}</span></span></button></li>`;
+    const prow2 = (p, note) => `<li><button class="prow" data-act="teamPlayer" data-id="${p.id}"><span class="no">${p.num}</span>${posTag(p)}<span class="nm"><b>${esc(p.name)}</b><span>${note}${p.hot ? '<span class="chip fire">燃えている</span>' : ''}${p.inj > 0 ? `<span class="chip warn">負傷 ${p.inj}日</span>` : ''}${susChip(p)}</span></span><span class="rt"><span class="ovr ${oc(p.ovr)}">${E.ovr(p)}</span></span></button></li>`;
     if (scorers.length) parts.push(`<div><div class="eyebrow" style="margin-bottom:6px">得点源</div><ul class="list">${scorers.map(p => prow2(p, `${p.st.g}得点 ${p.st.a}アシスト・${p.st.apps}試合`)).join('')}</ul></div>`);
     parts.push(`<div><div class="eyebrow" style="margin-bottom:6px">主力選手</div><ul class="list">${best.map(p => prow2(p, `${E.age(p, S.date)}歳 ${natChip(p)}`)).join('')}</ul></div>`);
     if (!c.ab) parts.push(`<dl class="kv"><dt>ホーム</dt><dd>${esc(c.stadium || '—')}</dd><dt>タイトル</dt><dd>${titlesText(c)}${c.o10 ? '・Jリーグ創設メンバー' : ''}</dd></dl>`);
@@ -1163,8 +1170,8 @@ function sheetPrematch(fid) {
   const row = (lab, a, b) => { const mx = Math.max(a, b, 1); return `<div class="cmp"><b class="l">${a.toFixed(0)}</b><span class="bar bl"><i style="width:${Math.max(8, 100 - (mx - a) * 9)}%;background:var(--accent-bg)"></i></span><span class="lab">${lab}</span><span class="bar"><i style="width:${Math.max(8, 100 - (mx - b) * 9)}%;background:var(--muted)"></i></span><b>${b.toFixed(0)}</b></div>`; };
   const warn = [];
   const F = E.FORMATIONS[c.tac.form];
-  const iss = E.lineupIssues(S, S.my);
-  c.tac.xi.forEach((id, i) => { const p = S.players[id]; if (!p || !E.available(p)) return; if (p.cond < 70) warn.push(`${p.name}が疲れています（${Math.round(p.cond)}%）`); if (E.posPenalty(p, F[i][0]) <= -1.5) warn.push(`${p.name}は${E.ROLE[F[i][0]].jp}の適性が低め（${Math.round(E.roleApt(p, F[i][0]))}）`); });
+  const iss = E.lineupIssues(S, S.my, E.compOf(f));
+  c.tac.xi.forEach((id, i) => { const p = S.players[id]; if (!p || !avail(p)) return; if (p.cond < 70) warn.push(`${p.name}が疲れています（${Math.round(p.cond)}%）`); if (E.posPenalty(p, F[i][0]) <= -1.5) warn.push(`${p.name}は${E.ROLE[F[i][0]].jp}の適性が低め（${Math.round(E.roleApt(p, F[i][0]))}）`); });
   const keys = o.tac.xi.map(id => S.players[id]).filter(Boolean).sort((a, b) => b.ovr - a.ovr).slice(0, 3);
   const hy = E.hypeMatch(S, f); const story = storyChips(f);
   const mySide = f.h === S.my ? 'h' : 'a';
@@ -1490,7 +1497,7 @@ function startMatch(fid, quick) {
   closeSheet();
   const fx = S.fixtures.find(f => f.id === fid); if (!fx || fx.played) return;
   E.validateLineup(S, S.my);
-  if (E.lineupIssues(S, S.my).block) return sheetPrematch(fid);
+  if (E.lineupIssues(S, S.my, E.compOf(fx)).block) return sheetPrematch(fid);
   const M = E.createMatch(S, fx);
   const k = M.userSide;
   MATCH = { M, fx, k, speed: S.settings.speed || 1, paused: false, timer: null, raf: null, sel: null, evq: [], hold: false, shown: { h: 0, a: 0 }, ftShown: false };
@@ -1754,7 +1761,7 @@ const ACT = {
     else {
       const old = xi[i]; const bi = c.tac.bench.indexOf(pid);
       xi[i] = pid;
-      if (bi >= 0) { if (old && E.available(S.players[old])) c.tac.bench[bi] = old; else c.tac.bench.splice(bi, 1); }
+      if (bi >= 0) { if (old && avail(S.players[old])) c.tac.bench[bi] = old; else c.tac.bench.splice(bi, 1); }
     }
     E.validateLineup(S, S.my); persist(false); closeSheet(); render();
   },

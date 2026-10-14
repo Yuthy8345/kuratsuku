@@ -788,7 +788,38 @@ function posPenalty(p, role) {
   if (gkSlot || p.pos === 'GK') return gkSlot === (p.pos === 'GK') ? 0 : -35;
   return aptPen(roleApt(p, role));
 }
-function available(p) { return p.inj <= 0 && p.sus <= 0; }
+/* Suspensions are served in the competition they were given in (2026-10-14): a league ban only by league games, a 天皇杯
+   ban only by 天皇杯 ties, an Lカップ ban only by Lカップ ties. p.sus = league games (as before), p.csus = {ec, lc};
+   yellow cards add up per competition too (league p.ycAcc: 4 = one game, cups p.cyc: 2 = one game, as in the real rules).
+   Whether a player can play depends on the competition of his club's next match (nextComp). */
+const COMP_JP = { lg: 'リーグ', ec: '天皇杯', lc: 'Lカップ' };
+const CARD = { lgYc: 4, cupYc: 2 };
+const compOf = f => (f && f.cup) || 'lg';
+function susIn(p, comp) { return !comp || comp === 'lg' ? (p.sus || 0) : ((p.csus && p.csus[comp]) || 0); }
+function setSus(p, comp, n) {
+  if (!comp || comp === 'lg') { p.sus = Math.max(0, n); return; }
+  const cs = p.csus || (p.csus = {});
+  if (n > 0) cs[comp] = n; else delete cs[comp];
+  if (!Object.keys(cs).length) delete p.csus;
+}
+// [[comp, games], ...] for every competition he is banned in
+function susList(p) { return ['lg', 'ec', 'lc'].map(k => [k, susIn(p, k)]).filter(x => x[1] > 0); }
+// the competition of the club's next match ('lg' when it has none left). Cached per fixture list; a played match bumps _fxv.
+let _fxv = 0; const _ncMemo = new WeakMap();
+function nextComp(S, cid) {
+  const fx = S.fixtures || []; const key = S.date + '|' + fx.length + '|' + _fxv;
+  let m = _ncMemo.get(fx);
+  if (!m || m.key !== key) {
+    const best = {};
+    for (const f of fx) if (!f.played) for (const c of [f.h, f.a]) if (!best[c] || f.date < best[c].date) best[c] = f;
+    m = { key, map: {} };
+    for (const c of Object.keys(best)) m.map[c] = compOf(best[c]);
+    _ncMemo.set(fx, m);
+  }
+  return m.map[cid] || 'lg';
+}
+// can he play a match of this competition (league if none given)?
+function available(p, comp) { return p.inj <= 0 && susIn(p, comp) <= 0; }
 function effective(p, role, cond) {
   const c = cond == null ? p.cond : cond;
   const formAdj = clamp((p.form - 6.5) * 1.2, -2, 2);
@@ -801,8 +832,8 @@ function slotOrder(slots) { const pr = r => SLOT_PRI[slots[r][0]] ?? 9; return s
 function autoLineup(S, cid, opts) {
   const c = S.clubs[cid];
   const slots = FORMATIONS[c.tac.form];
-  const opp = opts && opts.opp;
-  const pool = squad(S, cid).filter(p => available(p) && !(opp && p.loan && p.loan.from === opp));  // loanees sit out against their parent club
+  const opp = opts && opts.opp; const comp = (opts && opts.comp) || nextComp(S, cid);
+  const pool = squad(S, cid).filter(p => available(p, comp) && !(opp && p.loan && p.loan.from === opp));  // loanees sit out against their parent club
   const used = new Set(); const xi = new Array(11).fill(null);
   const restCond = opts && opts.rotate ? 82 : 72;
   for (const i of slotOrder(slots)) {
@@ -832,13 +863,13 @@ function autoLineup(S, cid, opts) {
   }
   c.tac.xi = xi;
   c.tac.benchManual = false;
-  autoBench(S, cid, true);
+  autoBench(S, cid, true, comp);
 }
 const BENCH_SIZE = 9;
 // force=true rebuilds the whole bench; otherwise a manager-picked bench is kept and only topped up
-function autoBench(S, cid, force) {
-  const c = S.clubs[cid];
-  const rest = squad(S, cid).filter(p => available(p) && !c.tac.xi.includes(p.id)).sort((a, b) => b.ovr - a.ovr);
+function autoBench(S, cid, force, comp) {
+  const c = S.clubs[cid]; comp = comp || nextComp(S, cid);
+  const rest = squad(S, cid).filter(p => available(p, comp) && !c.tac.xi.includes(p.id)).sort((a, b) => b.ovr - a.ovr);
   let bench = [];
   if (c.tac.benchManual && !force) {
     bench = (c.tac.bench || []).filter(id => rest.some(p => p.id === id)).slice(0, BENCH_SIZE);
@@ -853,7 +884,7 @@ function autoBench(S, cid, force) {
 // manager swaps one bench player (outId) for a reserve or starter (inId)
 function benchSwap(S, outId, inId) {
   const c = S.clubs[S.my]; const p = S.players[inId];
-  if (!p || p.club !== S.my || !available(p)) return false;
+  if (!p || p.club !== S.my || !available(p, nextComp(S, S.my))) return false;
   const bi = c.tac.bench.indexOf(outId);
   const xi = c.tac.xi.indexOf(inId);
   if (xi >= 0) { c.tac.xi[xi] = outId >= 0 && bi >= 0 ? outId : null; }
@@ -863,36 +894,38 @@ function benchSwap(S, outId, inId) {
   validateLineup(S, S.my);
   return true;
 }
-function clubRating(S, cid) {
-  const c = S.clubs[cid];
-  const can = id => id && S.players[id] && available(S.players[id]);
+function clubRating(S, cid, comp) {
+  const c = S.clubs[cid]; comp = comp || nextComp(S, cid);
+  const can = id => id && S.players[id] && available(S.players[id], comp);
   const slots = FORMATIONS[c.tac.form].map((s0, i) => ({ role: s0[0], pid: can(c.tac.xi[i]) ? c.tac.xi[i] : null }));
   const cond = {}; for (const s0 of slots) if (s0.pid) cond[s0.pid] = S.players[s0.pid].cond;
   const r = teamRating(S, { slots, cond, press: PRESS[c.tac.press] ? c.tac.press : 'mid', tactBonus: cid === S.my && S.training === 'tact' ? 1 : 0, pres: c.pres || 2 });
   const x = tacX(c.tac); r.mid += LINE[x.line].mid + BUILD[x.build].mid + (x.mark ? MARK.mid : 0);
   return r;
 }
-// what the manager has to sort out before kickoff: empty slots and players who can't play (injured / suspended)
-function lineupIssues(S, cid) {
-  const c = S.clubs[cid]; const xi = [], bench = [];
+// what the manager has to sort out before kickoff: empty slots and players who can't play (injured / suspended in the
+// competition of the next match)
+function lineupIssues(S, cid, comp) {
+  const c = S.clubs[cid]; const xi = [], bench = []; comp = comp || nextComp(S, cid);
+  const can = p => available(p, comp);
   const why = p => p.inj > 0 ? 'inj' : 'sus';
   FORMATIONS[c.tac.form].forEach((s0, i) => {
     const id = c.tac.xi[i]; const p = id && S.players[id];
     if (!p || p.club !== cid) xi.push({ i, role: s0[0], pid: null, why: 'empty' });
-    else if (!available(p)) xi.push({ i, role: s0[0], pid: id, why: why(p) });
+    else if (!can(p)) xi.push({ i, role: s0[0], pid: id, why: why(p) });
   });
-  for (const id of c.tac.bench) { const p = S.players[id]; if (p && p.club === cid && !available(p)) bench.push({ pid: id, why: why(p) }); }
+  for (const id of c.tac.bench) { const p = S.players[id]; if (p && p.club === cid && !can(p)) bench.push({ pid: id, why: why(p) }); }
   // an empty slot only blocks kickoff while someone fit is left to put there
-  const spare = squad(S, cid).some(p => available(p) && !c.tac.xi.includes(p.id));
+  const spare = squad(S, cid).some(p => can(p) && !c.tac.xi.includes(p.id));
   const block = xi.some(x => x.why !== 'empty' || spare) || bench.length > 0;
-  return { xi, bench, block, spare };
+  return { xi, bench, block, spare, comp };
 }
 // AI clubs: drop anyone who can't play and fill the gaps. The manager's own club is never changed behind his back:
 // only players who left the club are taken out; injured / suspended players stay where he put them until he swaps them.
 function validateLineup(S, cid, opts) {
-  const c = S.clubs[cid];
+  const c = S.clubs[cid]; const comp = (opts && opts.comp) || nextComp(S, cid);
   const inClub = id => id && S.players[id] && S.players[id].club === cid;
-  const ok = id => inClub(id) && available(S.players[id]);
+  const ok = id => inClub(id) && available(S.players[id], comp);
   if (cid === S.my && !(opts && opts.fill)) {
     const xi = FORMATIONS[c.tac.form].map((s0, i) => inClub(c.tac.xi[i]) ? c.tac.xi[i] : null);
     const changed = xi.some((id, i) => id !== c.tac.xi[i]) || xi.length !== c.tac.xi.length;
@@ -905,7 +938,7 @@ function validateLineup(S, cid, opts) {
   c.tac.bench = c.tac.bench.filter(id => ok(id) && !c.tac.xi.includes(id));
   if (c.tac.xi.some(x => !x)) {
     const slots = FORMATIONS[c.tac.form];
-    const pool = squad(S, cid).filter(p => available(p) && !c.tac.xi.includes(p.id));
+    const pool = squad(S, cid).filter(p => available(p, comp) && !c.tac.xi.includes(p.id));
     c.tac.xi.forEach((id, i) => {
       if (id) return;
       let best = null, bv = -1e9;
@@ -914,7 +947,7 @@ function validateLineup(S, cid, opts) {
     });
     changed = true;
   }
-  if (cid !== S.my) autoBench(S, cid);
+  if (cid !== S.my) autoBench(S, cid, false, comp);
   return changed;
 }
 // saved tactics (formation, game plan, XI and bench), up to PRESET_MAX. They belong to the manager (S.presets), not to
@@ -958,10 +991,10 @@ function loadPreset(S, idx) {
 }
 // out: saved players at the club who can't play now / gone: saved players who aren't at the club / other: saved at another club
 function presetStatus(S, pr) {
-  const out = [], gone = [];
+  const out = [], gone = []; const comp = nextComp(S, S.my);
   for (const k of ['xi', 'bench']) (pr[k] || []).forEach((id, i) => {
     if (!id) return; const have = presetHas(S, pr, k, i);
-    if (!have) gone.push(id); else if (!available(S.players[have])) out.push(have);
+    if (!have) gone.push(id); else if (!available(S.players[have], comp)) out.push(have);
   });
   return { out, gone, other: !!pr.club && pr.club !== S.my };
 }
@@ -991,7 +1024,8 @@ function fillEmpty(S) {
   const c = S.clubs[S.my]; const slots = FORMATIONS[c.tac.form];
   validateLineup(S, S.my);
   const xi = c.tac.xi; let nx = 0, nb = 0;
-  const pool = squad(S, S.my).filter(p => available(p) && !xi.includes(p.id));
+  const comp = nextComp(S, S.my);
+  const pool = squad(S, S.my).filter(p => available(p, comp) && !xi.includes(p.id));
   for (const i of slotOrder(slots)) {
     if (xi[i]) continue;
     let best = null, bv = -1e9;
@@ -1043,20 +1077,20 @@ function leagueAvg(S) {
   _lgKey = key; _lg = { att: a / n, mid: m / n, def: d / n };
   return _lg;
 }
-function sideFor(S, cid) {
+function sideFor(S, cid, comp) {
   const c = S.clubs[cid];
-  validateLineup(S, cid);
+  validateLineup(S, cid, { comp });
   // the UI doesn't let the manager kick off with a player who can't play; if it ever happens, patch the XI for this match
-  if (cid === S.my && c.tac.xi.some(id => !id || !available(S.players[id])) && lineupIssues(S, cid).block) validateLineup(S, cid, { fill: true });
+  if (cid === S.my && c.tac.xi.some(id => !id || !available(S.players[id], comp)) && lineupIssues(S, cid, comp).block) validateLineup(S, cid, { fill: true, comp });
   const slots = FORMATIONS[c.tac.form].map((s, i) => ({ role: s[0], x: s[1], y: s[2], pid: c.tac.xi[i] || null }));
   const cond = {};
   for (const s of slots) if (s.pid) cond[s.pid] = S.players[s.pid].cond;
   const tactBonus = cid === S.my && S.training === 'tact' ? 1 : 0;
-  return { cid, form: c.tac.form, ment: MENTALITY[c.tac.ment] ? c.tac.ment : 'bal', ctr: !!c.tac.ctr, press: PRESS[c.tac.press] ? c.tac.press : 'mid', ...tacX(c.tac), slots, bench: c.tac.bench.filter(id => S.players[id] && S.players[id].club === cid && available(S.players[id])), subs: 0, subLog: [], cond, tactBonus, sent: [], pres: c.pres || 2, fan: c.fan || 2 };
+  return { cid, form: c.tac.form, ment: MENTALITY[c.tac.ment] ? c.tac.ment : 'bal', ctr: !!c.tac.ctr, press: PRESS[c.tac.press] ? c.tac.press : 'mid', ...tacX(c.tac), slots, bench: c.tac.bench.filter(id => S.players[id] && S.players[id].club === cid && available(S.players[id], comp)), subs: 0, subLog: [], cond, tactBonus, sent: [], pres: c.pres || 2, fan: c.fan || 2 };
 }
 function createMatch(S, fx) {
   const M = {
-    fid: fx.id, min: 0, half: 1, done: false, h: sideFor(S, fx.h), a: sideFor(S, fx.a), hg: 0, ag: 0,
+    fid: fx.id, min: 0, half: 1, done: false, h: sideFor(S, fx.h, compOf(fx)), a: sideFor(S, fx.a, compOf(fx)), hg: 0, ag: 0,
     ev: [], st: { h: { sh: 0, ot: 0, pos: 0, fo: 0 }, a: { sh: 0, ot: 0, pos: 0, fo: 0 } },
     pm: {}, mom: 0, ball: { x: 50, y: 50, side: 'h' }, userSide: fx.h === S.my ? 'h' : fx.a === S.my ? 'a' : null,
     lg: leagueAvg(S), cup: fx.cup || null, neutral: !!fx.neutral,
@@ -1325,16 +1359,16 @@ function simulateFull(S, M) { while (!M.done) stepMatch(S, M); return M; }
 /* ---------- apply results ---------- */
 function finishMatch(S, M) {
   const fx = S.fixtures.find(f => f.id === M.fid);
-  fx.hg = M.hg; fx.ag = M.ag; fx.played = true;
+  fx.hg = M.hg; fx.ag = M.ag; fx.played = true; _fxv++;
   if (M.pk) fx.pk = M.pk;
   fx.sc = M.ev.filter(e => e.t === 'goal' || e.t === 'red').map(e => [e.m, e.side, e.t === 'goal' ? 'g' : 'r', e.pid]);
-  const cup = !!fx.cup;
+  const cup = !!fx.cup, comp = compOf(fx), cj = COMP_JP[comp];
   // in a cup tie the shootout decides who goes through
   const hw = cup ? cupWinner(fx) === fx.h : null;
   const res = { h: cup ? (hw ? 'W' : 'L') : M.hg > M.ag ? 'W' : M.hg < M.ag ? 'L' : 'D' };
   res.a = res.h === 'W' ? 'L' : res.h === 'L' ? 'W' : 'D';
-  // serve existing suspensions (suspended players were not in this match)
-  for (const cid of [fx.h, fx.a]) for (const p of squad(S, cid)) if (p.sus > 0 && !M.pm[p.id]) p.sus--;
+  // serve existing suspensions: only a match of the same competition counts (suspended players were not in it)
+  for (const cid of [fx.h, fx.a]) for (const p of squad(S, cid)) { const n = susIn(p, comp); if (n > 0 && !M.pm[p.id]) setSus(p, comp, n - 1); }
   // player updates
   for (const [pidS, pm] of Object.entries(M.pm)) {
     const p = S.players[pidS]; if (!p) continue;
@@ -1353,10 +1387,17 @@ function finishMatch(S, M) {
     if (dp && dp !== 'GK' && p.pos !== 'GK' && mins >= 45 && dp !== ppOf(p)) { const cur = apt(p, dp); if (cur < PLAY_MAX) { p.ap = p.ap || {}; p.ap[dp] = Math.round(Math.min(PLAY_MAX, cur + 0.6) * 10) / 10; } }
     p.form = p.form * 0.6 + rt * 0.4;
     p.cond = Math.round(sd.cond[pidS] != null ? sd.cond[pidS] : p.cond - 10);
-    if (pm.yc && !pm.rc && !cup) { p.st.yc++; p.ycAcc++; if (p.ycAcc >= 4) { p.sus = 1; p.ycAcc = 0; if (p.club === S.my) news(S, `${p.name}は累積警告で次節出場停止。`, 'warn'); } }
-    if (pm.rc) { p.st.rc++; p.sus = Math.max(p.sus, pm.yc >= 2 ? 1 : 2); if (p.club === S.my) news(S, `${p.name}は退場処分で出場停止（${p.sus}試合）。`, 'warn'); }
+    if (pm.yc && !pm.rc && !cup) { p.st.yc++; p.ycAcc++; if (p.ycAcc >= CARD.lgYc) { setSus(p, 'lg', Math.max(p.sus, 1)); p.ycAcc = 0; if (p.club === S.my) news(S, `${p.name}は累積警告で、リーグの次節に出場停止。`, 'warn'); } }
+    if (pm.yc && !pm.rc && cup) {
+      const y = p.cyc || (p.cyc = {}); y[comp] = (y[comp] || 0) + 1;
+      if (y[comp] >= CARD.cupYc) { setSus(p, comp, Math.max(susIn(p, comp), 1)); delete y[comp]; if (p.club === S.my) news(S, `${p.name}は${cj}の累積警告（2枚）で、${cj}の次の試合に出場停止。`, 'warn'); }
+      if (!Object.keys(y).length) delete p.cyc;
+    }
+    if (pm.rc) { if (!cup) p.st.rc++; setSus(p, comp, Math.max(susIn(p, comp), pm.yc >= 2 ? 1 : 2)); if (p.club === S.my) news(S, `${p.name}は退場処分で出場停止（${cj}の${susIn(p, comp)}試合）。`, 'warn'); }
     if (pm.inj) { p.inj = pm.inj; if (p.club === S.my) news(S, `${p.name}が負傷。全治およそ${pm.inj}日の見込み。`, 'warn'); }
   }
+  // a single cup yellow is wiped after the quarter-final (a second one there still means missing the semi-final)
+  if (cup && fx.cr === CUPS[comp].rounds.length - 3) for (const cid of [fx.h, fx.a]) for (const p of squad(S, cid)) if (p.cyc && p.cyc[comp] === 1) { delete p.cyc[comp]; if (!Object.keys(p.cyc).length) delete p.cyc; }
   // finances: gate for home club (a final at 国立 is shared)
   const hc = S.clubs[fx.h];
   let att = attendance(S, fx.h, fx.a);
@@ -1511,7 +1552,7 @@ function matchdayPrep(S) {
   for (const f of today) hypeMatch(S, f);
   for (const f of today) for (const [cid, opp] of [[f.h, f.a], [f.a, f.h]]) {
     if (cid === S.my || !S.clubs[cid]) continue;
-    autoLineup(S, cid, { rotate: true, opp });
+    autoLineup(S, cid, { rotate: true, opp, comp: compOf(f) });
     Object.assign(S.clubs[cid].tac, aiPlan(S, cid, opp));
   }
   if (today.some(f => f.h === S.my || f.a === S.my)) validateLineup(S, S.my);
@@ -2207,7 +2248,7 @@ function hypeMatch(S, f) {
     if (lost) hy.rev = (hy.rev || []).concat(cid);
     const up = HYPE.upTag && gap >= 4;
     const W = Math.max(HYPE.floor, W0 + (lost ? 0.8 : 0) + (f.cup && gap >= 3 ? 0.6 : 0) + (up ? HYPE.upTag : 0));
-    const pool = squad(S, cid).filter(p => available(p) && !p.retire);
+    const pool = squad(S, cid).filter(p => available(p, compOf(f)) && !p.retire);
     const picked = new Set();
     for (const p of pool) if (formerClubs(p).has(opp) && R() < HYPE.former * under) picked.add(p);
     if (W > 0 && R() < clamp(HYPE.k * W * under, 0, HYPE.cap)) {
@@ -2571,7 +2612,13 @@ function rollover(S) {
     if (p.st.apps || p.club === S.my) p.hist.unshift({ s: seasonLabel(S.season), c: p.club, ovr: Math.round(p.ovr), ...p.st });
     if (p.at) { p.at0 = p.at.slice(); p.ovr0 = p.ovr; p.pot0 = p.pot; }
     if (p.hist.length > 8) p.hist.length = 8;
-    p.st = blankStats(); p.ycAcc = 0; p.sus = 0; delete p.cs; delete p.hot;
+    p.st = blankStats(); p.ycAcc = 0; delete p.cyc; delete p.cs; delete p.hot;
+    // unserved bans: one game lapses, two or more carry over to the same competition next season (as in the J.League)
+    for (const [k, n] of susList(p)) {
+      if (n < 2 || p.club === 'RET') { setSus(p, k, 0); continue; }
+      if (p.club === S.my) news(S, `${p.name}は前季の出場停止が残っているため、新しいシーズンの${COMP_JP[k]}の最初の${n}試合に出られない。`, 'warn');
+    }
+    if (!p.sus) p.sus = 0;
   }
   for (const p of back) if (S.players[p.id] && p.loan) loanReturn(S, p);
   // relegation / promotion
@@ -2650,7 +2697,7 @@ const API = {
   D, jdate, FORMATIONS, ROLE, DPOS, DP_CAT, DP_JP, LEARN_MAX, PLAY_MAX, ppOf, apt, roleApt, posValues, learnRate, learnWeeks, MENTALITY, PRESS, TRAINING, FACILITY, ATTR, ATTR_SHOW, FOCUS, INTENS,
   calcOvr, roleScore, bestRoles, devPreview, migrate, weekly, power, presStars, presLabel,
   newGame, seasonForDate, seasonLabel, squad, strength, table, position, age, ovr, value, wage, money, attrs,
-  autoLineup, autoBench, benchSwap, benchRemove, lineupIssues, BENCH_SIZE, PRESET_MAX, savePreset, loadPreset, presetStatus, renamePreset, deletePreset, presetsOf, fillEmpty, clubRating, validateLineup, effective, posPenalty, available, teamRating,
+  autoLineup, autoBench, benchSwap, benchRemove, lineupIssues, BENCH_SIZE, PRESET_MAX, savePreset, loadPreset, presetStatus, renamePreset, deletePreset, presetsOf, fillEmpty, clubRating, validateLineup, effective, posPenalty, available, nextComp, compOf, susIn, setSus, susList, COMP_JP, CARD, teamRating,
   createMatch, stepMatch, simulateFull, finishMatch, doSub, benchOptions, onPitch, setMentality, bestSubFor, setCounter, mentLabel,
   advance, nextDay, simAIToday, myFixtureToday, nextMyFixture, todaysFixtures, inWindow, windowEnd, nextWindowStart,
   acceptOffer, rejectOffer, raiseOffer, OFFER_UP, setListed, setKeep, transferDay, bid, NEGO, negoInfo, negoWill, negoOf, negoStart, negoOffer, negoAgree, decideRetirements, shortlist, shortEntry, unshort, bidBlock,
