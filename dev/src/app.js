@@ -517,6 +517,15 @@ function subRateCtl() {
   const cur = E.SUB_RATE[S.settings.subRate] ? S.settings.subRate : 'mid';
   return `<div class="ctlrow"><label>交代の頻度</label><div class="seg">${['low', 'mid', 'high'].map(k => `<button data-act="subRate" data-k="${k}" aria-pressed="${cur === k}">${E.SUB_RATE[k].jp}</button>`).join('')}</div><span class="fine">${E.SUB_RATE[cur].sub}</span></div>`;
 }
+// 逃げ切りはおまかせ (S.settings.closeOut): on the tactics sheet, and during a match with what it is doing now
+function closeOutToggle(sd) {
+  const stopped = !!(sd && S.settings.closeOut && sd.closeOff);  // the manager changed the plan himself during this match
+  const on = !!S.settings.closeOut && !stopped;
+  const sub = stopped ? '作戦を自分で変えたので、この試合はおまかせを止めています。オンにすると再開します。'
+    : on && sd && sd.close ? 'いま逃げ切り中（守備的・ライン低い・時間を使う）。追いつかれたら元の作戦に戻します。'
+    : `${E.CLOSE.from}分以降にリードしたら、守備的・ライン低い・時間を使うに切り替えます。追いつかれたら元の作戦に戻します。`;
+  return `<button class="toggle" role="switch" aria-checked="${on}" data-act="closeOut"${stopped ? ' data-re="1"' : ''}><span><b>逃げ切りはおまかせ</b><br><span class="small muted">${sub}</span></span><span class="sw"></span></button>`;
+}
 function sheetPlayer(id, back) {
   const p = S.players[id]; if (!p) return;
   sheetState = { type: 'player', id, back: back || null };
@@ -776,7 +785,7 @@ function planCard(c) {
   const subs = S.settings.autoSubs ? `おまかせ（${(E.SUB_RATE[S.settings.subRate] || E.SUB_RATE.mid).jp}）` : '自分で選ぶ';
   return `<button class="plancard" data-act="plan" aria-label="戦術を変更">
     <span class="pc-head"><span class="eyebrow">戦術</span><span class="pc-edit">変更<span aria-hidden="true">›</span></span></span>
-    <dl class="pc-kv"><dt>攻撃の姿勢</dt><dd>${esc(E.mentLabel(t))}</dd><dt>プレス</dt><dd>${esc((E.PRESS[t.press] || E.PRESS.mid).jp)}</dd><dt>詳しい指示</dt><dd>${x ? esc(x) : '標準'}</dd><dt>交代</dt><dd>${subs}</dd></dl>
+    <dl class="pc-kv"><dt>攻撃の姿勢</dt><dd>${esc(E.mentLabel(t))}</dd><dt>プレス</dt><dd>${esc((E.PRESS[t.press] || E.PRESS.mid).jp)}</dd><dt>詳しい指示</dt><dd>${x ? esc(x) : '標準'}</dd>${S.settings.closeOut ? '<dt>逃げ切り</dt><dd>おまかせ</dd>' : ''}<dt>交代</dt><dd>${subs}</dd></dl>
   </button>`;
 }
 function sheetPlan() {
@@ -788,6 +797,7 @@ function sheetPlan() {
     <button class="toggle" role="switch" aria-checked="${!!c.tac.ctr}" data-act="ctr"><span><b>カウンターを狙う</b><br><span class="small muted">${CTR_DESC}</span></span><span class="sw"></span></button>
     <div class="ctlrow"><label>プレスの強度（高いほど中盤で優位、ただし消耗）</label>${seg('press', c.tac.press, [['low', '低'], ['mid', '中'], ['high', '高']])}</div>
     ${tacXBlock(E.tacX(c.tac), 't', nextOpp())}
+    ${closeOutToggle(null)}
     <button class="toggle" role="switch" aria-checked="${!!S.settings.autoSubs}" data-act="autoSubs"><span><b>交代はおまかせ</b><br><span class="small muted">オフにすると試合中に自分で交代を選びます</span></span><span class="sw"></span></button>
     ${subRateCtl()}
     <p class="fine" style="margin:0">変えた内容はすぐに反映されます。試合中も「采配」から変えられます。</p>`,
@@ -1527,7 +1537,7 @@ function feedAdd(e) {
   const { M } = MATCH;
   const li = document.createElement('li');
   const sys = ['ko', 'ht', 'ft'].includes(e.t);
-  li.className = e.t === 'goal' ? 'goal' : e.t === 'red' ? 'red' : e.t === 'hot' ? 'hot' : e.t === 'pk' ? 'goal' : sys ? 'sys' : '';
+  li.className = e.t === 'goal' ? 'goal' : e.t === 'red' ? 'red' : e.t === 'hot' ? 'hot' : e.t === 'pk' ? 'goal' : e.t === 'tac' ? 'tac' : sys ? 'sys' : '';
   const c = e.side ? S.clubs[M[e.side].cid] : null;
   li.innerHTML = `<time>${e.m > 90 ? '90+' + (e.m - 90) : e.m}'</time><i class="pip" style="${c ? 'background:' + c.c1 : ''}"></i><span>${e.t === 'goal' ? '<b class="evb">GOAL</b>' : e.t === 'yc' ? '<i class="cardi y"></i>' : e.t === 'red' ? '<i class="cardi r"></i>' : ''}${esc(e.text)}</span>`;
   feed.prepend(li);
@@ -1604,6 +1614,7 @@ function sheetMatchTactics() {
     <div class="ctlrow"><label>攻撃の姿勢</label><div class="seg">${MENT_OPTS.map(([x, l]) => `<button data-act="mMent" data-k="${x}" aria-pressed="${sd.ment === x}">${l}</button>`).join('')}</div><span class="fine">${MENT_DESC[sd.ment] || ''}</span></div>
     <button class="toggle" role="switch" aria-checked="${!!sd.ctr}" data-act="mCtr"><span><b>カウンターを狙う</b><br><span class="small muted">${CTR_DESC}</span></span><span class="sw"></span></button>
     ${(() => { const ace = E.markTarget(S, M, k === 'h' ? 'a' : 'h'); return tacXBlock(E.tacX(sd), 'm', ace && S.players[ace] ? S.players[ace].name : ''); })()}
+    ${closeOutToggle(sd)}
     <button class="toggle" role="switch" aria-checked="${!!S.settings.autoSubs}" data-act="autoSubs"><span><b>交代はおまかせ</b><br><span class="small muted">残り交代 ${left}回</span></span><span class="sw"></span></button>
     ${subRateCtl()}
     <div class="eyebrow">${sel ? 'OUT：' + esc(S.players[sel].name) + ' → 入れる選手を選ぶ' : '下げる選手を選ぶ'}</div>
@@ -1661,6 +1672,12 @@ const ACT = {
   ment(d) { S.clubs[S.my].tac.ment = d.k; persist(false); planRefresh(); },
   ctr() { const t = S.clubs[S.my].tac; t.ctr = !t.ctr; persist(false); planRefresh(); },
   press(d) { S.clubs[S.my].tac.press = d.k; persist(false); planRefresh(); },
+  // 逃げ切りはおまかせ; during a match, tapping it while it is on but stopped (the manager changed the plan) restarts it
+  closeOut(d) {
+    const restart = d.re === '1';
+    E.setCloseOut(S, restart ? true : !S.settings.closeOut, MATCH ? MATCH.M : null, MATCH ? MATCH.k : null);
+    persist(false); if (sheetState && sheetState.type === 'msub') refreshSheet(); else planRefresh();
+  },
   autoSubs() { S.settings.autoSubs = !S.settings.autoSubs; persist(false); if (sheetState && sheetState.type === 'msub') refreshSheet(); else planRefresh(); },
   boardLv(d) { S.settings.boardLv = d.k; persist(false); render(); },
   subRate(d) { S.settings.subRate = d.k; persist(false); if (sheetState && sheetState.type === 'msub') refreshSheet(); else planRefresh(); },

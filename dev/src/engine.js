@@ -139,6 +139,39 @@ const WIDTH = {
 };
 const MARK = { shot: 0.65, q: 0.92, mid: -1.4 };
 const KILL = { from: 70, own: 0.7, opp: 0.92 };
+/* 逃げ切りはおまかせ (2026-10-14, S.settings.closeOut, my club only — AI clubs never change their plan during a match, so the
+   league balance doesn't move): from CLOSE.from, while my side is ahead it sits deep and slows the game (守備的・ライン低い・
+   時間を使う; the counter setting stays as it is). If the lead goes, the plan goes back to what it was. A change the manager
+   makes himself to one of those three while it is in force ends it for the rest of the match (sd.closeOff); turning the
+   setting on again during the match starts it again. dev/test/closeout.js measures it (a one-goal lead at 75'). */
+const CLOSE = { from: 75, ment: 'def', line: 'low', kill: true };
+function closeOut(S, M, k, push) {
+  const sd = M[k];
+  if (!(S.settings && S.settings.closeOut)) { sd.close = null; return; }  // switched off: the plan stays as it is now
+  if (sd.closeOff) return;
+  const ahead = (k === 'h' ? M.hg - M.ag : M.ag - M.hg) > 0;
+  if (ahead && !sd.close) {
+    if (sd.ment === CLOSE.ment && sd.line === CLOSE.line && !!sd.kill === CLOSE.kill) return;  // already playing that way
+    sd.close = { ment: sd.ment, line: sd.line, kill: !!sd.kill };
+    sd.ment = CLOSE.ment; sd.line = CLOSE.line; sd.kill = CLOSE.kill;
+    push({ t: 'tac', side: k, text: '【逃げ切り】守備的・ライン低い・時間を使う に切り替え' });
+  } else if (!ahead && sd.close) {
+    sd.ment = sd.close.ment; sd.line = sd.close.line; sd.kill = sd.close.kill; sd.close = null;
+    push({ t: 'tac', side: k, text: '【逃げ切り】同点に追いつかれ、元の作戦に戻す' });
+  }
+}
+// the manager changed the plan himself: if 逃げ切り was in force and he changed one of its three, it stops for this match
+function closeManual(M, k, key, val) {
+  const sd = M[k];
+  if (!sd.close || !(key === 'ment' || key === 'line' || key === 'kill')) return;
+  if (key === 'kill' ? !!val === !!sd.kill : val === sd[key]) return;  // tapped what was already chosen
+  sd.close = null; sd.closeOff = true;
+}
+// 逃げ切りはおまかせ on/off (also during a match: on again restarts it, off keeps the plan as it is now)
+function setCloseOut(S, on, M, k) {
+  S.settings.closeOut = !!on;
+  if (M && k && M[k]) { if (on) M[k].closeOff = false; else M[k].close = null; }
+}
 const TAC_DEF = { line: 'mid', build: 'mix', width: 'mix', mark: false, kill: false };
 // the extra instructions of a side (old saves / AI clubs that never set them: the defaults)
 function tacX(t) { return { line: LINE[t && t.line] ? t.line : 'mid', build: BUILD[t && t.build] ? t.build : 'mix', width: WIDTH[t && t.width] ? t.width : 'mix', mark: !!(t && t.mark), kill: !!(t && t.kill) }; }
@@ -1044,6 +1077,7 @@ function stepMatch(S, M) {
   const push = e => { e.m = M.min; M.ev.push(e); out.push(e); };
   M.min++;
   const H = M.h, A = M.a;
+  if (M.userSide && M.min >= CLOSE.from) closeOut(S, M, M.userSide, push);
   // live ratings (recomputed with current cond and red cards)
   const live = side => {
     const sd = { ...side, slots: side.slots.map(s => ({ ...s, pid: side.sent.includes(s.pid) ? null : s.pid })) };
@@ -1246,10 +1280,11 @@ function aiSubs(S, M, k, push, rate) {
     doSub(S, M, k, s.pid, inn, push);
   }
 }
-function setMentality(M, k, ment) { M[k].ment = ment; }
+function setMentality(M, k, ment) { closeManual(M, k, 'ment', ment); M[k].ment = ment; }
 function setCounter(M, k, on) { M[k].ctr = !!on; }
 // change one of the extra instructions during a match (line / build / width / mark / kill)
 function setTac(M, k, key, val) {
+  closeManual(M, k, key, val);
   if (key === 'line' && LINE[val]) M[k].line = val; else if (key === 'build' && BUILD[val]) M[k].build = val;
   else if (key === 'width' && WIDTH[val]) M[k].width = val; else if (key === 'mark' || key === 'kill') M[k][key] = !!val;
 }
@@ -2512,7 +2547,7 @@ const API = {
   createMatch, stepMatch, simulateFull, finishMatch, doSub, benchOptions, onPitch, setMentality, bestSubFor, setCounter, mentLabel,
   advance, nextDay, simAIToday, myFixtureToday, nextMyFixture, todaysFixtures, inWindow, windowEnd, nextWindowStart,
   acceptOffer, rejectOffer, setListed, setKeep, transferDay, bid, decideRetirements, shortlist, shortEntry, unshort, bidBlock,
-  FORM_DESC, LINE, BUILD, WIDTH, MARK, KILL, TAC_DEF, tacX, tacLabel, setTac, aiPlan, aiMentality, CLUB_STYLE, widthFit, markTarget,
+  FORM_DESC, LINE, BUILD, WIDTH, MARK, KILL, CLOSE, setCloseOut, TAC_DEF, tacX, tacLabel, setTac, aiPlan, aiMentality, CLUB_STYLE, widthFit, markTarget,
   NUM_MAX, numOpen, numNext, setNum, checkTitle, leagueLeft, progressCups,
   ABROAD, abroadOf, isAbroadClub, price, addAbroad, abroadReluct,
   BOARD, BOARD_LV, boardLv, tenure, CUPS, CUP_PRIZE, NATIONAL, fxLabel, cupResult, cupWinner, hypeMatch, HYPE, SUB_RATE, subRate, STYLE, GROW, RARE, INTAKE, potCap, clubBase, devWeek, shareFor, LOAN, GEM, REBORN, LEGENDS, legendOf, rebornCheck, makeReborn, rebornNum, myLoans, loanCan, loanOptions, loanOut, growthOutlook, weeksLeft, yearsTo, bigGame, rivalry, SCOUT, sendScout, playShare, marketList, ensureFreeAgents, upgrade, facCost, takeJob, rollover, endSeason, news, fire,
