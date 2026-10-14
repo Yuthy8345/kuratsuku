@@ -1086,7 +1086,7 @@ function sheetNego(id, back) {
   const atAsk = fee >= n.ask;
   const body = `<div class="row">${kit(p.club, 'lg')}<div style="min-width:0"><div class="eyebrow">移籍交渉・${esc(club.name)}・〜${jd(n.until)}</div><h2>${esc(p.name)}</h2></div></div>
     <div class="card ng-card">
-      <div class="ng-ask"><span class="eyebrow">${esc(club.short)}の要求額</span><span>${n.ask < n.ask0 ? `<s>${E.money(n.ask0)}</s>` : n.ask > n.ask0 ? `<small>（最初 ${E.money(n.ask0)}）</small>` : ''}<b>${E.money(n.ask)}</b></span></div>
+      <div class="ng-ask"><div><span class="eyebrow">${esc(club.short)}の要求額</span>${n.ask < n.ask0 ? `<s>${E.money(n.ask0)}</s>` : n.ask > n.ask0 ? `<small>最初 ${E.money(n.ask0)}</small>` : ''}</div><b>${E.money(n.ask)}</b></div>
       <dl class="kv"><dt>相場（市場価値）</dt><dd>${E.money(pr)}</dd><dt>使える資金</dt><dd>${E.money(S.clubs[S.my].funds)}</dd><dt>相手の我慢</dt><dd><span class="ng-pat" role="img" aria-label="我慢 ${n.pat}/${E.NEGO.pat}">${pat}</span></dd></dl>
       <div class="row wrap">${chips}</div>
     </div>

@@ -132,14 +132,17 @@ async def main():
         await page.click('[data-tab="home"]'); await page.wait_for_timeout(300)
         cards = page.locator('article.card:has([data-act="offerUp"])')
         print('offer cards with 増額を求める:', await cards.count()); bad += [] if await cards.count() == 2 else ['raise buttons']
-        await cards.first.scroll_into_view_if_needed(); await page.screenshot(path=str(OUT/'nego-offer.png'))
+        scroll_card = "id => { const c = document.querySelector(`[data-act='offerUp'][data-id='${id}']`).closest('article'); window.scrollBy(0, c.getBoundingClientRect().top - 140); }"
+        await page.evaluate(scroll_card, '9001'); await page.wait_for_timeout(200); await page.screenshot(path=str(OUT/'nego-offer.png'))
+        if not fits(await page.locator('[data-act="offerUp"][data-id="9001"]').bounding_box(), vh - 230): bad.append('raise button above the dock')
         await page.click('[data-act="offerUp"][data-id="9001"]'); await page.wait_for_timeout(300)
         t3 = await toast(); card = await page.locator('article.card:has([data-id="9001"])').inner_text()
         print('raise →', t3, '|', ' '.join(l for l in card.split('\n') if '提示' in l or '増額' in l)[:80])
         bad += [] if '増額した' in t3 and '増額（+' in card and not await page.locator('[data-act="offerUp"][data-id="9001"]').count() else ['raised']
         await page.click('[data-act="offerUp"][data-id="9002"]'); await page.wait_for_timeout(300)
         t4 = await toast(); print('raise →', t4); bad += [] if '取り下げ' in t4 and not await page.locator('[data-id="9002"]').count() else ['withdrawn']
-        await calm(); await page.locator('article.card:has([data-id="9001"])').scroll_into_view_if_needed(); await page.screenshot(path=str(OUT/'nego-offer-raised.png'))
+        await calm(); await page.evaluate("() => { const c = document.querySelector(`article.card:has([data-id='9001'])`); window.scrollBy(0, c.getBoundingClientRect().top - 140); }"); await page.wait_for_timeout(200)
+        await page.screenshot(path=str(OUT/'nego-offer-raised.png'))
         st = await page.evaluate(LOAD); it = next(x for x in st['inbox'] if x['id'] == 9001)
         bad += [] if it['raised'] and 30000 < it['fee'] <= 36000 and it['fee0'] == 30000 else ['raise saved']
         saved = await page.evaluate("() => localStorage.getItem('touchline.j1.save')")

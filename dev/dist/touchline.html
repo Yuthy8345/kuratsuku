@@ -208,9 +208,9 @@ h1, h2, h3 { text-wrap: balance; margin: 0; }
 .prow .nm .sl-last { display: block; margin-top: 4px; font-size: 12px; line-height: 1.45; color: var(--ink); opacity: .82; } /* shortlist: last bid and how it went */
 /* 移籍交渉: asking price, patience magnets, what was said, my offer (− amount ＋) */
 .ng-card { display: grid; gap: 10px; }
-.ng-ask { display: flex; align-items: baseline; justify-content: space-between; gap: 4px 10px; flex-wrap: wrap; }
-.ng-ask > span:last-child { display: inline-flex; align-items: baseline; gap: 8px; margin-left: auto; }
-.ng-ask b { font-family: var(--f-display); font-weight: 400; font-size: 30px; line-height: 1.1; }
+.ng-ask { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.ng-ask > div { display: grid; gap: 2px; min-width: 0; }   /* the label, and under it the first ask when it has moved */
+.ng-ask b { font-family: var(--f-display); font-weight: 400; font-size: 30px; line-height: 1.1; white-space: nowrap; }
 .ng-ask s, .ng-ask small { color: var(--muted); font-size: 13px; }
 .ng-pat { display: inline-flex; gap: 5px; vertical-align: middle; }
 .ng-pat i { width: 14px; height: 14px; border-radius: 50%; background: #E0533F; box-shadow: var(--mag-shadow); }
@@ -4942,7 +4942,7 @@ function sheetNego(id, back) {
   const atAsk = fee >= n.ask;
   const body = `<div class="row">${kit(p.club, 'lg')}<div style="min-width:0"><div class="eyebrow">移籍交渉・${esc(club.name)}・〜${jd(n.until)}</div><h2>${esc(p.name)}</h2></div></div>
     <div class="card ng-card">
-      <div class="ng-ask"><span class="eyebrow">${esc(club.short)}の要求額</span><span>${n.ask < n.ask0 ? `<s>${E.money(n.ask0)}</s>` : n.ask > n.ask0 ? `<small>（最初 ${E.money(n.ask0)}）</small>` : ''}<b>${E.money(n.ask)}</b></span></div>
+      <div class="ng-ask"><div><span class="eyebrow">${esc(club.short)}の要求額</span>${n.ask < n.ask0 ? `<s>${E.money(n.ask0)}</s>` : n.ask > n.ask0 ? `<small>最初 ${E.money(n.ask0)}</small>` : ''}</div><b>${E.money(n.ask)}</b></div>
       <dl class="kv"><dt>相場（市場価値）</dt><dd>${E.money(pr)}</dd><dt>使える資金</dt><dd>${E.money(S.clubs[S.my].funds)}</dd><dt>相手の我慢</dt><dd><span class="ng-pat" role="img" aria-label="我慢 ${n.pat}/${E.NEGO.pat}">${pat}</span></dd></dl>
       <div class="row wrap">${chips}</div>
     </div>
