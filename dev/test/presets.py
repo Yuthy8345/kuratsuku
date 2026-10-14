@@ -87,7 +87,7 @@ async def main():
         fs = await page.locator('.formsel .fs-now b').inner_text(); print('formation plate', fs)
         await page.click('[data-act="presets"]'); await page.wait_for_timeout(350)
         meta = await page.locator('#sheet .preset >> nth=0').inner_text(); print('row:', meta.replace('\n', ' | '))
-        bad += [] if '浦和（ほかのクラブ）' in meta and 'いない選手' in meta and ' 保存' in meta and 'ゲーム内' not in meta else ['row text']
+        bad += [] if '浦和（ほかのクラブ）' in meta.replace('\n', '') and 'いない選手' in meta and ' 保存' in meta and 'ゲーム内' not in meta else ['row text']
         await page.screenshot(path=str(OUT/'t-presets-carry.png'))
         await page.click('#sheet [data-act="presetLoad"][data-i="0"]'); await page.wait_for_timeout(300)
         toast = await page.locator('.toast').first.inner_text(); print('toast', toast)

@@ -97,16 +97,15 @@ h1, h2, h3 { text-wrap: balance; margin: 0; }
 .k-dh { --pat: linear-gradient(135deg, var(--c1) 50%, var(--c2) 50%); }                                                            /* ななめ2色 */
 .k-tr { --pat: linear-gradient(90deg, var(--c1) 0 34%, var(--c2) 34% 66%, var(--c3) 66%); }                                        /* 縦の3色 */
 .k-bd { --pat: linear-gradient(180deg, var(--c1) 0 35%, var(--c2) 35% 65%, var(--c1) 65%); }                                       /* 横の帯 */
-.k-bd3 { --pat: linear-gradient(180deg, var(--c1) 0 31%, var(--c2) 31% 42%, var(--c3) 42% 58%, var(--c2) 58% 69%, var(--c1) 69%); } /* 横の帯（中に1本） */
 .k-sh { --pat: linear-gradient(135deg, var(--c1) 0 37%, var(--c2) 37% 63%, var(--c1) 63%); }                                       /* たすき */
-.k-sh3 { --pat: linear-gradient(135deg, var(--c1) 0 33%, var(--c2) 33% 43%, var(--c3) 43% 57%, var(--c2) 57% 67%, var(--c1) 67%); } /* たすき（中に1本） */
 .k-ub { --pat: linear-gradient(180deg, var(--c2) 0 27%, var(--c1) 27% 73%, var(--c2) 73%); }                                       /* 上下の帯 */
 .k-pn { --pat: linear-gradient(90deg, var(--c1) 0 26%, var(--c2) 26% 34%, var(--c1) 34% 46%, var(--c2) 46% 54%, var(--c1) 54% 66%, var(--c2) 66% 74%, var(--c1) 74%); } /* 細い3本線 */
 .k-cs { --pat: linear-gradient(90deg, var(--c1) 0 29%, var(--c2) 29% 39%, var(--c3) 39% 61%, var(--c2) 61% 71%, var(--c1) 71%); }  /* 真ん中のストライプ */
 .k-qt { --pat: conic-gradient(var(--c1) 0 25%, var(--c2) 0 50%, var(--c1) 0 75%, var(--c2) 0); }                                  /* 4分割 */
 .k-cd { --pat: radial-gradient(circle, var(--c2) 0 27%, transparent 28%), var(--c1); }                                             /* 真ん中に丸 */
 .k-tf { --pat: radial-gradient(ellipse 15% 15% at 50% 37%, var(--c2) 90%, transparent 100%), radial-gradient(ellipse 15% 15% at 37% 60%, var(--c2) 90%, transparent 100%), radial-gradient(ellipse 15% 15% at 63% 60%, var(--c2) 90%, transparent 100%), var(--c1); } /* 三つ葉 */
-.k-v { --pat: linear-gradient(to top right, var(--c1) 0 37%, var(--c2) 37% 63%, var(--c1) 63%) left top / 50% 78% no-repeat, linear-gradient(to top left, var(--c1) 0 37%, var(--c2) 37% 63%, var(--c1) 63%) right top / 50% 78% no-repeat, var(--c1); } /* V */
+/* V: the arms keep the angle of a 50%×78% box's diagonal (57.34deg) and run on into the bottom rim (長崎, 2026-10-14) */
+.k-v { --pat: linear-gradient(57.34deg, var(--c1) 0 44.8%, var(--c2) 44.8% 67.6%, var(--c1) 67.6%) left top / 50% 100% no-repeat, linear-gradient(-57.34deg, var(--c1) 0 44.8%, var(--c2) 44.8% 67.6%, var(--c1) 67.6%) right top / 50% 100% no-repeat, var(--c1); }
 .k-di::after { content: ''; position: absolute; left: 50%; top: 50%; width: 34%; height: 34%; background: var(--c2); transform: translate(-50%, -50%) rotate(45deg); border-radius: 1px; } /* 菱形 */
 
 /* dock — the thumb zone */
