@@ -153,6 +153,7 @@ for (const file of fs.readdirSync(RAW).filter(f => f.endsWith('.txt')).sort()) {
     const key = nameParts.join('');
     let nat = 'JPN';
     if (NAT[origin]) nat = NAT[origin];
+    else if (/^[A-Z]{3}$/.test(origin)) nat = origin;  // some club files give the country code (kashima: BRA / SRB / KOR); JP = Japanese
     if (JP_BORN_ABROAD.has(key)) nat = 'JPN';
     const age = ageAt(birth);
     const r = rnd(hash(id + key));

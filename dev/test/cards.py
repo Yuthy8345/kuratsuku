@@ -111,7 +111,7 @@ async def main():
         await page.click('[data-act="go"]'); await page.wait_for_timeout(500)
         if await page.locator('#sheet [data-act="closeSheet"]').count(): await page.click('#sheet [data-act="closeSheet"]'); await page.wait_for_timeout(200)
         st = await state(); pk = st['players'][str(K)]
-        ok(st['date'] > '2026-09-16' and bans(pk, 'lg') == 3 and not any(b.get('tot') for b in pk.get('bans', [])), f"next day the committee decided K's ban: {pk.get('bans')}")
+        ok(st['date'] > SAVE['date'] and bans(pk, 'lg') == 3 and not any(b.get('tot') for b in pk.get('bans', [])), f"next day the committee decided K's ban: {pk.get('bans')}")
         ok(any('規律委員会' in n['text'] for n in st['news'][:10]), 'news of the decision')
         # whiteboard look
         await page.evaluate("document.documentElement.dataset.board = 'white'"); await page.wait_for_timeout(150)

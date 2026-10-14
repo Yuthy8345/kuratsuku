@@ -110,9 +110,9 @@ const D0 = '2027-05-20', D1 = '2027-05-21';
   ok(!!stops.match, 'advance stops: ' + JSON.stringify(stops));
   // a final is crowned right after the match (not the next morning)
   const T = E.newGame(DATA, 'kashima', 't', '2026-10-13');
-  const lc = T.cups.lc; lc.r = 4; T.fixtures = T.fixtures.filter(f => f.cup !== 'lc');
-  const opp = T.order.find(c => c !== T.my);
-  const fin = { id: 9999, cup: 'lc', cr: 4, date: T.date, h: T.my, a: opp, hg: null, ag: null, played: false, neutral: true }; T.fixtures.push(fin);
+  const lc = T.cups.lc; lc.r = 5; T.fixtures = T.fixtures.filter(f => f.cup !== 'lc');
+  const opp = T.order.find(c => c !== T.my); lc.alive = [T.my, opp];
+  const fin = { id: 9999, cup: 'lc', cr: 5, st: 2, date: T.date, h: T.my, a: opp, hg: null, ag: null, played: false, neutral: true }; T.fixtures.push(fin);
   for (let i = 0; i < 30 && !(T.cele || []).length; i++) { fin.played = false; delete fin.hype; const M = E.createMatch(T, fin); E.simulateFull(T, M); M.hg = 2; M.ag = 1; E.finishMatch(T, M); }
   ok(T.cups.lc.champ === T.my && (T.cele || []).some(c => c.k === 'lc' && c.my === 2 && c.op === 1), 'final won → Lカップ celebration at once');
   ok(T.clubs[T.my].titles.lc >= 1 && T.cele[0].n === T.clubs[T.my].titles.lc, `title count on the pop-up (${T.cele[0].n})`);
@@ -153,7 +153,8 @@ const D0 = '2027-05-20', D1 = '2027-05-21';
   const V = E.newGame(DATA, 'mito', 't', '2026-10-13');
   for (let s = 0; s < 2; s++) { for (let g = 0; g < 3000; g++) { const st = E.advance(V); if (st.stop === 'match') { const f = V.fixtures.find(x => x.id === st.fid); const M = E.createMatch(V, f); E.simulateFull(V, M); E.finishMatch(V, M); } else if (st.stop === 'inbox') V.inbox.forEach(x => { x.seen = true; if (x.type === 'offer') E.rejectOffer(V, x.id); }); else if (st.stop === 'seasonEnd') break; else if (st.stop === 'fired') E.takeJob(V, V.fired.offers[0]); } E.rollover(V); if (V.fired) E.takeJob(V, V.fired.offers[0]); }
   const left = Object.values(V.players).filter(p => E.abroadOf(V, p)).length;
-  ok(left < abIds.size && left > abIds.size - 25 && !Object.values(V.players).some(p => p.name === '吉田 麻也' && E.abroadOf(V, p) && E.age(p, V.date) > 41), `after 2 seasons: ${left} left abroad (veterans retired)`);
+  const orig = [...abIds].filter(id => V.players[id] && E.abroadOf(V, V.players[id])).length;   // J1 players moving to Europe (2026-10-14) refill the pool
+  ok(orig < abIds.size && left > abIds.size - 25 && !Object.values(V.players).some(p => p.name === '吉田 麻也' && E.abroadOf(V, p) && E.age(p, V.date) > 41), `after 2 seasons: ${orig} of the ${abIds.size} still abroad (veterans retired), ${left} in all`);
 }
 
 console.log(fails ? `\n${fails} FAILED` : '\nall ok'); process.exit(fails ? 1 : 0);

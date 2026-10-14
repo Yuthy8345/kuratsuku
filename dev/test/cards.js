@@ -63,10 +63,6 @@ let league = 1;
 for (;;) { fx = toMyMatch(S); if (!fx || fx.cup) break; E.autoLineup(S, S.my); playMine(S, fx, T); league++; }
 ok(fx && fx.cup === 'ec', `first cup tie: ${fx && E.fxLabel(fx)} after ${league} league games`);
 ok(show(P(B)) === '["ec1"]' && show(P(C)) === '["lc21"]', `cup bans untouched by league games (B ${show(P(B))}, C ${show(P(C))})`);
-// the Lカップ 1st round is over for X's club: one sending-off game left goes on to any official match, the yellow one lapses
-const xServed = S.fixtures.filter(f => f.played && f.date >= r1.date && (f.h === X.club || f.a === X.club)).length;
-ok(r1.played && show(X) === `["*${10 - xServed}"]` && !X.cyc, `Lカップ 1st round over: ${X.name} ${show(X)} (1 game in the 1st round, then 1 in each of his club's next ${xServed - 1} matches; yellow ban and count gone)`);
-ok(!E.available(X, 'lg') && !E.available(X, 'ec') && !E.available(X, 'lc2'), '"*" ban counts for any competition');
 
 // 2) the 天皇杯 tie: B is out, A (league-banned again) may play
 E.setSus(P(A), 'lg', 1);
@@ -177,7 +173,18 @@ for (let i = 0; i < 20 && !(S.cups.ec.r > 0); i++) { const f = toMyMatch(S); if 
 }
 
 // 8) the rest of the season, day by day
-let bad = [], played = 0, scoredBanned = 0, given = {}, decided = 0;
+let bad = [], played = 0, scoredBanned = 0, given = {}, decided = 0, xDone = false;
+// the morning after X's club played its 2回戦 (9/29; the Lカップ 1stラウンド since 2026-10-14 has 2回戦〜4回戦): knocked out,
+// the sending-off games left go on to any official match and the yellow ban and count lapse; through, they stay in the 1stラウンド
+const xCheck = () => {
+  xDone = true;
+  const won = E.cupWinner(r1) === X.club;
+  if (won) ok(show(X) === '["lc19","lc11y"]' && X.cyc && X.cyc.lc1 === 1, `Lカップ 2回戦 won: ${X.name} ${show(X)} (1 game served, still in the 1stラウンド)`);
+  else {
+    ok(show(X) === '["*9"]' && !X.cyc, `Lカップ 1stラウンド over (lost the 2回戦): ${X.name} ${show(X)} (1 game served, the rest to any official match; yellow ban and count gone)`);
+    ok(!E.available(X, 'lg') && !E.available(X, 'ec') && !E.available(X, 'lc2'), '"*" ban counts for any competition');
+  }
+};
 for (let i = 0; i < 700 && !S.seasonEnd; i++) {
   const snap = {}, kick = {};
   for (const p of Object.values(S.players)) if (E.bansOf(p).length) { snap[p.id] = sumNonY(p); kick[p.id] = clone(E.bansOf(p)); }
@@ -187,6 +194,7 @@ for (let i = 0; i < 700 && !S.seasonEnd; i++) {
   else if (r.stop === 'inbox') for (const it of S.inbox) it.seen = true;
   else if (r.stop === 'fired') E.takeJob(S, S.fired.offers[0]);
   const now = S.fixtures.filter(f => f.played && !before.has(f.id)); played += now.length;
+  if (!xDone && r1.played && S.date > r1.date) xCheck();
   for (const p of Object.values(S.players)) {
     const b0 = snap[p.id] || {}, b1 = sumNonY(p);
     const mine = now.filter(f => f.h === p.club || f.a === p.club).map(E.compOf);

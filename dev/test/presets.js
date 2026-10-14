@@ -9,7 +9,7 @@ const clone = o => JSON.parse(JSON.stringify(o));
 
 /* new game, saving */
 const A = E.newGame(DATA, 'kashima', 't', '2026-10-14');
-ok(A.v === 10 && Array.isArray(A.presets) && A.presets.length === 0, 'new game: v10, no saved tactics');
+ok(A.v === 11 && Array.isArray(A.presets) && A.presets.length === 0, 'new game: v11, no saved tactics');
 const ta = A.clubs[A.my].tac;
 Object.assign(ta, { ment: 'def', ctr: true, press: 'high', line: 'low', mark: true });
 E.savePreset(A, null, '格上用', 1760400000000);
@@ -76,7 +76,7 @@ const old1 = { name: '旧A', form: '4-4-2', ment: 'bal', press: 'mid', xi: O.clu
 O.clubs.kashima.presets = [old1, Object.assign(clone(old1), { name: '旧B', ment: 'ctr' })];
 O.clubs.nagoya.presets = [Object.assign(clone(old1), { name: '名古屋時代' })];
 E.migrate(O, DATA);
-ok(O.v === 10 && O.presets.map(x => x.name).join() === '旧A,旧B,名古屋時代' && !O.clubs.kashima.presets && !O.clubs.nagoya.presets, `moved over: ${O.presets.map(x => x.name).join(' / ')}`);
+ok(O.v === 11 && O.presets.map(x => x.name).join() === '旧A,旧B,名古屋時代' && !O.clubs.kashima.presets && !O.clubs.nagoya.presets, `moved over: ${O.presets.map(x => x.name).join(' / ')}`);
 ok(O.presets[0].club === 'kashima' && O.presets[0].cn === O.clubs.kashima.short && !O.presets[0].at && O.presets[0].xn.every((n, i) => !old1.xi[i] || n === O.players[old1.xi[i]].name), 'club and names filled in, no real date');
 ok(O.presets[2].club === 'nagoya', 'the earlier club is remembered');
 st = E.loadPreset(O, 1); ok(O.clubs.kashima.tac.ment === 'def' && O.clubs.kashima.tac.ctr && st.empty === 0, 'old posture (ctr) loads as 守備的 + カウンター');
