@@ -71,9 +71,9 @@ async def main():
                 print('blocked again:', await page.locator('#sheet .card.alert').inner_text()); break
             elif await page.locator('#sheet [data-act="closeSheet"]').count(): await page.click('#sheet [data-act="closeSheet"]'); await page.wait_for_timeout(200)
             st = await state()
-            if st['players'][str(SUS)]['sus'] == 0 and st['players'][str(INJ)]['inj'] == 0 and any(f['played'] and 'kashima' in (f['h'], f['a']) for f in st['fixtures']): break
+            if not st['players'][str(SUS)].get('bans') and st['players'][str(INJ)]['inj'] == 0 and any(f['played'] and 'kashima' in (f['h'], f['a']) for f in st['fixtures']): break
         st = await state(); c = st['clubs']['kashima']
-        print('back fit:', st['players'][str(SUS)]['sus'] == 0, st['players'][str(INJ)]['inj'] == 0, '| returned to XI', SUS in c['tac']['xi'], '| returned to bench', SUS in c['tac']['bench'] or INJ in c['tac']['bench'])
+        print('back fit:', not st['players'][str(SUS)].get('bans'), st['players'][str(INJ)]['inj'] == 0, '| returned to XI', SUS in c['tac']['xi'], '| returned to bench', SUS in c['tac']['bench'] or INJ in c['tac']['bench'])
         print('XI unchanged by itself', [x for x in c['tac']['xi'] if x not in xi_before] == [] or 'changed (cards/injury in match?)')
         print('\n'.join(errs) or 'no errors')
         await b.close()

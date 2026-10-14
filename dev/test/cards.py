@@ -26,10 +26,16 @@ E.autoLineup(S, S.my);
 const xi = S.clubs[S.my].tac.xi.filter(id => S.players[id].pos !== 'GK');
 const A = xi[0], B = xi[1];
 E.setSus(S.players[A], 'lg', 1); E.setSus(S.players[B], 'ec', 1);
-process.stdout.write(JSON.stringify({ A, B, S }));
+// reserves: one waiting for the committee (league), one with a ban for any official match
+const res = E.squad(S, S.my).filter(p => !S.clubs[S.my].tac.xi.includes(p.id) && !S.clubs[S.my].tac.bench.includes(p.id) && p.pos !== 'GK');
+const K = res[0].id, W = res[1].id;
+S.players[K].bans = [{ c: 'lg', n: 1, r: 'sfp', x: 0, tot: 3, dd: E.D.add(S.date, 1) }];
+S.players[W].bans = [{ c: '*', n: 2, r: 'vc' }];
+process.stdout.write(JSON.stringify({ A, B, K, W, S }));
 '''
 gen = json.loads(subprocess.run(['node', '-e', GEN], cwd=str(ROOT), capture_output=True, text=True, check=True).stdout)
-A, B, SAVE = gen['A'], gen['B'], gen['S']
+A, B, K, W, SAVE = gen['A'], gen['B'], gen['K'], gen['W'], gen['S']
+def bans(pl, c=None): return sum(b['n'] for b in pl.get('bans', []) if c is None or b['c'] == c)
 fails = 0
 def ok(c, m):
     global fails
@@ -75,6 +81,11 @@ async def main():
         await page.click('[data-act="tab"][data-tab="squad"]'); await page.wait_for_timeout(300)
         tA = await page.locator(f'[data-act="player"][data-id="{A}"]').inner_text(); tB = await page.locator(f'[data-act="player"][data-id="{B}"]').inner_text()
         ok('出場停止（リーグ）' in tA and '出場停止（天皇杯）' in tB, 'squad list: 出場停止（リーグ） / 出場停止（天皇杯）')
+        tW = await page.locator(f'[data-act="player"][data-id="{W}"]').inner_text(); ok('出場停止（公式戦）' in tW, 'squad list: a ban for any official match says 出場停止（公式戦）')
+        await page.click(f'[data-act="player"][data-id="{K}"]'); await page.wait_for_timeout(350)
+        shk = await page.locator('#sheet').inner_text(); ok('出場停止（リーグ あと1試合・規律委員会で検討中）' in shk, 'player sheet: 規律委員会で検討中 before the decision')
+        await page.screenshot(path=str(OUT/'cards-pending.png'))
+        await page.click('#sheet [data-act="closeSheet"]'); await page.wait_for_timeout(200)
         await page.locator(f'[data-act="player"][data-id="{A}"]').scroll_into_view_if_needed(); await page.screenshot(path=str(OUT/'cards-squad.png'))
         await page.click(f'[data-act="player"][data-id="{A}"]'); await page.wait_for_timeout(350)
         sh = await page.locator('#sheet').inner_text(); ok('出場停止（リーグ あと1試合）' in sh, 'player sheet: 出場停止（リーグ あと1試合）')
@@ -84,8 +95,10 @@ async def main():
         await page.click('[data-act="go"]'); await page.wait_for_timeout(400)
         ok(await page.locator('#sheet [data-act="quick"]').count() == 1, 'prematch: the tie can be played')
         await page.click('#sheet [data-act="quick"]'); await page.wait_for_timeout(300); await page.click('[data-act="mClose"]'); await page.wait_for_timeout(300)
-        st = await state(); pa, pb = st['players'][str(A)], st['players'][str(B)]
-        ok(pa['sus'] == 1 and not (pb.get('csus') or {}).get('ec'), f"after the tie: A still has his league ban ({pa['sus']}), B served his ({pb.get('csus')})")
+        st = await state(); pa, pb, pk, pw = (st['players'][str(i)] for i in (A, B, K, W))
+        ok(bans(pa, 'lg') == 1 and bans(pb) == 0, f"after the tie: A still has his league ban ({pa.get('bans')}), B served his ({pb.get('bans')})")
+        ok(bans(pk, 'lg') == 1 and any(b.get('tot') for b in pk.get('bans', [])), "K's straight red still waits for the committee on the day")
+        ok(bans(pw, '*') == 1, f"the 天皇杯 tie served one game of W's ban for any official match ({pw.get('bans')})")
         # next league game: A blocks
         await page.click('[data-act="tab"][data-tab="tactics"]'); await page.wait_for_timeout(300)
         if A in st['clubs']['yokohamafm']['tac']['xi']:
@@ -94,6 +107,12 @@ async def main():
             ok(await page.locator('[data-tab="tactics"] .dot').count() == 1, 'tactics tab shows the dot')
             await page.screenshot(path=str(OUT/'cards-tactics-league.png'))
         else: ok(False, 'A was not in the XI after the tie')
+        # the next morning the committee decides
+        await page.click('[data-act="go"]'); await page.wait_for_timeout(500)
+        if await page.locator('#sheet [data-act="closeSheet"]').count(): await page.click('#sheet [data-act="closeSheet"]'); await page.wait_for_timeout(200)
+        st = await state(); pk = st['players'][str(K)]
+        ok(st['date'] > '2026-09-16' and bans(pk, 'lg') == 3 and not any(b.get('tot') for b in pk.get('bans', [])), f"next day the committee decided K's ban: {pk.get('bans')}")
+        ok(any('規律委員会' in n['text'] for n in st['news'][:10]), 'news of the decision')
         # whiteboard look
         await page.evaluate("document.documentElement.dataset.board = 'white'"); await page.wait_for_timeout(150)
         await page.click('[data-act="tab"][data-tab="squad"]'); await page.wait_for_timeout(300)

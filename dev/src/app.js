@@ -417,11 +417,11 @@ function storyChips(f) {
 // can he play his club's next match? (a ban only counts in the competition it was given in: league, 天皇杯, Lカップ)
 const avail = p => E.available(p, E.nextComp(S, p.club));
 // every ban he has, e.g. 出場停止（リーグ） / 出場停止（リーグ・天皇杯）
-const susChip = p => { const l = E.susList(p); return l.length ? `<span class="chip warn">出場停止（${l.map(([k]) => E.COMP_JP[k]).join('・')}）</span>` : ''; };
+const susChip = p => { const l = E.susList(p); return l.length ? `<span class="chip warn">出場停止（${[...new Set(l.map(([k]) => E.COMP_JP[k]))].join('・')}）</span>` : ''; };
 // fit for the next match but banned in another competition, e.g. リーグは出場停止 before a cup tie
-const susElse = p => E.susList(p).filter(([k]) => k !== E.nextComp(S, p.club)).map(([k]) => `<span class="chip">${E.COMP_JP[k]}は出場停止</span>`).join('');
-// why a player can't play his club's next match, e.g. 出場停止（リーグであと1試合） / 負傷（あと5日）
-const outText = p => { if (p.inj > 0) return `負傷（あと${p.inj}日）`; const k = E.nextComp(S, p.club); return `出場停止（${E.COMP_JP[k]}であと${E.susIn(p, k)}試合）`; };
+const susElse = p => E.susList(p, E.nextComp(S, p.club)).map(([k]) => `<span class="chip">${E.COMP_JP[k]}は出場停止</span>`).join('');
+// why a player can't play his club's next match, e.g. 出場停止（リーグであと1試合） / 負傷（あと5日）; a straight red waits for the committee
+const outText = p => { if (p.inj > 0) return `負傷（あと${p.inj}日）`; const k = E.nextComp(S, p.club); return `出場停止（${E.COMP_JP[k]}であと${E.susIn(p, k)}試合${E.banPending(p) ? '・試合数は規律委員会で検討中' : ''}）`; };
 const outShort = p => p.inj > 0 ? '負傷' : '出場停止';
 function issueLines(iss) {
   const c = S.clubs[S.my]; const F = E.FORMATIONS[c.tac.form];
@@ -542,7 +542,7 @@ function sheetPlayer(id, back) {
   const avgR = p.st.apps ? (p.st.rt / p.st.apps).toFixed(2) : '—';
   const status = [];
   if (p.inj > 0) status.push(`<span class="chip warn">負傷中（あと${p.inj}日）</span>`);
-  { const l = E.susList(p); if (l.length) status.push(`<span class="chip warn">出場停止（${l.map(([k, n]) => `${E.COMP_JP[k]} あと${n}試合`).join('・')}）</span>`); }
+  { const l = E.susList(p); if (l.length) status.push(`<span class="chip warn" style="white-space:normal">出場停止（${l.map(([k, n]) => `${E.COMP_JP[k]} あと${n}試合`).join('・')}${E.banPending(p) ? '・規律委員会で検討中' : ''}）</span>`); }
   if (p.listed) status.push('<span class="chip acc">放出リスト登録中</span>');
   if (p.keep && mine) status.push('<span class="chip ok">放出不可（オファーはすべて断る）</span>');
   if (p.retire) status.push('<span class="chip">今季限りで引退</span>');

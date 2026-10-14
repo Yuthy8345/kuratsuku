@@ -1546,22 +1546,90 @@ function posPenalty(p, role) {
   if (gkSlot || p.pos === 'GK') return gkSlot === (p.pos === 'GK') ? 0 : -35;
   return aptPen(roleApt(p, role));
 }
-/* Suspensions are served in the competition they were given in (2026-10-14): a league ban only by league games, a 天皇杯
-   ban only by 天皇杯 ties, an Lカップ ban only by Lカップ ties. p.sus = league games (as before), p.csus = {ec, lc};
-   yellow cards add up per competition too (league p.ycAcc: 4 = one game, cups p.cyc: 2 = one game, as in the real rules).
-   Whether a player can play depends on the competition of his club's next match (nextComp). */
-const COMP_JP = { lg: 'リーグ', ec: '天皇杯', lc: 'Lカップ' };
+/* Suspensions as in the real rules (2026-10-14): J.League 規律委員会「2026/27シーズンの出場停止処分に関する取扱いについての
+   細則」, JFA 懲罰規程 別紙1・2, 天皇杯 開催規程 第18条.
+   - Competitions: the league (lg), the 天皇杯 (ec), the Lカップ 1st round (lc1 = 1回戦) and prime round (lc2 = ラウンド16〜決勝);
+     the two Lカップ stages are separate competitions, as in the real rules. A ban is served in the next matches of the
+     competition it was given in; whether a player can play depends on his club's next match (nextComp).
+   - Yellows add up per competition: league 4 = 1 game (p.ycAcc), cups 2 = 1 game (p.cyc); a single cup yellow is wiped after
+     the quarter-final. Two yellows in one match are not counted (that red is 1 game); a yellow before a straight red is.
+   - A straight red: the next game at once; the discipline committee sets the total the next day (RED: the JFA minimum for
+     the offence, sometimes more). The same kind of offence again in the same competition doubles it (not DOGSO).
+     Sending-off games are served before yellow-card games.
+   - When the competition is over for his club (knocked out, the stage or the league finished; banSweep) a sending-off ban
+     goes on to the club's next senior official match in any competition ('*'); a yellow-card ban lapses.
+   - End of season: 1 game left lapses, 2+ (not counting games added for a repeat) carry over to next season's league and
+     Lカップ ('J'); yellow counts start again. Players whose club was outside J1 played a J2 season: their bans are done.
+   - Moving to a club in another league: yellow counts and yellow bans for the league sleep (they count again if he comes
+     back); sending-off bans go with him.
+   p.bans = [{c, n, y, r, x, tot, dd}]: c = where it applies (lg / ec / lc1 / lc2 / '*' / 'J'), n = games left, y = from yellows,
+   r = reason (RED key or 'yy'), x = games added for a repeat, tot / dd = the committee's total and the day it is announced.
+   p.rch = {comp: [reasons]} this season (for repeats). Old saves: p.sus / p.csus become league / cup bans (bansOf). */
+const COMP_JP = { lg: 'リーグ', ec: '天皇杯', lc1: 'Lカップ', lc2: 'Lカップ', '*': '公式戦', J: 'リーグ・Lカップ' };
 const CARD = { lgYc: 4, cupYc: 2 };
-const compOf = f => (f && f.cup) || 'lg';
-function susIn(p, comp) { return !comp || comp === 'lg' ? (p.sus || 0) : ((p.csus && p.csus[comp]) || 0); }
-function setSus(p, comp, n) {
-  if (!comp || comp === 'lg') { p.sus = Math.max(0, n); return; }
-  const cs = p.csus || (p.csus = {});
-  if (n > 0) cs[comp] = n; else delete cs[comp];
-  if (!Object.keys(cs).length) delete p.csus;
+// straight reds: share among sending-offs (w), the games the committee gives ([games, weight]; the first is the JFA minimum),
+// whether a second one of the same kind in the same competition doubles it (rep). The shares and the extra games are estimates.
+const RED = {
+  dogso: { jp: '相手の決定的な得点機会の阻止', feed: '決定機阻止', w: 0.45, g: [[1, 1]], rep: false },
+  sfp: { jp: '著しく不正なファウルプレー', feed: '危険なタックル', w: 0.40, g: [[2, 0.70], [3, 0.22], [4, 0.08]], rep: true },
+  vc: { jp: '乱暴な行為', feed: '乱暴な行為', w: 0.10, g: [[2, 0.35], [3, 0.40], [4, 0.20], [5, 0.05]], rep: true },
+  abuse: { jp: '攻撃的・侮辱的な言動', feed: '侮辱的な言動', w: 0.05, g: [[1, 0.60], [2, 0.40]], rep: true },
+};
+const compOf = f => !f ? 'lg' : f.cup === 'lc' ? (f.cr === 0 ? 'lc1' : 'lc2') : (f.cup || 'lg');
+const banHits = (b, comp) => b.c === (comp || 'lg') || b.c === '*' || (b.c === 'J' && comp !== 'ec');
+function bansOf(p) {
+  if (p.sus > 0 || p.csus || (p.cyc && p.cyc.lc != null)) {  // old saves
+    const l = p.bans || (p.bans = []);
+    if (p.sus > 0) l.push({ c: 'lg', n: p.sus });
+    if (p.csus) for (const [k, n] of Object.entries(p.csus)) if (n > 0) l.push({ c: k === 'lc' ? 'lc2' : k, n });
+    p.sus = 0; delete p.csus;
+    if (p.cyc && p.cyc.lc != null) { p.cyc.lc2 = p.cyc.lc; delete p.cyc.lc; }
+    if (!l.length) delete p.bans;
+  }
+  return p.bans || [];
 }
-// [[comp, games], ...] for every competition he is banned in
-function susList(p) { return ['lg', 'ec', 'lc'].map(k => [k, susIn(p, k)]).filter(x => x[1] > 0); }
+function susIn(p, comp) { let n = 0; for (const b of bansOf(p)) if (banHits(b, comp)) n += b.n; return n; }
+function addBan(p, b) { bansOf(p); (p.bans || (p.bans = [])).push(b); return b; }
+// one game served in a match of `comp` he was banned for: sending-off games first, then yellow-card ones
+function serveBan(p, comp) {
+  const l = bansOf(p); const b = l.find(x => !x.y && banHits(x, comp)) || l.find(x => banHits(x, comp)); if (!b) return;
+  if (--b.n <= 0) l.splice(l.indexOf(b), 1);
+  if (!l.length) delete p.bans;
+}
+// a ban of n games in one competition, replacing his bans there (tests, old code)
+function setSus(p, comp, n) { const l = bansOf(p).filter(b => b.c !== comp); if (n > 0) l.push({ c: comp, n }); if (l.length) p.bans = l; else delete p.bans; }
+// [[where, games], ...] to show (the Lカップ stages together); with `except`, only the bans that don't count for that competition
+function susList(p, except) {
+  const m = {};
+  for (const b of bansOf(p)) { if (except && banHits(b, except)) continue; const k = b.c === 'lc1' ? 'lc2' : b.c; m[k] = (m[k] || 0) + b.n; }
+  return ['lg', 'ec', 'lc2', 'J', '*'].filter(k => m[k]).map(k => [k, m[k]]);
+}
+const banPending = p => bansOf(p).some(b => b.tot);
+function redGames(r) { const g = RED[r].g; let x = R() * g.reduce((a, e) => a + e[1], 0); for (const [n, w] of g) { x -= w; if (x <= 0) return n; } return g[g.length - 1][0]; }
+// every morning: the committee's decisions, and bans of competitions that are over for the player's club
+function banSweep(S) {
+  const rem = {};
+  for (const f of S.fixtures) if (!f.played) for (const c of [f.h, f.a]) (rem[c] || (rem[c] = new Set())).add(compOf(f));
+  const has = (cid, c) => !!(rem[cid] && rem[cid].has(c));
+  const alive = (key, cid) => { const cu = S.cups && S.cups[key]; return !!cu && !cu.champ && cu.out[cid] == null && (cu.alive.includes(cid) || (cu.bye || []).includes(cid)); };
+  const over = (c, cid) => c === 'lg' ? !has(cid, 'lg') : c === 'ec' ? !has(cid, 'ec') && !alive('ec', cid) : c === 'lc1' ? !has(cid, 'lc1') : c === 'lc2' ? !has(cid, 'lc2') && !alive('lc', cid) : false;
+  for (const p of Object.values(S.players)) {
+    if (!p.bans && !p.cyc && !(p.sus > 0) && !p.csus) continue;
+    const l = bansOf(p); const mine = p.club === S.my;
+    for (const b of l) if (b.tot && S.date >= b.dd) {
+      b.n += b.tot - 1;
+      if (mine) news(S, `規律委員会が${p.name}の出場停止を${b.tot}試合に決定（${RED[b.r] ? RED[b.r].jp : '退場'}${b.x ? '。同じ大会で2回目のため2倍' : ''}）。`, 'warn');
+      delete b.tot; delete b.dd;
+    }
+    for (const b of l.slice()) {
+      if (!['lg', 'ec', 'lc1', 'lc2'].includes(b.c) || b.tot || !over(b.c, p.club)) continue;
+      if (b.y) { if (b.c === 'lg' && !S.order.includes(p.club)) continue; l.splice(l.indexOf(b), 1); }  // a league yellow ban sleeps outside J1
+      else { if (mine) news(S, `${p.name}の出場停止（残り${b.n}試合）は、${COMP_JP[b.c]}の試合がもうないため、次の公式戦で消化する。`, 'info'); b.c = '*'; }
+    }
+    if (!l.length) delete p.bans;
+    if (p.cyc) { for (const k of Object.keys(p.cyc)) if (over(k, p.club)) delete p.cyc[k]; if (!Object.keys(p.cyc).length) delete p.cyc; }
+  }
+}
 // the competition of the club's next match ('lg' when it has none left). Cached per fixture list; a played match bumps _fxv.
 let _fxv = 0; const _ncMemo = new WeakMap();
 function nextComp(S, cid) {
@@ -1932,7 +2000,8 @@ function stepMatch(S, M) {
       }
     } else if (R() < 0.0005) {
       const pl = pick(onPitch(sd).filter(s => s.role !== 'GK'));
-      if (pl) { M.pm[pl.pid].rc = 1; M.pm[pl.pid].rt -= 2; sd.sent.push(pl.pid); push({ t: 'red', side: k, pid: pl.pid, text: `${pname(S, pl.pid)}に一発レッド！退場` }); }
+      const rr = wpick(Object.keys(RED), r => RED[r].w);
+      if (pl) { M.pm[pl.pid].rc = 1; M.pm[pl.pid].rr = rr; M.pm[pl.pid].rt -= 2; sd.sent.push(pl.pid); push({ t: 'red', side: k, pid: pl.pid, text: `${pname(S, pl.pid)}に一発レッド！退場（${RED[rr].feed}）` }); }
     }
     // injury
     const med = S.clubs[sd.cid].fac.medical;
@@ -2126,7 +2195,7 @@ function finishMatch(S, M) {
   const res = { h: cup ? (hw ? 'W' : 'L') : M.hg > M.ag ? 'W' : M.hg < M.ag ? 'L' : 'D' };
   res.a = res.h === 'W' ? 'L' : res.h === 'L' ? 'W' : 'D';
   // serve existing suspensions: only a match of the same competition counts (suspended players were not in it)
-  for (const cid of [fx.h, fx.a]) for (const p of squad(S, cid)) { const n = susIn(p, comp); if (n > 0 && !M.pm[p.id]) setSus(p, comp, n - 1); }
+  for (const cid of [fx.h, fx.a]) for (const p of squad(S, cid)) if (!M.pm[p.id] && susIn(p, comp) > 0) serveBan(p, comp);
   // player updates
   for (const [pidS, pm] of Object.entries(M.pm)) {
     const p = S.players[pidS]; if (!p) continue;
@@ -2145,17 +2214,29 @@ function finishMatch(S, M) {
     if (dp && dp !== 'GK' && p.pos !== 'GK' && mins >= 45 && dp !== ppOf(p)) { const cur = apt(p, dp); if (cur < PLAY_MAX) { p.ap = p.ap || {}; p.ap[dp] = Math.round(Math.min(PLAY_MAX, cur + 0.6) * 10) / 10; } }
     p.form = p.form * 0.6 + rt * 0.4;
     p.cond = Math.round(sd.cond[pidS] != null ? sd.cond[pidS] : p.cond - 10);
-    if (pm.yc && !pm.rc && !cup) { p.st.yc++; p.ycAcc++; if (p.ycAcc >= CARD.lgYc) { setSus(p, 'lg', Math.max(p.sus, 1)); p.ycAcc = 0; if (p.club === S.my) news(S, `${p.name}は累積警告で、リーグの次節に出場停止。`, 'warn'); } }
-    if (pm.yc && !pm.rc && cup) {
+    // cards: sending-off first (its games are served first), then the yellow (two in one match = that red, not counted)
+    const mine = p.club === S.my, yy = pm.rc && pm.yc >= 2;
+    if (pm.rc) {
+      if (!cup) p.st.rc++;
+      if (yy) { addBan(p, { c: comp, n: 1, r: 'yy' }); if (mine) news(S, `${p.name}は2枚目の警告で退場。${cj}の次の1試合に出場停止。`, 'warn'); }
+      else {
+        const r = RED[pm.rr] ? pm.rr : 'sfp', rh = p.rch || (p.rch = {}), seen = rh[comp] || (rh[comp] = []);
+        const base = redGames(r), x = RED[r].rep && seen.includes(r) ? base : 0;
+        seen.push(r);
+        addBan(p, { c: comp, n: 1, r, x, tot: base + x, dd: D.add(S.date, 1) });
+        if (mine) news(S, `${p.name}は一発退場（${RED[r].jp}）。${cj}の次の1試合は出場停止、試合数は規律委員会が決める。`, 'warn');
+      }
+    }
+    if (pm.yc && !yy && !cup) { p.st.yc++; p.ycAcc++; if (p.ycAcc >= CARD.lgYc) { addBan(p, { c: 'lg', n: 1, y: 1 }); p.ycAcc = 0; if (mine) news(S, `${p.name}は累積警告（${CARD.lgYc}枚）で、リーグの次の1試合に出場停止。`, 'warn'); } }
+    if (pm.yc && !yy && cup) {
       const y = p.cyc || (p.cyc = {}); y[comp] = (y[comp] || 0) + 1;
-      if (y[comp] >= CARD.cupYc) { setSus(p, comp, Math.max(susIn(p, comp), 1)); delete y[comp]; if (p.club === S.my) news(S, `${p.name}は${cj}の累積警告（2枚）で、${cj}の次の試合に出場停止。`, 'warn'); }
+      if (y[comp] >= CARD.cupYc) { addBan(p, { c: comp, n: 1, y: 1 }); delete y[comp]; if (mine) news(S, `${p.name}は${cj}の累積警告（${CARD.cupYc}枚）で、${cj}の次の1試合に出場停止。`, 'warn'); }
       if (!Object.keys(y).length) delete p.cyc;
     }
-    if (pm.rc) { if (!cup) p.st.rc++; setSus(p, comp, Math.max(susIn(p, comp), pm.yc >= 2 ? 1 : 2)); if (p.club === S.my) news(S, `${p.name}は退場処分で出場停止（${cj}の${susIn(p, comp)}試合）。`, 'warn'); }
     if (pm.inj) { p.inj = pm.inj; if (p.club === S.my) news(S, `${p.name}が負傷。全治およそ${pm.inj}日の見込み。`, 'warn'); }
   }
   // a single cup yellow is wiped after the quarter-final (a second one there still means missing the semi-final)
-  if (cup && fx.cr === CUPS[comp].rounds.length - 3) for (const cid of [fx.h, fx.a]) for (const p of squad(S, cid)) if (p.cyc && p.cyc[comp] === 1) { delete p.cyc[comp]; if (!Object.keys(p.cyc).length) delete p.cyc; }
+  if (cup && fx.cr === CUPS[fx.cup].rounds.length - 3) for (const cid of [fx.h, fx.a]) for (const p of squad(S, cid)) if (p.cyc && p.cyc[comp] === 1) { delete p.cyc[comp]; if (!Object.keys(p.cyc).length) delete p.cyc; }
   // finances: gate for home club (a final at 国立 is shared)
   const hc = S.clubs[fx.h];
   let att = attendance(S, fx.h, fx.a);
@@ -2306,6 +2387,7 @@ function nextDay(S) {
 // the morning of a matchday: cup draws, who is on fire, and the other clubs' team sheets and game plans
 function matchdayPrep(S) {
   progressCups(S);
+  banSweep(S);
   const today = todaysFixtures(S);
   for (const f of today) hypeMatch(S, f);
   for (const f of today) for (const [cid, opp] of [[f.h, f.a], [f.a, f.h]]) {
@@ -3370,13 +3452,19 @@ function rollover(S) {
     if (p.st.apps || p.club === S.my) p.hist.unshift({ s: seasonLabel(S.season), c: p.club, ovr: Math.round(p.ovr), ...p.st });
     if (p.at) { p.at0 = p.at.slice(); p.ovr0 = p.ovr; p.pot0 = p.pot; }
     if (p.hist.length > 8) p.hist.length = 8;
-    p.st = blankStats(); p.ycAcc = 0; delete p.cyc; delete p.cs; delete p.hot;
-    // unserved bans: one game lapses, two or more carry over to the same competition next season (as in the J.League)
-    for (const [k, n] of susList(p)) {
-      if (n < 2 || p.club === 'RET') { setSus(p, k, 0); continue; }
-      if (p.club === S.my) news(S, `${p.name}は前季の出場停止が残っているため、新しいシーズンの${COMP_JP[k]}の最初の${n}試合に出られない。`, 'warn');
+    p.st = blankStats(); p.ycAcc = 0; delete p.cyc; delete p.rch; delete p.cs; delete p.hot;
+    // unserved bans: 1 game lapses, 2+ (not counting games added for a repeat) carry over to next season's league and
+    // Lカップ; yellow-card bans lapse with their competition. Outside J1 (J2 clubs, on loan) he played a J2 season.
+    const l = bansOf(p);
+    if (l.length) {
+      for (const b of l) if (b.tot) { b.n += b.tot - 1; delete b.tot; delete b.dd; }
+      const red = l.filter(b => !b.y), base = red.reduce((a, b) => a + Math.max(0, b.n - (b.x || 0)), 0);
+      if (base < 2 || p.loan || !S.order.includes(p.club)) delete p.bans;
+      else {
+        p.bans = red.map(b => ({ c: 'J', n: b.n, r: b.r }));
+        if (p.club === S.my) news(S, `${p.name}は出場停止が${red.reduce((a, b) => a + b.n, 0)}試合残っているため、新しいシーズンのリーグ戦・Lカップの最初の試合に出られない。`, 'warn');
+      }
     }
-    if (!p.sus) p.sus = 0;
   }
   for (const p of back) if (S.players[p.id] && p.loan) loanReturn(S, p);
   // relegation / promotion
@@ -3455,7 +3543,7 @@ const API = {
   D, jdate, FORMATIONS, ROLE, DPOS, DP_CAT, DP_JP, LEARN_MAX, PLAY_MAX, ppOf, apt, roleApt, posValues, learnRate, learnWeeks, MENTALITY, PRESS, TRAINING, FACILITY, ATTR, ATTR_SHOW, FOCUS, INTENS,
   calcOvr, roleScore, bestRoles, devPreview, migrate, weekly, power, presStars, presLabel,
   newGame, seasonForDate, seasonLabel, squad, strength, table, position, age, ovr, value, wage, money, attrs,
-  autoLineup, autoBench, benchSwap, benchRemove, lineupIssues, BENCH_SIZE, PRESET_MAX, savePreset, loadPreset, presetStatus, renamePreset, deletePreset, presetsOf, fillEmpty, clubRating, validateLineup, effective, posPenalty, available, nextComp, compOf, susIn, setSus, susList, COMP_JP, CARD, teamRating,
+  autoLineup, autoBench, benchSwap, benchRemove, lineupIssues, BENCH_SIZE, PRESET_MAX, savePreset, loadPreset, presetStatus, renamePreset, deletePreset, presetsOf, fillEmpty, clubRating, validateLineup, effective, posPenalty, available, nextComp, compOf, susIn, setSus, susList, bansOf, banHits, addBan, serveBan, banSweep, banPending, COMP_JP, CARD, RED, teamRating,
   createMatch, stepMatch, simulateFull, finishMatch, doSub, benchOptions, onPitch, setMentality, bestSubFor, setCounter, mentLabel,
   advance, nextDay, simAIToday, myFixtureToday, nextMyFixture, todaysFixtures, inWindow, windowEnd, nextWindowStart,
   acceptOffer, rejectOffer, raiseOffer, OFFER_UP, setListed, setKeep, transferDay, bid, NEGO, negoInfo, negoWill, negoOf, negoStart, negoOffer, negoAgree, decideRetirements, shortlist, shortEntry, unshort, bidBlock,
@@ -4342,11 +4430,11 @@ function storyChips(f) {
 // can he play his club's next match? (a ban only counts in the competition it was given in: league, 天皇杯, Lカップ)
 const avail = p => E.available(p, E.nextComp(S, p.club));
 // every ban he has, e.g. 出場停止（リーグ） / 出場停止（リーグ・天皇杯）
-const susChip = p => { const l = E.susList(p); return l.length ? `<span class="chip warn">出場停止（${l.map(([k]) => E.COMP_JP[k]).join('・')}）</span>` : ''; };
+const susChip = p => { const l = E.susList(p); return l.length ? `<span class="chip warn">出場停止（${[...new Set(l.map(([k]) => E.COMP_JP[k]))].join('・')}）</span>` : ''; };
 // fit for the next match but banned in another competition, e.g. リーグは出場停止 before a cup tie
-const susElse = p => E.susList(p).filter(([k]) => k !== E.nextComp(S, p.club)).map(([k]) => `<span class="chip">${E.COMP_JP[k]}は出場停止</span>`).join('');
-// why a player can't play his club's next match, e.g. 出場停止（リーグであと1試合） / 負傷（あと5日）
-const outText = p => { if (p.inj > 0) return `負傷（あと${p.inj}日）`; const k = E.nextComp(S, p.club); return `出場停止（${E.COMP_JP[k]}であと${E.susIn(p, k)}試合）`; };
+const susElse = p => E.susList(p, E.nextComp(S, p.club)).map(([k]) => `<span class="chip">${E.COMP_JP[k]}は出場停止</span>`).join('');
+// why a player can't play his club's next match, e.g. 出場停止（リーグであと1試合） / 負傷（あと5日）; a straight red waits for the committee
+const outText = p => { if (p.inj > 0) return `負傷（あと${p.inj}日）`; const k = E.nextComp(S, p.club); return `出場停止（${E.COMP_JP[k]}であと${E.susIn(p, k)}試合${E.banPending(p) ? '・試合数は規律委員会で検討中' : ''}）`; };
 const outShort = p => p.inj > 0 ? '負傷' : '出場停止';
 function issueLines(iss) {
   const c = S.clubs[S.my]; const F = E.FORMATIONS[c.tac.form];
@@ -4467,7 +4555,7 @@ function sheetPlayer(id, back) {
   const avgR = p.st.apps ? (p.st.rt / p.st.apps).toFixed(2) : '—';
   const status = [];
   if (p.inj > 0) status.push(`<span class="chip warn">負傷中（あと${p.inj}日）</span>`);
-  { const l = E.susList(p); if (l.length) status.push(`<span class="chip warn">出場停止（${l.map(([k, n]) => `${E.COMP_JP[k]} あと${n}試合`).join('・')}）</span>`); }
+  { const l = E.susList(p); if (l.length) status.push(`<span class="chip warn" style="white-space:normal">出場停止（${l.map(([k, n]) => `${E.COMP_JP[k]} あと${n}試合`).join('・')}${E.banPending(p) ? '・規律委員会で検討中' : ''}）</span>`); }
   if (p.listed) status.push('<span class="chip acc">放出リスト登録中</span>');
   if (p.keep && mine) status.push('<span class="chip ok">放出不可（オファーはすべて断る）</span>');
   if (p.retire) status.push('<span class="chip">今季限りで引退</span>');
