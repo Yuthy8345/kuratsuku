@@ -286,7 +286,9 @@ function render() {
   if (!S) { root.innerHTML = UI.screen === 'select' ? viewSelect() : viewTitle(); return; }
   const views = { home: viewHome, squad: viewSquad, tactics: viewTactics, league: viewLeague, club: viewClub };
   if (S.clubs[S.my] && !S.fired) E.validateLineup(S, S.my);
-  root.innerHTML = `<div class="app">${header()}<main class="view" id="view">${views[UI.tab]()}</main></div>${dock()}`;
+  const sec = secFloat();
+  root.innerHTML = `<div class="app${sec ? ' has-sec' : ''}${sec && UI.tab === 'home' ? ' has-sec-home' : ''}">${header()}<main class="view" id="view">${views[UI.tab]()}</main></div>${dock()}${sec}`;
+  secPlace();
 }
 function header() {
   const c = S.clubs[S.my]; const r = rankOf(S.my);
@@ -366,7 +368,6 @@ function viewHome() {
   const nc = ntCard(); if (nc) out.push(nc);
   const offers = S.inbox.filter(x => x.type === 'offer' && !x.done);
   if (offers.length) { out.push(`<h3 class="sec-h">移籍オファー<small>${offers.length}件</small></h3>`); offers.forEach(o => { out.push(offerCard(o)); o.seen = true; }); }
-  const yc = youthCard(); if (yc) out.push(yc);
   if (S.lastResult) {
     const f = S.fixtures.find(x => x.id === S.lastResult.fid);
     if (f && f.played) out.push(`<button class="card" data-act="fxDetail" data-id="${f.id}" style="text-align:left;display:grid;gap:4px"><div class="eyebrow">前の試合の結果</div><div class="row"><span class="res res-${S.lastResult.res}">${{ W: '勝', D: '分', L: '敗' }[S.lastResult.res]}</span><b>${esc(S.clubs[f.h].short)} ${f.hg} - ${f.ag} ${esc(S.clubs[f.a].short)}${pkText(f)}</b><span class="spacer"></span><span class="small muted">${E.fxLabel(f)}</span></div></button>`);
@@ -756,16 +757,161 @@ function ntRecords() {
   return `<h3 class="sec-h">代表</h3>${list.length ? `<ul class="list">${list.map(x => { const p = S.players[x.pid]; return `<li><div style="display:grid;gap:4px;padding:9px 12px"><div class="row"><b style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.name)}</b><span class="spacer"></span><span class="chip ntchip">${esc(E.ntName(x.cc))}</span></div><span class="small muted tnum">招集${x.n}回${p && p.nt ? `・通算${p.nt.caps}試合${p.nt.g}得点` : ''}${p && p.club !== S.my ? '・移籍' : ''}</span></div></li>`; }).join('')}</ul>` : '<p class="empty">まだクラブから代表に選ばれた選手はいません。クラブで活躍すると、代表ウィークの前に選ばれることがあります。</p>'}
     ${res.length ? `<div class="eyebrow" style="margin:10px 0 6px">日本代表の最近の試合</div><ul class="list">${res.map(r => `<li><div class="fx"><span class="h">日本</span><span class="sc">${r.hg}-${r.ag}${r.pk ? `<small>PK${r.pk[0]}-${r.pk[1]}</small>` : ''}</span><span class="a">${esc(E.natJp(r.opp))}</span></div><div class="fx-note">${E.D.y(r.d)}/${jdw(r.d)}・${r.stage ? 'アジアカップ ' + esc(r.stage) : '国際親善試合'}</div></li>`).join('')}</ul>` : ''}`;
 }
-function youthCard() {
-  const it = S.inbox.find(x => x.type === 'youth' && !x.done); if (!it) return '';
+// 若手の成長レポート (the month's development of my young players and those out on loan): opened from the secretary's
+// summary of the month (before 2026-10-15 a card on the home screen)
+function youthItem() {
+  const it = S.inbox.find(x => x.type === 'youth'); if (!it) return null;
   const rows = it.rows.filter(r => { const p = S.players[r.pid]; return p && (p.club === S.my || (p.loan && p.loan.from === S.my)); });
-  if (!rows.length) return '';
-  const show = rows.slice(0, 6);
-  return `<section class="card" style="display:grid;gap:8px"><div class="row"><div class="eyebrow">若手の成長レポート・${it.m}月</div><span class="spacer"></span><button class="btn ghost" data-act="youthDone" data-id="${it.id}" style="min-height:36px;padding:0 12px">閉じる</button></div>
-    <ul class="list">${show.map(r => { const p = S.players[r.pid]; const bl = Math.round(r.pb) > Math.round(r.pa);
+  return rows.length ? { it, rows } : null;
+}
+function sheetYouth(back) {
+  const y = youthItem(); if (!y) return;
+  sheetState = { type: 'youth', back };
+  openSheet(`<div class="eyebrow">若手の成長レポート・${y.it.m}月</div><h2>先月からの変化</h2>
+    <ul class="list">${y.rows.map(r => { const p = S.players[r.pid]; const bl = Math.round(r.pb) > Math.round(r.pa);
       const where = r.loan ? `${S.clubs[r.loan] ? esc(S.clubs[r.loan].short) : 'J2'}へレンタル中` : `出場機会 ${r.sh == null ? '—' : pct(r.sh) + '%'}`;
       return `<li><button class="prow" data-act="player" data-id="${p.id}"><span class="no">${p.num}</span>${posTag(p)}<span class="nm"><b>${esc(p.name)}</b><span>${E.age(p, S.date)}歳・${where}${bl ? `<span class="chip ok">伸びしろ ${Math.round(r.pa)}→${Math.round(r.pb)}</span>` : ''}${p.gem ? '<span class="chip acc">逸材</span>' : ''}</span></span><span class="rt"><span class="ovr ${oc(r.b)}">${Math.round(r.b)}</span>${dlt(r.b - r.a, true)}</span></button></li>`; }).join('')}</ul>
-    <p class="fine" style="margin:0">23歳以下と期限付き移籍中の選手の、先月からの変化${rows.length > show.length ? `（ほか${rows.length - show.length}人）` : ''}。試合に出ている選手ほど伸びます。</p></section>`;
+    <p class="fine" style="margin:0">23歳以下と期限付き移籍中の選手の、先月からの変化です。試合に出ている選手ほど伸びます。</p>`,
+    back === 'sec' ? '<button class="btn ghost block" data-act="secOpen">秘書の連絡に戻る</button>' : '<button class="btn ghost block" data-act="closeSheet">閉じる</button>');
+}
+
+/* ---------- 秘書 (2026-10-15): the secretary magnet above the dock, her sheet, and her lines in the pre-match sheet and on
+   the tactics screen. Everything she says comes from secItems(): the players who can't play (E.secFix), the ones back
+   (E.secReturns) and the notes (E.secNotes, drawn by SEC_VIEW[kind]; later work adds its own kinds there). She only
+   changes the team when the manager taps 入れ替える / おすすめどおりに入れ替える / 戻す. */
+const secNm = () => E.secName(S);
+const secWho = () => `${E.SEC.role} ${secNm()}`;
+let secUid = 0;
+// the secretary's magnet: a portrait (navy suit, bob) drawn here, nobody in particular
+function akiMag(cls, badge) {
+  const u = 'ak' + (++secUid);
+  return `<span class="aki ${cls || ''}" aria-hidden="true"><svg viewBox="0 0 100 100"><defs><clipPath id="c${u}"><circle cx="50" cy="50" r="44"/></clipPath><radialGradient id="g${u}" cx="34%" cy="24%" r="58%"><stop offset="0" stop-color="#fff" stop-opacity=".55"/><stop offset=".55" stop-color="#fff" stop-opacity=".08"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs>
+    <circle cx="50" cy="50" r="48" fill="#1E2942"/><circle cx="50" cy="50" r="45.5" fill="#C9A752"/>
+    <g clip-path="url(#c${u})"><rect width="100" height="100" fill="#EEE5D6"/>
+      <path d="M26 47 C24 26 36 15 50 15 C64 15 76 26 74 47 L76 67 C71 72 63 71 59 66 L41 66 C37 71 29 72 24 67 Z" fill="#2A2232"/>
+      <path d="M44 60 L56 60 L57.5 75 L42.5 75 Z" fill="#E9C3AB"/>
+      <path d="M10 100 C13 84 26 76 41 73 L50 88 L59 73 C74 76 87 84 90 100 Z" fill="#1E2942"/>
+      <path d="M41 73 L50 88 L59 73 L55.5 71.5 L50 81 L44.5 71.5 Z" fill="#FFFFFF"/>
+      <path d="M41 73 L46 80 L44 82 L38 75 Z M59 73 L54 80 L56 82 L62 75 Z" fill="#2B3858"/>
+      <ellipse cx="50" cy="45" rx="14.5" ry="17.5" fill="#F6DCC9"/>
+      <path d="M33.5 43 C33 28 43 21 52 21.5 C62 22 68 30 66.8 41 C62 33 55 30.5 47 32.5 C41 34 37 38 33.5 43 Z" fill="#2A2232"/>
+      <ellipse cx="44" cy="46.6" rx="1.9" ry="2.4" fill="#2A2232"/><ellipse cx="56" cy="46.6" rx="1.9" ry="2.4" fill="#2A2232"/>
+      <path d="M40.6 44.6 Q44 42.4 47.2 44.2 M52.8 44.2 Q56 42.4 59.4 44.6" stroke="#2A2232" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+      <circle cx="41.5" cy="52" r="2.6" fill="#EE9C96" opacity=".5"/><circle cx="58.5" cy="52" r="2.6" fill="#EE9C96" opacity=".5"/>
+      <path d="M46.6 55.4 Q50 57.8 53.4 55.4" stroke="#C4505A" stroke-width="1.9" fill="none" stroke-linecap="round"/>
+    </g><circle cx="50" cy="50" r="44" fill="url(#g${u})"/></svg>${badge ? `<i class="aki-badge">${badge}</i>` : ''}</span>`;
+}
+const outWhy = { inj: 'ケガから', sus: '出場停止明けで', nt: '代表から' };
+// notes: what the bubble says and what the sheet shows, by kind
+const SEC_VIEW = {
+  hello: {
+    bubble: () => `はじめまして。${E.SEC.role}の${secNm()}です ›`,
+    title: () => 'はじめまして',
+    body: n => `<p class="small" style="margin:0">${n.data.old ? '今日から' : ''}${esc(S.clubs[S.my].short)}の${E.SEC.role}を担当する${esc(secNm())}です。試合に出られない選手が出たら代わりを用意して、その選手が戻ってきたらお知らせします。月のはじめには順位やお金のこともまとめますね。メンバーは、監督が「入れ替える」を押すまで変えません。</p>
+      <p class="fine" style="margin:0">名前は上の「名前を変える」から変えられます（クラブ → 経営からも）。</p>`,
+    done: 'わかりました',
+  },
+  month: {
+    bubble: n => `${n.data.m}月になりました。今月のまとめです ›`,
+    title: n => `${n.data.m}月のまとめ`,
+    body: n => {
+      const d = n.data; const f = d.big && S.fixtures.find(x => x.id === d.big.fid);
+      const opp = f ? (f.h === S.my ? f.a : f.h) : null;
+      const top = (d.top || []).map(t => S.players[t.pid] ? `${esc(S.players[t.pid].short)} ${t.a}→${t.b}` : '').filter(Boolean);
+      const y = youthItem();
+      return `<dl class="kv sec-kv"><dt>順位</dt><dd>${d.rank == null ? '開幕前' : d.rank === 1 ? '首位' : `${d.rank}位（首位 ${esc(S.clubs[d.lead] ? S.clubs[d.lead].short : '')}と勝点${d.gap}差）`}</dd>
+        <dt>次の大一番</dt><dd>${f && S.clubs[opp] ? `${jdw(f.date)} ${esc(S.clubs[opp].short)}戦・${esc(d.big.tag)}${f.played ? '（終了）' : ''}` : 'この1か月はありません'}</dd>
+        <dt>資金</dt><dd>${E.money(d.funds)}${d.delta == null ? '' : `（先月から ${d.delta >= 0 ? '+' : ''}${E.money(d.delta)}）`}</dd>
+        <dt>若手</dt><dd>${top.length ? `${top.join('、')}${d.youth > top.length ? ` ほか${d.youth - top.length}人` : ''}が成長` : '先月から目立った変化はありません'}</dd></dl>
+        ${y ? '<button class="btn ghost block" data-act="youthOpen" style="min-height:40px">若手の成長レポート</button>' : ''}`;
+    },
+  },
+};
+const secView = n => SEC_VIEW[n.k] || { bubble: () => `${E.SEC.role}からのお知らせ ›`, title: () => 'お知らせ', body: x => `<p class="small" style="margin:0">${esc(x.data.text || '')}</p>`, done: 'わかりました' };
+// what she has to say now, most pressing first
+function secItems() {
+  if (!S || S.fired || !S.clubs[S.my]) return { fix: null, back: [], notes: [], n: 0, unseen: [] };
+  const fix = E.secFix(S); const back = E.secReturns(S); const notes = E.secNotes(S).filter(x => SEC_VIEW[x.k] || x.data.text);
+  const unseen = notes.filter(x => !x.seen);
+  return { fix: fix.items.length ? fix : null, back, notes, unseen, n: (fix.items.length ? fix.items.length : 0) + back.length + unseen.length };
+}
+const secOutN = fix => fix.items.filter(x => x.out).length;
+function secFixLine(fix) {
+  const n = secOutN(fix), e = fix.items.length - n;
+  return n ? `次の試合に出られない選手が${n}人います。代わりを用意しました` : `先発の${e}枠が空いています。入る選手を用意しました`;
+}
+const pairs = fix => fix.items.slice(0, 4).map(it => `${it.out ? esc(S.players[it.out].short) : (E.ROLE[it.role] ? E.ROLE[it.role].jp : '') + 'の空き'}→${it.cand ? esc(S.players[it.cand].short) : 'なし'}`).join('、') + (fix.items.length > 4 ? ` ほか${fix.items.length - 4}人` : '');
+const backLine = m => { const p = S.players[m.out]; return `${esc(p.short)}が${outWhy[m.why] || ''}戻りました。${m.k === 'xi' ? `${E.ROLE[m.role].jp}に` : 'ベンチに'}戻しますか？`; };
+const backSub = m => { const q = S.players[m.sub]; return m.k === 'xi' ? `代わりに先発していた${esc(q.short)}は${S.clubs[S.my].tac.bench.includes(m.out) || (m.fill && S.clubs[S.my].tac.bench.includes(m.fill)) || S.clubs[S.my].tac.bench.length < E.BENCH_SIZE ? 'ベンチへ' : 'ベンチ外へ'}` : `代わりに入っていた${esc(q.short)}はベンチ外へ`; };
+// the magnet above the dock: on the home screen with what she has to say, elsewhere just the magnet and a count
+function secFloat() {
+  const si = secItems(); if (!si.n) return '';
+  const home = UI.tab === 'home';
+  let bub = '';
+  if (home) {
+    if (si.fix) bub = `<button class="sec-bub" data-act="secOpen"><b>${secFixLine(si.fix)} ›</b><small>${esc(secWho())}</small></button>`;
+    else if (si.back.length) { const m = si.back[0]; bub = `<div class="sec-bub"><button class="sec-bub-t" data-act="secOpen"><b>${backLine(m)}</b><small>${backSub(m)}</small></button><div class="grid2"><button class="btn ghost" data-act="secKeep" data-id="${m.out}">このまま</button><button class="btn primary" data-act="secBack" data-id="${m.out}">戻す</button></div></div>`; }
+    else if (si.unseen.length) bub = `<button class="sec-bub" data-act="secOpen"><b>${esc(secView(si.unseen[0]).bubble(si.unseen[0]))}</b><small>${esc(secWho())}${si.unseen.length > 1 ? `・ほか${si.unseen.length - 1}件` : ''}</small></button>`;
+  }
+  return `<div class="sec-float${home ? ' home' : ''}" id="sec-float">${bub}<button class="sec-mag" data-act="secOpen" aria-label="${esc(secWho())}の連絡（${si.n}件）">${akiMag('', si.n)}</button></div>`;
+}
+// keep the magnet just above the dock, or above the switch bar on screens that have one
+function secPlace() {
+  const fl = document.getElementById('sec-float'); if (!fl) return;
+  const dock = document.querySelector('.dock'); const sn = document.querySelector('#view > .subnav');
+  let b = dock ? dock.offsetHeight : 124;
+  if (sn && dock) b += Math.max(0, dock.getBoundingClientRect().top - sn.getBoundingClientRect().top);
+  fl.style.bottom = (b + 8) + 'px';
+}
+function secMagLine(fix) { return `<div class="sec-line">${akiMag('sm')}<p><b>${secFixLine(fix)}。</b><span class="small">（${pairs(fix)}）</span></p></div>`; }
+const SEC_MAG = (p, out) => { const c = S.clubs[S.my]; const kt = lum(c.c1) > 0.6 ? '#141414' : '#ffffff'; return `<span class="sec-pm${out ? ' out' : ''}" style="--k1:${c.c1};--k2:${c.c2};--kt:${kt}">${p ? p.num : '+'}</span>`; };
+function secFixRows(fix) {
+  const F = E.FORMATIONS[S.clubs[S.my].tac.form];
+  return `<ul class="sec-list">${fix.items.map(it => {
+    const o = it.out && S.players[it.out], n = it.cand && S.players[it.cand], fl = it.fill && S.players[it.fill];
+    const where = it.k === 'xi' ? E.ROLE[F[it.i][0]].jp : 'ベンチ';
+    const top = o ? `${SEC_MAG(o, true)}<span class="sec-tx"><b>${where}　${esc(o.name)}</b><small>${outText(o)}</small></span>` : `${SEC_MAG(null, true)}<span class="sec-tx"><b>${where}　空き</b><small>先発の枠が空いています</small></span>`;
+    const sub = n ? (it.k === 'xi' ? `適性${it.apt}・総合力${E.ovr(n)}` : `${dpOf(n)}・総合力${E.ovr(n)}`) : '';
+    const bot = n ? `<span class="sec-ar" aria-hidden="true">↳</span>${SEC_MAG(n)}<span class="sec-tx"><span class="sec-nm"><b>${esc(n.name)}</b>${it.from === 'bench' ? '<span class="chip">ベンチから</span>' : ''}</span><small>${sub}</small></span><button class="btn ghost sec-do" data-act="secOne" data-id="${it.id}">入れ替える</button>`
+      : `<span class="sec-ar" aria-hidden="true">↳</span><span class="sec-tx"><small>代わりに出られる選手がいません</small></span>${o ? `<button class="btn ghost sec-do" data-act="secOne" data-id="${it.id}">外す</button>` : ''}`;
+    return `<li class="sec-row"><div class="sec-ln">${top}</div><div class="sec-ln">${bot}</div>${fl ? `<div class="sec-fill">ベンチの空きには ${esc(fl.name)}（${dpOf(fl)}・${E.ovr(fl)}）</div>` : ''}</li>`;
+  }).join('')}</ul>`;
+}
+// the secretary's sheet: who can't play (with a stand-in each), who is back, her notes. back: 'pre' (fid) returns to the
+// pre-match sheet
+function sheetSec(back, fid) {
+  sheetState = { type: 'sec', back, fid };
+  const si = secItems(); const c = S.clubs[S.my];
+  const nf = E.nextMyFixture(S); const f = (fid && S.fixtures.find(x => x.id === fid)) || nf;
+  const opp = f ? S.clubs[f.h === S.my ? f.a : f.h] : null;
+  const out = [];
+  if (si.fix) out.push(`<section class="sec-sec"><h4>${f && opp ? `${jdw(f.date)} ${esc(opp.short)}戦（${E.fxLabel(f)}）` : '次の試合'}に出られない選手</h4>${secFixRows(si.fix)}<p class="fine" style="margin:0">押すまでメンバーは変わりません。候補は同じ役割でいちばん力を出せる選手です。</p></section>`);
+  for (const m of si.back) out.push(`<section class="sec-sec"><h4>戻ってきた選手</h4><p class="small" style="margin:0"><b>${backLine(m)}</b><br><span class="muted">${backSub(m)}。</span></p><div class="grid2"><button class="btn ghost" data-act="secKeep" data-id="${m.out}">このまま</button><button class="btn primary" data-act="secBack" data-id="${m.out}">戻す</button></div></section>`);
+  for (const n of si.notes) { const v = secView(n); out.push(`<section class="sec-sec"><h4>${esc(v.title(n))}<small>${jd(n.d)}</small></h4>${v.body(n)}${v.done ? `<button class="btn ghost block" data-act="secDone" data-id="${n.id}" style="min-height:40px">${v.done}</button>` : ''}</section>`); }
+  E.secSeen(S); persist(false);
+  openSheet(`<div class="sec-head">${akiMag('md')}<div style="min-width:0;flex:1"><div class="eyebrow">${E.SEC.role}からの連絡</div><b class="sec-name">${esc(secWho())}</b></div><button class="btn ghost sec-rename" data-act="secName">名前を変える</button></div>
+    ${out.join('') || `<p class="empty">いまはお知らせはありません。${esc(c.short)}の様子を見ておきますね。</p>`}`,
+    (si.fix ? `<button class="btn primary block" data-act="secAll" style="min-height:54px;font-size:16px">おすすめどおりに入れ替える</button>` : '')
+    + (back === 'pre' && fid ? `<button class="btn ghost block" data-act="secPre" data-id="${fid}">試合前に戻る</button>` : '<button class="btn ghost block" data-act="closeSheet">閉じる</button>'));
+  render();
+}
+function sheetSecName(back) {
+  sheetState = { type: 'secName', back };
+  openSheet(`<div class="mgr-card" style="--k1:#1E2942;--k2:#C9A752;--kt:#F2EFE4">
+      <div class="eyebrow">${E.SEC.role}の名前</div>
+      <div class="mgr-club">${akiMag('lg')}<b>${esc(S.clubs[S.my].short)}の${E.SEC.role}</b></div>
+      <label class="mgr-plate" for="sec-name"><span class="mgr-plate-k">${E.SEC.role}</span><input id="sec-name" maxlength="${E.SEC.max}" placeholder="${esc(E.SEC.name)}" autocomplete="off" enterkeyhint="done" value="${esc(secNm())}" aria-label="${E.SEC.role}の名前"></label>
+      <p class="fine" style="margin:0">${E.SEC.max}文字まで。空欄なら「${esc(E.SEC.name)}」になります。</p>
+    </div>`,
+    `<button class="btn primary block" data-act="secNameSave">この名前にする</button><button class="btn ghost block" data-act="${back === 'club' ? 'closeSheet' : 'secOpen'}">戻る</button>`);
+  const inp = document.getElementById('sec-name');
+  if (inp) inp.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); inp.blur(); } });
+}
+// クラブ → 経営: who she is and where to rename her
+function secCard() {
+  return `<section class="card sec-card"><div class="row" style="gap:12px">${akiMag('md')}<div style="min-width:0;flex:1"><div class="eyebrow">クラブスタッフ</div><b class="sec-name">${esc(secWho())}</b></div><button class="btn ghost sec-rename" data-act="secName" data-back="club">名前を変える</button></div>
+    <p class="fine" style="margin:0">試合に出られない選手の代わり、戻ってきた選手、月のはじめのまとめを知らせます。メンバーは、監督が押すまで変わりません。</p>
+    <button class="btn ghost block" data-act="secOpen">連絡を見る</button></section>`;
 }
 
 function sheetTrain(id) {
@@ -815,7 +961,8 @@ function viewTactics() {
   const seg = (act, cur, opts) => `<div class="seg">${opts.map(([k, l]) => `<button data-act="${act}" data-k="${k}" aria-pressed="${cur === k}">${l}</button>`).join('')}</div>`;
   const iss = E.lineupIssues(S, S.my);
   const empty = iss.spare && iss.xi.some(x => x.why === 'empty');
-  const banner = iss.block ? `<div class="card alert"><div class="eyebrow">試合の前に入れ替えが必要です</div><ul>${issueLines(iss).map(t => `<li>${esc(t)}</li>`).join('')}</ul><p class="fine" style="margin:6px 0 0">選手やベンチの行をタップして入れ替えてください。自動では入れ替わりません。${empty ? '空いた枠だけなら、下のボタンでおまかせで埋められます。' : ''}</p>${empty ? '<button class="btn block" data-act="fillEmpty" style="margin-top:8px">空いた枠をおまかせで埋める</button>' : ''}</div>` : '';
+  const sfx = iss.block ? E.secFix(S) : null;
+  const banner = iss.block ? `<div class="card alert"><div class="eyebrow">試合の前に入れ替えが必要です</div><ul>${issueLines(iss).map(t => `<li>${esc(t)}</li>`).join('')}</ul>${sfx.items.length ? secMagLine(sfx) + '<button class="btn primary block" data-act="secAll" style="margin-top:8px">おすすめどおりに入れ替える</button>' : ''}<p class="fine" style="margin:6px 0 0">押すまでメンバーは変わりません。<button class="linkish" data-act="secOpen">1人ずつ選ぶ</button>か、選手やベンチの行をタップして自分で入れ替えることもできます。${empty ? '空いた枠だけなら、下のボタンでおまかせで埋められます。' : ''}</p>${empty ? '<button class="btn block" data-act="fillEmpty" style="margin-top:8px">空いた枠をおまかせで埋める</button>' : ''}</div>` : '';
   return `${banner}<div class="trate"><div><small>攻撃</small><b>${Math.round(r.att)}</b></div><div><small>中盤</small><b>${Math.round(r.mid)}</b></div><div><small>守備</small><b>${Math.round(r.def)}</b></div></div>
     ${formSelect(c)}
     <p class="fine" style="margin:-6px 0 0">${esc(E.FORM_DESC[c.tac.form] || '')}</p>
@@ -1111,6 +1258,7 @@ function viewClub() {
         <p class="fine">試合ごとに、戦力から見込まれる勝点を上回れば上がり、下回れば下がります。シーズン終了時は目標の順位との差で増減します。信頼が尽きると解任、J2降格でも解任です。</p>
         ${boardLvCtl()}
       </section>
+      ${secCard()}
       <section class="card" style="display:grid;gap:8px">
         <div class="row"><div class="eyebrow">クラブの格</div><span class="spacer"></span>${presBadge(c)}<b>${E.presLabel(c.pres)}</b></div>
         <div class="small">${titlesText(c)}${c.o10 ? '・Jリーグ創設メンバー' : ''}</div>
@@ -1285,9 +1433,9 @@ function sheetPrematch(fid) {
     ${gap >= 3 && c.tac.ment !== 'def' && !c.tac.ctr ? '<p class="fine" style="margin:0">格上が相手です。「守備的」や「カウンターを狙う」で戦うと勝機が増えます（戦術画面）。</p>' : ''}
     ${fire}
     <div><div class="eyebrow" style="margin-bottom:6px">警戒する選手</div><div class="row wrap">${keys.map(p => `<span class="chip">${posTag(p, 'width:26px;height:16px;font-size:9px')}${esc(p.name)} ${E.ovr(p)}</span>`).join('')}</div></div>
-    ${iss.block ? `<div class="card alert"><div class="eyebrow">このままでは試合に進めません</div><ul>${issueLines(iss).map(t => `<li>${esc(t)}</li>`).join('')}</ul><p class="fine" style="margin:6px 0 0">戦術画面で、出られない選手を自分で入れ替えてください。</p></div>` : ''}
+    ${iss.block ? `<div class="card alert"><div class="eyebrow">このままでは試合に進めません</div><ul>${issueLines(iss).map(t => `<li>${esc(t)}</li>`).join('')}</ul>${(() => { const fx = E.secFix(S, E.compOf(f)); return fx.items.length ? secMagLine(fx) : ''; })()}<p class="fine" style="margin:6px 0 0">押すまでメンバーは変わりません。</p></div>` : ''}
     ${warn.length ? `<div class="card" style="padding:10px 12px"><div class="eyebrow" style="color:var(--loss)">メンバーの注意点</div><ul style="margin:6px 0 0;padding-left:18px;font-size:13px">${warn.slice(0, 5).map(w => `<li>${esc(w)}</li>`).join('')}</ul></div>` : iss.block ? '' : '<p class="fine">メンバーに問題はありません。</p>'}`,
-    iss.block ? `<button class="btn primary block" data-act="toTactics" style="min-height:54px;font-size:16px">メンバーを入れ替える</button><button class="btn ghost block" data-act="closeSheet">閉じる</button>`
+    iss.block ? `<button class="btn primary block" data-act="secAll" style="min-height:54px;font-size:16px">おすすめどおりに入れ替える</button><div class="grid3"><button class="btn ghost" data-act="secOpen" data-back="pre" data-fid="${fid}">1人ずつ選ぶ</button><button class="btn ghost" data-act="toTactics">戦術画面へ</button><button class="btn ghost" data-act="closeSheet">閉じる</button></div>`
       : `<button class="btn primary block" data-act="kickoff" data-id="${fid}" style="min-height:54px;font-size:16px">キックオフ</button><div class="grid2"><button class="btn ghost" data-act="toTactics">戦術を調整</button><button class="btn ghost" data-act="quick" data-id="${fid}">結果だけ見る</button></div>`);
 }
 const VERDICT = { champion: 'リーグ優勝！', met: '目標達成', near: 'あと一歩', missed: '目標未達', relegated: 'J2降格' };
@@ -1567,6 +1715,8 @@ function refreshSheet() {
   if (s.type === 'loan') return S.players[s.id] && S.players[s.id].club === S.my ? sheetLoan(s.id) : sheetPlayer(s.id);
   if (s.type === 'num') return sheetNum(s.id, s.sel);
   if (s.type === 'plan') return sheetPlan();
+  if (s.type === 'sec') return sheetSec(s.back, s.fid);
+  if (s.type === 'youth') return sheetYouth(s.back);
   if (s.type === 'team') return sheetTeam(s.id, s.tab, s.back);
   if (s.type === 'cele') return sheetCele();
   if (s.type === 'player') sheetPlayer(s.id, s.back); else if (s.type === 'train') sheetTrain(s.id); else if (s.type === 'bench') sheetBench(s.id); else if (s.type === 'slot') sheetSlot(s.i); else if (s.type === 'pre') sheetPrematch(s.id); else if (s.type === 'msub') sheetMatchTactics();
@@ -1796,6 +1946,7 @@ function go() {
   if (st.stop === 'match') sheetPrematch(st.fid);
   else if (st.stop === 'inbox') { const it = S.inbox.find(x => x.type !== 'youth'); UI.tab = 'home'; render(); window.scrollTo(0, 0); toast(it && it.type === 'scout' ? 'スカウトが戻りました' : it && it.type === 'nt' ? '代表メンバーが発表されました' : '移籍オファーが届きました'); }
   else if (st.stop === 'note') { if (/フロント/.test(st.text)) { UI.tab = 'home'; render(); window.scrollTo(0, 0); } toast(st.text); }
+  else if (st.stop === 'sec') { UI.tab = 'home'; render(); window.scrollTo(0, 0); sheetSec(); }
   else if (st.stop === 'cele') { persist(true); UI.tab = 'home'; render(); window.scrollTo(0, 0); sheetCele(); }
   else if (st.stop === 'seasonEnd') { persist(true); render(); sheetSeasonEnd(); }
   else if (st.stop === 'fired') { persist(true); render(); sheetFired(); }
@@ -1846,7 +1997,8 @@ const ACT = {
   autoXI() { E.autoLineup(S, S.my); persist(false); render(); toast('ベストメンバーを組みました'); },
   benchPick(d) { sheetBench(Number(d.id)); },
   benchIn(d) {
-    const outId = sheetState && sheetState.id; const o = S.players[outId], p = S.players[d.id];
+    const outId = sheetState && sheetState.id; const o = S.players[outId], p = S.players[d.id]; const c0 = S.clubs[S.my];
+    if (o && !avail(o) && c0.tac.bench.includes(outId)) E.secTook(S, outId, Number(d.id), 'bench');
     if (E.benchSwap(S, outId, Number(d.id))) { persist(false); closeSheet(); render(); toast(o ? `${p.short}をベンチに入れました（${o.short}はベンチ外）` : `${p.short}をベンチに入れました`); }
   },
   benchOut(d) { const p = S.players[d.id]; if (E.benchRemove(S, Number(d.id))) { persist(false); closeSheet(); render(); toast(`${p.short}をベンチから外しました`); } },
@@ -1860,6 +2012,7 @@ const ACT = {
       const old = xi[i]; const bi = c.tac.bench.indexOf(pid);
       xi[i] = pid;
       if (bi >= 0) { if (old && avail(S.players[old])) c.tac.bench[bi] = old; else c.tac.bench.splice(bi, 1); }
+      if (old) E.secTook(S, old, pid, 'xi');
     }
     E.validateLineup(S, S.my); persist(false); closeSheet(); render();
   },
@@ -1912,6 +2065,40 @@ const ACT = {
   numSet(d) { const r = E.setNum(S, Number(d.id), Number(d.n)); toast(r.msg); if (r.ok) { persist(false); sheetPlayer(Number(d.id)); render(); } else sheetNum(Number(d.id)); },
   loanSheet(d) { sheetLoan(Number(d.id)); },
   loanGo(d) { const r = E.loanOut(S, Number(d.id), d.k); toast(r.msg); if (r.ok) { persist(true); sheetPlayer(Number(d.id)); render(); } else refreshSheet(); },
+  secOpen(d) {
+    const sub = sheetState && ['youth', 'secName'].includes(sheetState.type);
+    const b = d.back ? { back: d.back, fid: d.fid ? Number(d.fid) : null } : sub ? (UI.secBack || {}) : {};
+    UI.secBack = b; sheetSec(b.back, b.fid);
+  },
+  secAll() {
+    const st = sheetState; const pre = st && st.type === 'pre' ? st.id : st && st.type === 'sec' && st.back === 'pre' ? st.fid : null;
+    const fx = pre && S.fixtures.find(x => x.id === pre);
+    const done = E.secSwapAll(S, fx ? E.compOf(fx) : undefined); persist(false);
+    toast(done.length ? `${secNm()}：${done.length}人を入れ替えました` : '入れ替えられる選手がいません');
+    if (pre) sheetPrematch(pre); else if (st && st.type === 'sec') sheetSec(st.back, st.fid); else render();
+  },
+  secOne(d) {
+    const st = sheetState || {}; const pre = st.type === 'sec' && st.back === 'pre' ? st.fid : null;
+    const fx = pre && S.fixtures.find(x => x.id === pre); const comp = fx ? E.compOf(fx) : undefined;
+    const it = E.secSwap(S, d.id, comp); persist(false);
+    if (it) toast(it.cand ? `${S.players[it.cand].short}を${it.k === 'xi' ? E.ROLE[it.role].jp + 'に' : 'ベンチに'}入れました` : `${S.players[it.out].short}を外しました`);
+    if (pre && !E.secFix(S, comp).items.length) sheetPrematch(pre); else sheetSec(st.back, st.fid);
+  },
+  secBack(d) {
+    const r = E.secRestore(S, Number(d.id)); persist(false);
+    if (r) toast(`${S.players[r.out].short}を戻しました（${S.players[r.sub].short}は${r.to === 'bench' ? 'ベンチへ' : 'ベンチ外へ'}）`);
+    if (sheetState && sheetState.type === 'sec') refreshSheet(); else render();
+  },
+  secKeep(d) { E.secKeep(S, Number(d.id)); persist(false); if (sheetState && sheetState.type === 'sec') refreshSheet(); else render(); },
+  secDone(d) { E.secDone(S, Number(d.id)); persist(false); refreshSheet(); render(); },
+  secName(d) { sheetSecName(d.back); },
+  secNameSave() {
+    const n = E.setSecName(S, (document.getElementById('sec-name') || {}).value || ''); persist(false);
+    toast(`${E.SEC.role}の名前を「${n}」にしました`);
+    if (sheetState && sheetState.back === 'club') { closeSheet(); render(); } else { const b = UI.secBack || {}; sheetSec(b.back, b.fid); }
+  },
+  secPre(d) { sheetPrematch(Number(d.id)); },
+  youthOpen() { sheetYouth('sec'); },
   youthDone(d) { const it = S.inbox.find(x => x.id === Number(d.id)); if (it) it.done = true; persist(false); render(); },
   unshort(d) { const p = S.players[d.id]; E.unshort(S, Number(d.id)); persist(false); toast(`${p ? p.name : '選手'}をショートリストから外しました`); refreshSheet(); render(); },
   upgrade(d) { const r = E.upgrade(S, d.k); toast(r.msg); if (r.ok) { persist(true); render(); } },

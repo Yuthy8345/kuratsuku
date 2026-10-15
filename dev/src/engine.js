@@ -586,7 +586,12 @@ function migrate(S, DATA) {
     const n = addAbroad(S, DATA, d => first || clash.has(nameKey(d.name)));
     if (n && !S.fired) news(S, `移籍市場の海外組に、これまで加わっていなかった選手（${n}人）が加わった。`, 'transfer');
   }
-  S.v = Math.max(S.v || 1, 12);
+  // v13 (2026-10-15): the club secretary (秘書). She introduces herself; the month's summary starts next month.
+  if ((S.v || 1) < 13) {
+    secOf(S); if (S.clubs[S.my]) S.sec.f0 = S.clubs[S.my].funds;
+    if (!S.fired) secPost(S, 'hello', { old: true });
+  }
+  S.v = Math.max(S.v || 1, 13);
   return S;
 }
 // old saves: the season's unplayed league rounds go to the real 2026/27 dates (a round whose date has passed goes to the
@@ -778,7 +783,8 @@ function newGame(DATA, clubId, managerName, todayISO) {
     initAttrs(S.players[p.id]);
   }
   addAbroad(S, DATA);
-  S.v = 12; S.presV = 4; S.presets = []; S.nt = { done: {}, res: [], log: [] };
+  S.v = 13; S.presV = 4; S.presets = []; S.nt = { done: {}, res: [], log: [] };
+  secOf(S).f0 = S.clubs[clubId].funds; secPost(S, 'hello', {});
   for (const p of squad(S, clubId)) track(S, p);
   for (const id of S.order) autoLineup(S, id);
   S.fixtures = genFixtures(S.order, DATA.round1, sy);
@@ -1267,6 +1273,163 @@ function benchRemove(S, pid) {
   return true;
 }
 
+/* ---------- 秘書 (2026-10-15): the club secretary speaks up; all her messages go through here ----------
+   S.sec = { name, back: [return memories], notes: [posted notes], nid, f0 (funds at the last month start), stop }.
+   She never changes the team by herself: secFix only suggests, secSwap / secSwapAll apply when the manager taps.
+   Messages: live ones are worked out from the state each time (secFix = players who can't play, secReturns = players
+   back who were swapped out); the rest are notes posted with secPost(S, kind, data) (the month's summary; later the
+   sponsor / hometown / camp work posts theirs the same way). A note with {stop: true} stops the day advance. */
+const SEC = { name: 'あき', role: '秘書', max: 8, keep: 120, notes: 12 };
+function secOf(S) {
+  if (!S.sec) S.sec = { name: SEC.name, back: [], notes: [], nid: 1 };
+  if (!S.sec.back) S.sec.back = []; if (!S.sec.notes) S.sec.notes = [];
+  return S.sec;
+}
+function secName(S) { return (S.sec && S.sec.name) || SEC.name; }
+function setSecName(S, name) { const n = String(name || '').trim().replace(/\s+/g, ' ').slice(0, SEC.max); secOf(S).name = n || SEC.name; return secOf(S).name; }
+function secPost(S, k, data, opts) {
+  const s = secOf(S); opts = opts || {};
+  if (opts.replace !== false) s.notes = s.notes.filter(n => n.k !== k);
+  const n = { id: s.nid++, k, d: S.date, data: data || {}, seen: false };
+  s.notes.unshift(n); if (s.notes.length > SEC.notes) s.notes.length = SEC.notes;
+  if (opts.stop) s.stop = true;
+  return n;
+}
+function secNotes(S) { return (S.sec && S.sec.notes) || []; }
+function secSeen(S) { for (const n of secNotes(S)) n.seen = true; }
+function secDone(S, id) { const s = secOf(S); s.notes = s.notes.filter(n => n.id !== id); }
+// the stand-in for each place a player can't fill in the next match (or the match of `comp`): the best fit for the role
+// among the fit players not starting (the bench too; a bench player moving up leaves his place to the best reserve),
+// for a bench player who can't play the best reserve (a goalkeeper for a goalkeeper). Places are filled GK first.
+function secFix(S, comp) {
+  const c = S.clubs[S.my]; comp = comp || nextComp(S, S.my);
+  const iss = lineupIssues(S, S.my, comp); if (!iss.block) return { comp, items: [] };
+  const F = FORMATIONS[c.tac.form], xi = c.tac.xi, bench = c.tac.bench;
+  const fit = squad(S, S.my).filter(p => available(p, comp) && !xi.includes(p.id));
+  const taken = new Set();
+  const val = (p, role) => effective(p, role) - Math.max(0, 72 - p.cond) * 0.4;
+  const reserve = pos => {   // best fit player off the matchday squad, same registered position first
+    const rs = fit.filter(p => !taken.has(p.id) && !bench.includes(p.id));
+    const same = rs.filter(p => p.pos === pos), pool = same.length ? same : rs.filter(p => pos === 'GK' || p.pos !== 'GK');
+    const p = pool.sort((a, b) => b.ovr - a.ovr)[0]; if (p) taken.add(p.id); return p ? p.id : null;
+  };
+  const items = [], byI = {}; for (const x of iss.xi) byI[x.i] = x;
+  for (const i of slotOrder(F)) {
+    const x = byI[i]; if (!x) continue;
+    const role = F[i][0]; let best = null, bv = -1e9;
+    for (const p of fit) { if (taken.has(p.id)) continue; const v = val(p, role); if (v > bv) { bv = v; best = p; } }
+    const it = { id: x.pid ? 'p' + x.pid : 'e' + i, k: 'xi', i, role, out: x.pid || null, why: x.why, cand: best ? best.id : null, from: null, fill: null };
+    if (best) {
+      taken.add(best.id); it.apt = Math.round(roleApt(best, role));
+      if (bench.includes(best.id)) { it.from = 'bench'; it.fill = reserve(best.pos); }
+    }
+    items.push(it);
+  }
+  for (const x of iss.bench) {
+    const o = S.players[x.pid];
+    items.push({ id: 'p' + x.pid, k: 'bench', out: x.pid, why: x.why, cand: reserve(o.pos), from: null, fill: null });
+  }
+  return { comp, items };
+}
+// put the stand-in in (one item); remembers who he stood in for
+function secPut(S, it) {
+  const c = S.clubs[S.my]; const xi = c.tac.xi, bench = c.tac.bench;
+  if (it.k === 'xi') {
+    if ((xi[it.i] || null) !== it.out) return false;
+    const bi = it.cand ? bench.indexOf(it.cand) : -1;
+    xi[it.i] = it.cand || null;
+    if (bi >= 0) { if (it.fill) bench[bi] = it.fill; else bench.splice(bi, 1); }
+    if (it.out) { const k = bench.indexOf(it.out); if (k >= 0) bench.splice(k, 1); }
+  } else {
+    const k = bench.indexOf(it.out); if (k < 0) return false;
+    if (it.cand) bench[k] = it.cand; else bench.splice(k, 1);
+  }
+  c.tac.bench = bench.filter((id, j, a) => id && a.indexOf(id) === j && !xi.includes(id));
+  c.tac.benchManual = true;
+  if (it.out) secTook(S, it.out, it.cand, it.k, it.k === 'xi' && it.from === 'bench' ? it.fill : null);
+  return true;
+}
+function secSwap(S, id, comp) {
+  const it = secFix(S, comp).items.find(x => x.id === id); if (!it) return null;
+  const ok = secPut(S, it); validateLineup(S, S.my); return ok ? it : null;
+}
+function secSwapAll(S, comp) {
+  const done = []; const fx = secFix(S, comp);
+  for (const it of fx.items) if (secPut(S, it)) done.push(it);
+  validateLineup(S, S.my);
+  return done;
+}
+// someone took the place of `out`: if `out` can't play, remember him so the secretary can offer to put him back when he
+// is fit again; a stand-in who is himself replaced passes the memory on (the returning player goes where the team is now)
+function secTook(S, out, inn, kind, fill) {
+  const s = secOf(S); const p = S.players[out]; if (!p) return;
+  for (const m of s.back) if (m.sub === out && m.out !== inn) m.sub = inn || null;
+  s.back = s.back.filter(m => m.out !== out && m.out !== inn && m.sub);
+  if (!inn || available(p, nextComp(S, S.my))) return;
+  s.back.push({ out, sub: inn, k: kind || 'xi', fill: fill || null, why: p.inj > 0 ? 'inj' : p.away ? 'nt' : 'sus', d: S.date });
+}
+// players swapped out who can play the next match again; stale memories (he left, the stand-in is no longer where he was
+// put, he is back in the team already, or it is too old) are dropped here
+function secReturns(S) {
+  const s = S.sec; if (!s || !s.back || !s.back.length) return [];
+  const c = S.clubs[S.my]; if (!c) return [];
+  const comp = nextComp(S, S.my); const out = [];
+  s.back = s.back.filter(m => {
+    const p = S.players[m.out], q = S.players[m.sub];
+    if (!p || p.club !== S.my || !q || q.club !== S.my || D.diff(S.date, m.d) > SEC.keep) return false;
+    if (c.tac.xi.includes(m.out) || (m.k === 'bench' && c.tac.bench.includes(m.out))) return false;
+    const i = m.k === 'xi' ? c.tac.xi.indexOf(m.sub) : c.tac.bench.indexOf(m.sub);
+    if (i < 0) return false;
+    if (available(p, comp)) out.push(Object.assign({}, m, { i, role: m.k === 'xi' ? FORMATIONS[c.tac.form][i][0] : null }));
+    return true;
+  });
+  return out;
+}
+// put him back where his stand-in is; the stand-in goes to the bench (into the place of the reserve who filled the
+// bench for him, or a free place) or, with the bench full, out of the matchday squad
+function secRestore(S, out) {
+  const m = secReturns(S).find(x => x.out === out); if (!m) return null;
+  const c = S.clubs[S.my]; const xi = c.tac.xi, bench = c.tac.bench;
+  let to = 'out';
+  if (m.k === 'xi') {
+    const bj = bench.indexOf(out);
+    xi[m.i] = out;
+    if (bj >= 0) { bench[bj] = m.sub; to = 'bench'; }
+    else if (m.fill && bench.includes(m.fill)) { bench[bench.indexOf(m.fill)] = m.sub; to = 'bench'; }
+    else if (bench.length < BENCH_SIZE) { bench.push(m.sub); to = 'bench'; }
+  } else bench[m.i] = out;
+  c.tac.bench = bench.filter((id, j, a) => id && a.indexOf(id) === j && !xi.includes(id));
+  c.tac.benchManual = true;
+  secOf(S).back = S.sec.back.filter(x => x.out !== out);
+  for (const x of S.sec.back) if (x.sub === m.sub && m.k === 'xi') x.sub = out;
+  validateLineup(S, S.my);
+  return { out, sub: m.sub, k: m.k, to };
+}
+function secKeep(S, out) { const s = secOf(S); s.back = s.back.filter(m => m.out !== out); }
+// the next big match (a derby, a cup tie from the semi-finals, a six-pointer) within `days`
+function bigMatch(S, days) {
+  const lim = D.add(S.date, days || 35);
+  for (const f of S.fixtures.filter(x => !x.played && (x.h === S.my || x.a === S.my) && x.date <= lim).sort((a, b) => a.date.localeCompare(b.date))) {
+    const t = matchStory(S, f).filter(x => x.k === 'derby' || x.w >= 0.6);
+    if (t.length) return { fid: f.id, tag: t[0].jp };
+  }
+  return null;
+}
+// the 1st of the month: place, the next big match, money and the young players, as one note (it doesn't stop the days)
+function secMonth(S, youth) {
+  const s = secOf(S); const c = S.clubs[S.my]; if (!c || S.fired) return;
+  const t = table(S); const i = t.findIndex(r => r.id === S.my);
+  const played = i >= 0 && t[i].p > 0;
+  const ups = (youth || []).filter(r => Math.round(r.b) > Math.round(r.a));
+  s.notes = s.notes.filter(n => !(n.k === 'hello' && n.seen));   // her hello, once read, gives way to the first summary
+  secPost(S, 'month', {
+    m: D.m(S.date), rank: played ? i + 1 : null, gap: played ? t[0].pts - t[i].pts : null, lead: played ? t[0].id : null,
+    big: bigMatch(S, 35), funds: c.funds, delta: s.f0 == null ? null : c.funds - s.f0,
+    youth: ups.length, top: ups.slice(0, 2).map(r => ({ pid: r.pid, a: Math.round(r.a), b: Math.round(r.b) })),
+  });
+  s.f0 = c.funds;
+}
+
 /* ---------- team strength ---------- */
 function teamRating(S, side) {
   // side: {form, ment, press, slots:[{role, pid}], cond:{pid:val}}
@@ -1751,6 +1914,7 @@ function advance(S, maxDays) {
     if (S.fired) return { stop: 'fired' };
     if (S.inbox.filter(x => !x.seen).length > before) return { stop: 'inbox' };
     if (S._stopNote) { const n = S._stopNote; S._stopNote = null; return { stop: 'note', text: n }; }
+    if (S.sec && S.sec.stop) { S.sec.stop = false; return { stop: 'sec' }; }
   }
   return { stop: 'limit' };
 }
@@ -1829,6 +1993,7 @@ function monthly(S) {
     rows.sort((x, y) => (y.b - y.a) - (x.b - x.a) || (y.pb - y.pa) - (x.pb - x.pa) || y.b - x.b);
     S.inbox.unshift({ id: S.nextInboxId++, type: 'youth', m: D.m(S.date) === 1 ? 12 : D.m(S.date) - 1, rows, d: S.date, seen: true, done: false });
   }
+  secMonth(S, rows);
   const my = S.clubs[S.my];
   news(S, `${D.m(S.date)}月の収支：スポンサー収入 ${money(my.spon || 0)}／人件費 ${money(Math.round(squad(S, S.my).reduce((a, p) => a + wage(p), 0) / 12))}`, 'money');
   if (my.funds < 0) { S.board = clamp(S.board - 6, 0, 100); news(S, '資金がマイナスになっている。フロントは財政を懸念している。', 'warn'); }
@@ -2429,6 +2594,7 @@ function takeJob(S, cid) {
   autoLineup(S, cid);
   if (S.clubs[from]) autoLineup(S, from);
   setExpectations(S);
+  if (S.sec) { S.sec.back = []; S.sec.f0 = S.clubs[cid].funds; }
   news(S, `${S.clubs[cid].name}の新監督に就任。目標は「${S.clubs[cid].target.jp}」。`, 'big');
 }
 
@@ -2971,6 +3137,7 @@ function rollover(S) {
   const B = boardLv(S);
   const fireMe = myRelegated || (S.board < B.fireEnd && tenure(S) > B.grace);
   const newDate = (S.season + 1) + '-06-08';
+  if (S.sec) S.sec.back = [];   // last season's stand-ins: the new season starts as the manager puts the team
   // retirements (decided at the end of the season)
   decideRetirements(S);
   for (const p of Object.values(S.players)) if (p.retire) { if (p.club === S.my) news(S, `${p.name}が現役引退。お疲れさまでした。`, 'info'); p.club = 'RET'; }
@@ -3445,6 +3612,7 @@ const API = {
   D, jdate, FORMATIONS, ROLE, DPOS, DP_CAT, DP_JP, LEARN_MAX, PLAY_MAX, ppOf, apt, roleApt, posValues, learnRate, learnWeeks, MENTALITY, PRESS, TRAINING, FACILITY, ATTR, ATTR_SHOW, FOCUS, INTENS,
   calcOvr, roleScore, bestRoles, devPreview, migrate, weekly, power, presStars, presLabel,
   newGame, seasonForDate, seasonLabel, squad, strength, table, position, age, ovr, value, wage, money, attrs,
+  SEC, secOf, secName, setSecName, secPost, secNotes, secSeen, secDone, secFix, secSwap, secSwapAll, secTook, secReturns, secRestore, secKeep, secMonth, bigMatch, matchStory,
   autoLineup, autoBench, benchSwap, benchRemove, lineupIssues, BENCH_SIZE, PRESET_MAX, savePreset, loadPreset, presetStatus, renamePreset, deletePreset, presetsOf, fillEmpty, clubRating, validateLineup, effective, posPenalty, available, nextComp, compOf, susIn, setSus, susList, bansOf, banHits, addBan, serveBan, banSweep, banPending, COMP_JP, CARD, RED, teamRating,
   createMatch, stepMatch, simulateFull, finishMatch, doSub, benchOptions, onPitch, setMentality, bestSubFor, setCounter, mentLabel,
   advance, nextDay, simAIToday, myFixtureToday, nextMyFixture, todaysFixtures, inWindow, windowEnd, nextWindowStart,

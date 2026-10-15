@@ -130,6 +130,12 @@ async def main():
                         if g['sw'] > g['iw'] + 1: q.append('horizontal scroll')
                         if q: print(f"   {name} {tab}: {' / '.join(q)}"); bad.append(f'{tag} {tab}')
                         await subnav(tab)
+                        # the secretary's magnet (2026-10-15): just above the dock, or above the switch bar
+                        sg = await page.evaluate('''() => { const m = document.querySelector('#sec-float .sec-mag'); if (!m) return null; const r = m.getBoundingClientRect();
+                          const s = document.querySelector('#view > .subnav'), d = document.querySelector('.dock').getBoundingClientRect(); const lim = s ? s.getBoundingClientRect().top : d.top;
+                          const bb = document.querySelector('#sec-float .sec-bub'); return [lim - r.bottom, r.top, bb ? bb.getBoundingClientRect().top : r.top]; }''')
+                        if sg is None and tab == 'home': print(f"   {name} {tab}: no secretary magnet"); bad.append(f'{tag} {tab} secretary')
+                        elif sg and not (0 <= sg[0] <= 24 and min(sg[1], sg[2]) > top): print(f"   {name} {tab}: secretary magnet {sg}"); bad.append(f'{tag} {tab} secretary')
                     # a short screen: club → 移籍市場 → ショートリスト (empty); its 経営/移籍市場/記録 bar used to float halfway up
                     await page.locator('[data-act="clView"][data-k="market"]').dispatch_event('click'); await page.wait_for_timeout(150)
                     await subnav('market')
@@ -143,6 +149,13 @@ async def main():
                     await page.locator('[data-act="player"]').first.dispatch_event('click'); await page.wait_for_timeout(350)
                     await bottom_of('#sheet', 'sheet')
                     await page.locator('#sheet [data-act="closeSheet"]').last.dispatch_event('click'); await page.wait_for_timeout(300)
+                    # the secretary's sheet
+                    await page.locator('[data-tab="home"]').dispatch_event('click'); await page.wait_for_timeout(150)
+                    if await page.locator('#sec-float .sec-mag').count():
+                        await page.locator('#sec-float .sec-mag').dispatch_event('click'); await page.wait_for_timeout(350)
+                        await bottom_of('#sheet', 'secretary sheet')
+                        if w == 393: await page.screenshot(path=str(OUT/f"ip-sec-{mode}-{w}x{h}.png"))
+                        await page.locator('#sheet [data-act="closeSheet"]').last.dispatch_event('click'); await page.wait_for_timeout(300)
                     await page.locator('[data-tab="home"]').dispatch_event('click'); await page.wait_for_timeout(150)
                     await again('home again')
                     await page.screenshot(path=str(OUT/f"ip-home-{mode}-{w}x{h}.png"))

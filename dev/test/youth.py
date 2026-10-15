@@ -82,16 +82,25 @@ async def main():
             if await page.locator('#sheet [data-act="quick"]').count():
                 await page.click('#sheet [data-act="quick"]'); await page.wait_for_timeout(200); await page.click('[data-act="mClose"]'); await page.wait_for_timeout(150)
             elif await page.locator('#sheet.on [data-act="closeSheet"]').count(): await page.click('#sheet [data-act="closeSheet"]'); await page.wait_for_timeout(250)
+        # the report is in the secretary's summary of the month (2026-10-15〜; before, a card on the home screen)
         await page.click('[data-tab="home"]'); await page.wait_for_timeout(250)
-        card = page.locator('section.card', has_text='若手の成長レポート')
-        txt = await card.inner_text() if await card.count() else ''
-        print('date', st['date'], '| youth report:', txt.split('\n')[0] if txt else '(none)', '| rows', await card.locator('.prow').count() if txt else 0, '| loanee listed', 'レンタル中' in txt)
-        bad += [] if txt and 'レンタル中' in txt else ['youth report']
+        bub = await page.locator('#sec-float .sec-bub').inner_text() if await page.locator('#sec-float .sec-bub').count() else ''
+        print('secretary:', bub.split('\n')[0] if bub else '(none)')
+        txt = ''
+        if await page.locator('#sec-float .sec-mag').count():
+            await page.click('#sec-float .sec-mag'); await page.wait_for_timeout(350)
+            if await page.locator('#sheet [data-act="youthOpen"]').count():
+                await page.click('#sheet [data-act="youthOpen"]'); await page.wait_for_timeout(350)
+                txt = await page.locator('#sheet').inner_text()
+        print('date', st['date'], '| youth report:', txt.split('\n')[0] if txt else '(none)', '| rows', await page.locator('#sheet .prow').count() if txt else 0, '| loanee listed', 'レンタル中' in txt)
+        bad += [] if txt and '若手の成長レポート' in txt and 'レンタル中' in txt else ['youth report']
         if txt:
-            await card.scroll_into_view_if_needed(); await page.wait_for_timeout(200); await page.screenshot(path=str(OUT/'y-report.png'))
-            await card.locator('[data-act="youthDone"]').click(); await page.wait_for_timeout(250)
-            st = await page.evaluate(LOAD); gone = not await page.locator('section.card', has_text='若手の成長レポート').count()
-            print('closed:', gone, [x.get('done') for x in st['inbox'] if x['type'] == 'youth']); bad += [] if gone else ['close report']
+            await page.screenshot(path=str(OUT/'y-report.png'))
+            await page.click('#sheet [data-act="secOpen"]'); await page.wait_for_timeout(300)
+            await page.click('#sheet [data-act="closeSheet"]'); await page.wait_for_timeout(300)
+            b2 = await page.locator('#sec-float .sec-bub').inner_text() if await page.locator('#sec-float .sec-bub').count() else ''
+            gone = '月になりました' not in b2
+            print('read: the summary leaves the bubble', gone); bad += [] if gone else ['close report']
         # --- a young player at home now has a chart (two points)
         await squad()
         await open_player('youngest')

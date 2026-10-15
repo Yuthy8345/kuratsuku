@@ -1,6 +1,8 @@
 """通しプレイ（2026-10-15）: 画面から N シーズン遊び、ときどき全タブ・サブ画面・選手シート・他チーム情報を開いて、ページのエラーと
-止まる画面がないかを見る。試合はクイック、オファーは断る、先発の警告はベストメンバー、ポップアップは閉じる。
-xi＝先発を直した回数（試合に進めなかった回数）。新しいポップアップを足したら resolve() に1行足す。
+止まる画面がないかを見る。試合はクイック、オファーは断る、先発の警告は秘書の「おすすめどおりに入れ替える」（2026-10-15〜。
+それで直らなければ戦術画面でベストメンバー）、ポップアップは閉じる。
+xi＝先発を直した回数（試合に進めなかった回数）、taps＝そのために押した回数（秘書の1タップで直れば1回）、xi_left＝1タップで
+直らなかった回数。新しいポップアップを足したら resolve() に1行足す。
 usage: python3 dev/test/e2e.py [club] [seasons] [outdir]   （1シーズン約70秒）"""
 import asyncio, pathlib, sys, time, json
 from playwright.async_api import async_playwright
@@ -28,7 +30,7 @@ async def main():
         async def has(sel): return await page.locator(sel).count() > 0
         async def click(sel, w=120):
             await page.locator(sel).first.click(); await page.wait_for_timeout(w)
-        stats = {'matches': 0, 'offers': 0, 'ret': 0, 'cele': 0, 'reborn': 0, 'jobs': 0, 'closed': 0, 'xi': 0, 'tours': 0, 'stuck': 0, 'nt': 0}
+        stats = {'matches': 0, 'offers': 0, 'ret': 0, 'cele': 0, 'reborn': 0, 'jobs': 0, 'closed': 0, 'xi': 0, 'taps': 0, 'xi_left': 0, 'tours': 0, 'stuck': 0, 'nt': 0, 'sec': 0}
         unknown = {}
         seasons = 0; t0 = time.time(); it = 0
         async def resolve():
@@ -38,10 +40,21 @@ async def main():
                 if await has('#sheet [data-act="quick"]'):
                     await click('#sheet [data-act="quick"]', 150); stats['matches'] += 1
                     if await has('[data-act="mClose"]'): await click('[data-act="mClose"]', 150)
+                elif await has('#sheet .card.alert') and await has('#sheet [data-act="secAll"]'):
+                    if stats['xi'] == 0: await page.screenshot(path=str(OUT / 'prematch-blocked.png'))
+                    await click('#sheet [data-act="secAll"]', 200); stats['xi'] += 1; stats['taps'] += 1
+                    if await has('#sheet .card.alert') and await has('#sheet [data-act="toTactics"]'):
+                        stats['xi_left'] += 1; stats['taps'] += 2
+                        await click('#sheet [data-act="toTactics"]', 200); await click('[data-act="autoXI"]', 150)
                 elif await has('#sheet .card.alert') and await has('#sheet [data-act="toTactics"]'):
-                    await click('#sheet [data-act="toTactics"]', 200); stats['xi'] += 1
-                    if await has('[data-act="fillEmpty"]'): await click('[data-act="fillEmpty"]', 150)
+                    await click('#sheet [data-act="toTactics"]', 200); stats['xi'] += 1; stats['xi_left'] += 1; stats['taps'] += 2
+                    if await has('[data-act="fillEmpty"]'): await click('[data-act="fillEmpty"]', 150); stats['taps'] += 1
                     await click('[data-act="autoXI"]', 150)
+                elif await has('#sheet .sec-head'):
+                    stats['sec'] += 1
+                    if await has('#sheet [data-act="secAll"]'): await click('#sheet [data-act="secAll"]', 200)
+                    if await has('#sheet [data-act="secPre"]'): await click('#sheet [data-act="secPre"]', 200)
+                    else: await click('#sheet [data-act="closeSheet"]', 150)
                 elif await has('#sheet [data-act="retNext"]'): await click('#sheet [data-act="retNext"]', 150); stats['ret'] += 1
                 elif await has('#sheet [data-act="celeDone"]'):
                     if stats['cele'] == 0: await page.screenshot(path=str(OUT / 'cele.png'))
@@ -92,11 +105,17 @@ async def main():
                 continue
             if not await has('#sheet.on'): await click('[data-act="go"]', 140)
             await resolve()
+            # her bubble: a player back → 戻す; otherwise open her sheet now and then (reads the month's summary)
+            if not await has('#sheet.on') and await has('#sec-float [data-act="secBack"]'):
+                await click('#sec-float [data-act="secBack"]', 150); stats['sec'] += 1
+            elif not await has('#sheet.on') and it % 9 == 0 and await has('#sec-float .sec-mag'):
+                await click('#sec-float .sec-mag', 250); stats['sec'] += 1; await resolve()
             # offers on home
             while await has('[data-act="offerNo"]') and not await has('#sheet.on'):
                 await click('[data-act="offerNo"]', 120); stats['offers'] += 1
         await tour()
         print('stats', json.dumps(stats, ensure_ascii=False), 'iterations', it, f'{time.time() - t0:.0f}s')
+        print(f"lineup fixes: {stats['xi']}, taps {stats['taps']} ({stats['taps'] / max(1, stats['xi']):.2f} per fix), not fixed by her one tap {stats['xi_left']}")
         print('sheets closed by closeSheet:', json.dumps(unknown, ensure_ascii=False)[:1500])
         # reload and continue works
         await page.reload(); await page.wait_for_timeout(500)
