@@ -591,7 +591,9 @@ function migrate(S, DATA) {
     secOf(S); if (S.clubs[S.my]) S.sec.f0 = S.clubs[S.my].funds;
     if (!S.fired) secPost(S, 'hello', { old: true });
   }
-  S.v = Math.max(S.v || 1, 13);
+  // v14 (2026-10-15): sponsor contracts. This season stays on the old fixed sponsors; the offers come with the next one.
+  if ((S.v || 1) < 14 && !S.spon) S.spon = { s: S.season, nid: 1, old: true, hist: [] };
+  S.v = Math.max(S.v || 1, 14);
   return S;
 }
 // old saves: the season's unplayed league rounds go to the real 2026/27 dates (a round whose date has passed goes to the
@@ -783,8 +785,8 @@ function newGame(DATA, clubId, managerName, todayISO) {
     initAttrs(S.players[p.id]);
   }
   addAbroad(S, DATA);
-  S.v = 13; S.presV = 4; S.presets = []; S.nt = { done: {}, res: [], log: [] };
-  secOf(S).f0 = S.clubs[clubId].funds; secPost(S, 'hello', {});
+  S.v = 14; S.presV = 4; S.presets = []; S.nt = { done: {}, res: [], log: [] };
+  secOf(S).f0 = S.clubs[clubId].funds;
   for (const p of squad(S, clubId)) track(S, p);
   for (const id of S.order) autoLineup(S, id);
   S.fixtures = genFixtures(S.order, DATA.round1, sy);
@@ -793,6 +795,8 @@ function newGame(DATA, clubId, managerName, todayISO) {
   ensureFreeAgents(S);
   setSponsors(S);
   setExpectations(S);
+  sponOffer(S);
+  secPost(S, 'hello', {});   // her hello first, the sponsor offers under it
   news(S, `${S.clubs[clubId].name}の監督に就任。${seasonLabel(sy)}シーズンが始まる。`, 'big');
   news(S, `クラブの目標は「${S.clubs[clubId].target.jp}」。`, 'board');
   return S;
@@ -1422,13 +1426,282 @@ function secMonth(S, youth) {
   const played = i >= 0 && t[i].p > 0;
   const ups = (youth || []).filter(r => Math.round(r.b) > Math.round(r.a));
   s.notes = s.notes.filter(n => !(n.k === 'hello' && n.seen));   // her hello, once read, gives way to the first summary
+  s.notes = s.notes.filter(n => !(n.seen && (n.k === 'sponHit' || n.k === 'sponMiss' || (n.k === 'spon' && !sponPending(S)))));  // sponsor news already read
+  const ds = sponDeals(S);
   secPost(S, 'month', {
     m: D.m(S.date), rank: played ? i + 1 : null, gap: played ? t[0].pts - t[i].pts : null, lead: played ? t[0].id : null,
     big: bigMatch(S, 35), funds: c.funds, delta: s.f0 == null ? null : c.funds - s.f0,
     youth: ups.length, top: ups.slice(0, 2).map(r => ({ pid: r.pid, a: Math.round(r.a), b: Math.round(r.b) })),
+    sp: ds.length ? { n: ds.length, done: ds.filter(d => d.st === 'done').length, fail: ds.filter(d => d.st === 'fail').length, got: ds.reduce((a, d) => a + d.got, 0) } : null,
   });
   s.f0 = c.funds;
 }
+
+/* ---------- スポンサー契約 (2026-10-15) ----------
+   My club's sponsors come in two parts: the fixed sponsors (SPON.base of c.spon, every month) and up to three contracts
+   picked before the season from five offers. A contract = a made-up local company (place + coined word + trade, never a
+   real name), one condition for the season, a guarantee (paid with the monthly sponsors; what's left is settled when the
+   season ends) and a bonus paid the day the condition is met. The contract's place on the kit scales both (SPON.slot:
+   胸 1.2, 背中 1, 袖 0.8). The conditions are set from the club's pre-season strength (sponEst, fitted on 800 simulated
+   club-seasons) so every card has an estimated chance p; the money follows p so each card is worth the same on average:
+   value = SPON.card × the season's sponsors, guarantee = value × gs(p), bonus = (value − guarantee) / p. Three cards are
+   then 0.6 + 3 × 0.14 = 102% of the old sponsors on paper (about 80% if all three fail, 125% if all are met); the
+   conditions are met a little more often than estimated, so econ.js (her pick, the team picked automatically) comes to
+   about 100〜110%.
+   AI clubs keep their c.spon as before, so the league's money doesn't change.
+   S.spon = { s (season), nid, offer: [cards] while choosing, deals: [contracts], end (my club's last fixture), months
+   (monthly payments left at signing), u23 (league starts by players 23 and under), yo: [academy players who started],
+   asked (the manager has seen the offer), old (this season without contracts: an old save, or a job taken mid-season) }.
+   card = { id, co, mk, col, k, n, lv, p, g, b }; contract = card + { slot, paid, st: 'run'|'done'|'fail', got, dd }. */
+const SPON = {
+  base: 0.6, card: 0.14, n: 5, max: 3,
+  slot: [{ k: 'chest', jp: '胸', f: 1.2 }, { k: 'back', jp: '背中', f: 1 }, { k: 'sleeve', jp: '袖', f: 0.8 }],
+  p: [0, 0.75, 0.5, 0.28],                 // the chance aimed at for ●, ●●, ●●●
+  lv: p => p >= 0.62 ? 1 : p >= 0.4 ? 2 : 3,
+  gs: p => 0.25 + 0.4 * p,                 // the guarantee's share of the value
+  pMin: 0.12, pMax: 0.92,
+  // the manager's club over a season against its pre-season strength pw (power − league average): mean = a + b·pw + h·max(0,
+  // pw − 3) (a strong club pulls away), sd below / above pw 3. Fitted on 100 simulated seasons of my club (several clubs,
+  // the team picked as econ.js does; it does better than an AI club of the same strength, which rotates more). 2026-10-15
+  fit: { pts: [55.1, 2.01, 3.17, 11, 11.9], gf: [43.7, 0.63, 9.78, 11.1, 21], cs: [13.4, 0.59, -0.58, 4.4, 6.1], hl: [5.9, -0.288, -0.164, 2.4, 1.9], rank: [10.05, -1.035, 0.036, 5.4, 3.1] },
+  u23: [25, 27, 27],                       // league starts by players 23 and under ≈ 25 + 27 × (how many start now), sd 27
+  att: 0.045,                              // a season's average crowd vs the pre-season estimate: sd 4.5%
+  cup: [-0.871, 0.101, 0.214],             // best four in either cup: logistic, same hinge (0.2 weak, 0.32 average, 0.55 strong, 0.8 dominant)
+  yo: [0.8, 0.45, 0.25],                   // academy players to start: as many as start now (●), one more (●●), two more (●●●)
+  // kinds; one of 'pts'/'rank' per offer (they ask for nearly the same thing)
+  kinds: { pts: 1, rank: 1, gf: 1, cs: 0.8, hl: 1, u23: 1, yo: 1, cup: 0.9, att: 1 },
+  words: ['ハルモ', 'ルミエ', 'ソラノ', 'カナエ', 'ツバクロ', 'ミナモ', 'コハク', 'ヒバナ', 'ノゾミア', 'キラリエ', 'モクレ', 'コノハ', 'ホシノワ', 'イロハナ',
+    'タマユラ', 'ソヨギ', 'フクラ', 'セセラ', 'カザミ', 'ナギト', 'ユラリ', 'トワノ', 'アカリエ', 'シズクネ', 'ハナビシ', 'マドカヤ', 'ヒカリノ', 'ツムギノ'],
+  trades: ['製菓', '運輸', '電機', '住建', '食品', '製薬', '酒造', '観光', '印刷', '工業', '物産', '精機', '化成', '乳業', '交通', '商事', '製麺', '珈琲', '醤油', '建設', '産業', '石油', '家具', '製作所'],
+  cols: ['#C8473E', '#2F6FD6', '#2E9C64', '#7E57C2', '#D98A1C', '#1A8C8C', '#B5487D', '#5C6BC0', '#8D6E3F', '#E0603A'],
+};
+const ncdf = z => { const t = 1 / (1 + 0.2316419 * Math.abs(z)); const d = 0.3989423 * Math.exp(-z * z / 2);
+  const q = d * t * (0.3193815 + t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274)))); return z > 0 ? 1 - q : q; };
+const m100 = v => Math.max(100, Math.round(v / 100) * 100);
+function sponOf(S) { return S.spon || null; }
+// this season's contracts are in force (an old save or a job taken mid-season run on the old fixed sponsors until it ends)
+function sponOn(S) { const s = S.spon; return !!s && s.s === S.season && !s.old; }
+function sponDeals(S) { return sponOn(S) ? S.spon.deals || [] : []; }
+// month starts from today to the club's last fixture (= payments left; a payday is the 1st)
+function payMonths(from, to) { if (!to || to < from) return 1; const n = (D.y(to) - D.y(from)) * 12 + D.m(to) - D.m(from) + (D.d(from) === 1 ? 1 : 0); return Math.max(1, n); }
+function myLastFixture(S) { let e = null; for (const f of S.fixtures) if (f.h === S.my || f.a === S.my) if (!e || f.date > e) e = f.date; return e; }
+function sponPlace(S, c) { const city = String(c.short || '').replace(/[A-Za-z・]/g, ''); return city && R() < 0.65 ? city : (c.area || city || c.short); }
+function youthOf(S, cid) { return squad(S, cid).filter(p => p.yo === cid && !p.loan); }
+// what the club can expect this season (mean, sd) for each kind, from its strength now
+function sponEst(S) {
+  const avg = S.order.reduce((a, c) => a + power(S, c), 0) / Math.max(1, S.order.length);
+  const pw = power(S, S.my) - avg; const c = S.clubs[S.my];
+  const o = {};
+  const hi = Math.max(0, pw - 3);
+  for (const [k, [a, b, h, s1, s2]] of Object.entries(SPON.fit)) o[k] = { mu: a + b * pw + h * hi, sd: pw < 3 ? s1 : s2 };
+  const xi = (c.tac.xi || []).map(id => S.players[id]).filter(Boolean);
+  const u = SPON.u23[0] + SPON.u23[1] * xi.filter(p => age(p, S.date) <= 23).length;
+  o.u23 = { mu: u, sd: clamp(u * 0.6, 12, SPON.u23[2]) };   // few young starters now: a narrower, lower spread
+  let at = 0; const opp = S.order.filter(z => z !== S.my);
+  for (const z of opp) at += attendance(S, S.my, z); at /= Math.max(1, opp.length);
+  o.att = { mu: at, sd: at * SPON.att, full: at >= c.cap * 0.88 };   // near a full house the crowd is capped: no card
+  o.cup = { p: 1 / (1 + Math.exp(-(SPON.cup[0] + SPON.cup[1] * pw + SPON.cup[2] * hi))) };
+  const yo = youthOf(S, S.my); o.yo = { m: yo.length, k: yo.filter(p => (c.tac.xi || []).includes(p.id)).length };
+  o.pw = pw;
+  return o;
+}
+// P(the condition is met) for kind k with target n
+function sponP(k, n, e) {
+  const x = e[k];
+  if (k === 'cup') return x.p;
+  if (k === 'yo') return null;
+  if (k === 'hl' || k === 'rank') return ncdf((n + 0.5 - x.mu) / x.sd);           // at most n
+  if (k === 'att') return 1 - ncdf((n - x.mu) / x.sd);
+  return 1 - ncdf((n - 0.5 - x.mu) / x.sd);                                       // at least n
+}
+// the target for kind k nearest to the chance aimed at
+function sponTarget(k, lv, e) {
+  const want = SPON.p[lv];
+  if (k === 'yo') {   // a choice more than luck: starting as many as start now is likely, each one more is up to the manager
+    const { m, k: now } = e.yo; const n = clamp(now + lv - 1, 1, m), more = n - now;
+    return { n, p: more <= 0 ? SPON.yo[0] : more === 1 ? SPON.yo[1] : SPON.yo[2] };
+  }
+  if (k === 'cup') return { n: 4, p: e.cup.p };
+  const span = { pts: [10, 110, 1], gf: [10, 120, 1], cs: [1, 30, 1], hl: [0, 15, 1], rank: [1, 18, 1], u23: [10, 300, 5], att: [1000, 80000, 100] }[k];
+  let best = null;
+  for (let n = span[0]; n <= span[1]; n += span[2]) {
+    const p = sponP(k, n, e);
+    if (!best || Math.abs(p - want) < Math.abs(best.p - want)) best = { n, p };
+  }
+  return best;
+}
+function sponCo(S, used) {
+  const c = S.clubs[S.my];
+  for (let i = 0; i < 40; i++) {
+    const w = pick(SPON.words); if (used.has(w)) continue;
+    used.add(w);
+    const br = w + pick(SPON.trades);
+    return { co: sponPlace(S, c) + br, br, mk: w[0] };
+  }
+  const br = pick(SPON.trades); return { co: c.area + br, br, mk: c.area[0] };
+}
+// five offers for my club's season; opts.stop: the secretary brings them (stops the days)
+function sponOffer(S, opts) {
+  opts = opts || {};
+  const c = S.clubs[S.my]; if (!c || S.fired || !S.order.includes(S.my)) return null;
+  const old = S.spon || {};
+  const end = myLastFixture(S);
+  const months = Math.min(12, payMonths(D.add(S.date, 1), end));
+  S.spon = { s: S.season, nid: old.nid || 1, offer: [], deals: [], end, months, u23: 0, yo: [], asked: false, hist: old.hist || [] };
+  const e = sponEst(S);
+  const value = c.spon * months * SPON.card;
+  const pool = Object.keys(SPON.kinds).filter(k => !(k === 'yo' && e.yo.m < 2) && !(k === 'att' && e.att.full));
+  const drop = R() < 0.5 ? 'pts' : 'rank';   // 勝点 or 順位, not both
+  let rest = pool.filter(k => k !== drop); const kinds = [];
+  while (kinds.length < SPON.n && rest.length) { const k = wpick(rest, x => SPON.kinds[x]); kinds.push(k); rest = rest.filter(x => x !== k); }
+  const lvs = shuffle([1, 1, 2, 2, 3]);
+  const used = new Set((old.offer || []).concat(old.deals || []).map(x => x.co && SPON.words.find(w => x.co.includes(w))).filter(Boolean));
+  kinds.forEach((k, i) => {
+    const t = sponTarget(k, lvs[i], e);
+    const p = clamp(t.p, SPON.pMin, SPON.pMax);
+    const g = m100(value * SPON.gs(p)), b = m100((value - g) / p);
+    S.spon.offer.push({ id: S.spon.nid++, ...sponCo(S, used), col: SPON.cols[(S.season * 3 + i) % SPON.cols.length], k, n: t.n, lv: SPON.lv(p), p: Math.round(p * 100) / 100, g, b });
+  });
+  S.spon.offer.sort((a, b) => a.lv - b.lv || a.id - b.id);
+  secPost(S, 'spon', { s: S.season }, { stop: !!opts.stop });
+  return S.spon.offer;
+}
+function sponPending(S) { return sponOn(S) && !!S.spon.offer && S.spon.offer.length > 0; }
+// the secretary's pick: the three likeliest, the likeliest on the chest
+function sponRec(S) {
+  if (!sponPending(S)) return [];
+  return S.spon.offer.slice().sort((a, b) => b.p - a.p || a.id - b.id).slice(0, SPON.max).map(x => x.id);
+}
+// sign the offers in ids (slot order: 胸, 背中, 袖; null leaves a slot empty)
+function sponPick(S, ids, opts) {
+  opts = opts || {};
+  if (!sponPending(S)) return false;
+  const sp = S.spon; const list = (ids || []).slice(0, SPON.max);
+  const seen = new Set();
+  for (const id of list) { if (id == null) continue; if (seen.has(id) || !sp.offer.some(x => x.id === id)) return false; seen.add(id); }
+  sp.deals = [];
+  list.forEach((id, slot) => { if (id == null) return; const x = sp.offer.find(y => y.id === id); sp.deals.push({ ...x, slot, paid: 0, st: 'run', got: 0 }); });
+  sp.offer = null; sponLook(S);
+  const s = secOf(S); s.notes = s.notes.filter(n => n.k !== 'spon');
+  if (opts.auto) secPost(S, 'spon', { s: S.season, auto: true });
+  news(S, sp.deals.length ? `スポンサー${sp.deals.length}社と契約${opts.auto ? '（秘書のおすすめ）' : ''}。${sp.deals.map(d => `${SPON.slot[d.slot].jp}：${d.co}`).join('・')}` : '今季はスポンサー契約を結ばなかった。', 'money');
+  sponCheck(S);
+  return true;
+}
+function sponAuto(S) { return sponPending(S) ? sponPick(S, sponRec(S), { auto: true }) : false; }
+// the manager has seen the offers: her stop for them (the only note that stops the days so far) is no longer needed
+function sponLook(S) { if (S.spon) S.spon.asked = true; if (S.sec) S.sec.stop = false; }
+// how far each condition has got
+function sponStat(S) {
+  const me = S.my, t = table(S); const i = t.findIndex(r => r.id === me); const r = i >= 0 ? t[i] : null;
+  let hl = 0, cs = 0, an = 0, at = 0, left = 0;
+  for (const f of S.fixtures) {
+    if (f.cup || (f.h !== me && f.a !== me)) continue;
+    if (!f.played) { left++; continue; }
+    const h = f.h === me, ga = h ? f.ag : f.hg, gf = h ? f.hg : f.ag;
+    if (ga === 0) cs++;
+    if (h) { if (gf < ga) hl++; if (f.att) { an++; at += f.att; } }
+  }
+  const sf = S.fixtures.some(f => f.cup && (f.h === me || f.a === me) && cupDepth(f) <= 1);
+  const alive = ['ec', 'lc'].some(k => { const x = cupResult(S, k, me); return x === '勝ち残り'; });
+  return { pts: r ? r.pts : 0, rank: r && r.p ? i + 1 : null, gf: r ? r.gf : 0, cs, hl, att: an ? Math.round(at / an) : null, an, left, sf, alive,
+    u23: (S.spon && S.spon.u23) || 0, yo: ((S.spon && S.spon.yo) || []).length, played: r ? r.p : 0 };
+}
+// one contract now: { now, goal, pct (0-100), st, need (what's left, for the note) }
+function sponNow(S, d, st) {
+  st = st || sponStat(S);
+  const end = !st.left;
+  let now = st[d.k], pct = 0, ok = false, bad = false;
+  switch (d.k) {
+    case 'pts': case 'gf': case 'cs': case 'u23': case 'yo':
+      ok = now >= d.n; pct = Math.min(100, now / d.n * 100);
+      bad = !ok && (end || (d.k === 'pts' && now + 3 * st.left < d.n) || (d.k === 'u23' && now + 11 * st.left < d.n)); break;
+    case 'hl': bad = now > d.n; ok = end && !bad; pct = Math.min(100, now / Math.max(1, d.n + 1) * 100); break;
+    case 'rank': ok = end && now != null && now <= d.n; bad = end && !ok; pct = now == null ? 0 : now <= d.n ? 100 : Math.max(0, 100 - (now - d.n) * 12); break;
+    case 'att': ok = end && now != null && now >= d.n; bad = end && !ok; pct = now == null ? 0 : Math.min(100, now / d.n * 100); break;
+    case 'cup': now = st.sf ? 1 : 0; ok = st.sf; bad = !ok && !st.alive; pct = ok ? 100 : bad ? 0 : 50; break;
+  }
+  return { now, goal: d.n, pct: Math.round(pct), st: d.st !== 'run' ? d.st : ok ? 'done' : bad ? 'fail' : 'run', end };
+}
+// update the contracts: a met condition pays its bonus now; final (the season is over) settles the rest
+function sponCheck(S, final) {
+  const deals = sponDeals(S).filter(d => d.st === 'run'); if (!deals.length) return 0;
+  const c = S.clubs[S.my]; const st = sponStat(S); let n = 0;
+  for (const d of deals) {
+    let v = sponNow(S, d, st).st;
+    if (final && v === 'run') v = 'fail';
+    if (v === 'done') {
+      const pay = Math.round(d.b * SPON.slot[d.slot].f);
+      d.st = 'done'; d.got = pay; d.dd = S.date; c.funds += pay; c.fin.spon += pay; n++;
+      news(S, `${d.co}との約束「${sponShort(d)}」を達成。ボーナス ${money(pay)}。`, 'money');
+      secPost(S, 'sponHit', { id: d.id, co: d.co, k: d.k, n: d.n, got: pay, slot: d.slot }, { replace: false });
+    } else if (v === 'fail') {
+      d.st = 'fail'; d.dd = S.date; n++;
+      news(S, `${d.co}との約束「${sponShort(d)}」には届かなかった。`, 'info');
+      if (!final) secPost(S, 'sponMiss', { id: d.id, co: d.co, k: d.k, n: d.n, slot: d.slot }, { replace: false });
+    }
+  }
+  return n;
+}
+// monthly: the fixed sponsors plus an equal share of each guarantee
+function sponMonthly(S, c) {
+  if (!sponOn(S)) return c.spon || 5000;
+  let sp = Math.round((c.spon || 5000) * SPON.base);
+  const m = payMonths(S.date, S.spon.end);
+  for (const d of S.spon.deals) {
+    const due = Math.round(d.g * SPON.slot[d.slot].f) - d.paid; if (due <= 0) continue;
+    const pay = Math.min(due, Math.round(due / m)); d.paid += pay; sp += pay;
+  }
+  return sp;
+}
+// what a month brings now (for the club screen): fixed + guarantees
+function sponMonth(S) {
+  const c = S.clubs[S.my]; if (!sponOn(S)) return { base: c.spon || 5000, guar: 0 };
+  const m = payMonths(D.add(S.date, 1), S.spon.end);
+  return { base: Math.round((c.spon || 5000) * SPON.base), guar: S.spon.deals.reduce((a, d) => a + Math.max(0, Math.round((Math.round(d.g * SPON.slot[d.slot].f) - d.paid) / m)), 0) };
+}
+// the season is over: what's left of the guarantees, the last conditions, and a summary for the season review
+function sponSettle(S) {
+  if (!sponOn(S)) return null;
+  const c = S.clubs[S.my];
+  for (const d of S.spon.deals) { const due = Math.round(d.g * SPON.slot[d.slot].f) - d.paid; if (due > 0) { d.paid += due; c.funds += due; c.fin.spon += due; } }
+  sponCheck(S, true);
+  if (sponPending(S)) S.spon.offer = null;
+  const sum = { s: S.season, deals: S.spon.deals.map(d => ({ co: d.co, br: d.br, mk: d.mk, col: d.col, k: d.k, n: d.n, slot: d.slot, st: d.st, paid: d.paid, got: d.got })) };
+  sum.guar = sum.deals.reduce((a, d) => a + d.paid, 0); sum.bonus = sum.deals.reduce((a, d) => a + d.got, 0);
+  S.spon.hist = [sum].concat(S.spon.hist || []).slice(0, 5);
+  return sum;
+}
+// my starters in a match: 23 and under (league), academy players (every competition)
+function sponCount(S, M, fx) {
+  if (!sponOn(S) || !M.userSide) return;
+  for (const [pid, pm] of Object.entries(M.pm)) {
+    if (pm.side !== M.userSide || pm.on !== 0) continue;
+    const p = S.players[pid]; if (!p) continue;
+    if (!fx.cup && age(p, S.date) <= 23) S.spon.u23 = (S.spon.u23 || 0) + 1;
+    if (p.yo === S.my && !(S.spon.yo || []).includes(p.id)) (S.spon.yo = S.spon.yo || []).push(p.id);
+  }
+}
+// a new job: the new club's contracts if its season hasn't started, otherwise the old fixed sponsors until the season ends
+function sponJob(S) {
+  const started = S.fixtures.some(f => f.played && (f.h === S.my || f.a === S.my));
+  const s = S.spon || {};
+  if (started || S.seasonEnd) S.spon = { s: S.season, nid: s.nid || 1, old: true, hist: s.hist || [] };
+  else { S.spon = { nid: s.nid || 1, hist: s.hist || [] }; sponOffer(S); }
+}
+const SPON_TXT = {
+  pts: { jp: n => `リーグ戦で勝点${n}以上`, sh: n => `勝点${n}以上` },
+  rank: { jp: n => `リーグ戦で${n}位以内`, sh: n => `${n}位以内` },
+  gf: { jp: n => `リーグ戦で${n}得点以上`, sh: n => `${n}得点以上` },
+  cs: { jp: n => `リーグ戦で無失点${n}試合以上`, sh: n => `無失点${n}試合以上` },
+  hl: { jp: n => `ホームのリーグ戦で負け${n}以下`, sh: n => `ホームの負け${n}以下` },
+  u23: { jp: n => `リーグ戦で23歳以下をのべ${n}回先発`, sh: n => `23歳以下 のべ${n}回先発` },
+  yo: { jp: n => `ユース出身の選手を${n}人先発させる`, sh: n => `ユース出身 ${n}人先発` },
+  cup: { jp: () => '天皇杯かLカップでベスト4', sh: () => 'カップ戦ベスト4' },
+  att: { jp: n => `ホームの観客 平均${n.toLocaleString('ja-JP')}人以上`, sh: n => `観客平均${n.toLocaleString('ja-JP')}人` },
+};
+function sponText(d) { return SPON_TXT[d.k].jp(d.n); }
+function sponShort(d) { return SPON_TXT[d.k].sh(d.n); }
 
 /* ---------- team strength ---------- */
 function teamRating(S, side) {
@@ -1473,6 +1746,7 @@ function sideFor(S, cid, comp) {
   return { cid, form: c.tac.form, ment: MENTALITY[c.tac.ment] ? c.tac.ment : 'bal', ctr: !!c.tac.ctr, press: PRESS[c.tac.press] ? c.tac.press : 'mid', ...tacX(c.tac), slots, bench: c.tac.bench.filter(id => S.players[id] && S.players[id].club === cid && available(S.players[id], comp)), subs: 0, subLog: [], cond, tactBonus, sent: [], pres: c.pres || 2, fan: c.fan || 2 };
 }
 function createMatch(S, fx) {
+  if ((fx.h === S.my || fx.a === S.my) && sponPending(S)) sponAuto(S);   // kick-off without a choice: her three
   const M = {
     fid: fx.id, min: 0, half: 1, done: false, h: sideFor(S, fx.h, compOf(fx)), a: sideFor(S, fx.a, compOf(fx)), hg: 0, ag: 0,
     ev: [], st: { h: { sh: 0, ot: 0, pos: 0, fo: 0 }, a: { sh: 0, ot: 0, pos: 0, fo: 0 } },
@@ -1832,9 +2106,11 @@ function finishMatch(S, M) {
     }
   }
   M.applied = true;
+  if (M.userSide) sponCount(S, M, fx);
   // a final is decided now (the winner is crowned at once, not the next morning); the league title the moment it is certain
   if (cup && cupFinal(fx)) progressCups(S);
   else if (!cup && fx.r >= 20) checkTitle(S);
+  if (M.userSide) sponCheck(S);
   return fx;
 }
 /* 優勝のお祝い (2026-10-13): S.cele is a queue of pop-ups for my titles. The league one is queued the moment the title is
@@ -1956,6 +2232,7 @@ function nextDay(S) {
 function matchdayPrep(S) {
   progressCups(S);
   banSweep(S);
+  if (sponDeals(S).some(d => d.k === 'cup' && d.st === 'run')) sponCheck(S);   // the semi-final draw (or a cup over)
   const today = todaysFixtures(S);
   for (const f of today) hypeMatch(S, f);
   for (const f of today) for (const [cid, opp] of [[f.h, f.a], [f.a, f.h]]) {
@@ -1970,8 +2247,9 @@ function monthly(S) {
   for (const cid of S.order) {
     const c = S.clubs[cid];
     const w = Math.round(squad(S, cid).reduce((a, p) => a + wage(p), 0) / 12);
-    const sp = c.spon || 5000;
+    const sp = cid === S.my ? sponMonthly(S, c) : c.spon || 5000;   // my club: the fixed sponsors + the contracts' guarantees
     c.funds += sp - w; c.fin.wages += w; c.fin.spon += sp;
+    if (cid === S.my) c._sp = sp;
   }
   // development report for my club (change since last month)
   const mine = squad(S, S.my).filter(p => p.at);
@@ -1995,7 +2273,7 @@ function monthly(S) {
   }
   secMonth(S, rows);
   const my = S.clubs[S.my];
-  news(S, `${D.m(S.date)}月の収支：スポンサー収入 ${money(my.spon || 0)}／人件費 ${money(Math.round(squad(S, S.my).reduce((a, p) => a + wage(p), 0) / 12))}`, 'money');
+  news(S, `${D.m(S.date)}月の収支：スポンサー収入 ${money(my._sp != null ? my._sp : my.spon || 0)}／人件費 ${money(Math.round(squad(S, S.my).reduce((a, p) => a + wage(p), 0) / 12))}`, 'money');
   if (my.funds < 0) { S.board = clamp(S.board - 6, 0, 100); news(S, '資金がマイナスになっている。フロントは財政を懸念している。', 'warn'); }
 }
 
@@ -2398,7 +2676,7 @@ function makeReborn(S, L) {
   const parts = L.name.split(' ');
   p.name = L.name; p.short = L.nat ? parts[parts.length - 1] : parts[0]; p.nat = L.nat || 'JPN';
   initAttrs(p);
-  p.reborn = L.id;
+  p.reborn = L.id; p.yo = S.my;   // he comes up through the academy
   S.reborn.used.push(L.id);
   if (L.num && !squad(S, S.my).some(q => q.id !== p.id && q.num === L.num)) p.num = L.num;
   S.reborn.show = p.id;  // the pop-up is still to be seen
@@ -2594,7 +2872,8 @@ function takeJob(S, cid) {
   autoLineup(S, cid);
   if (S.clubs[from]) autoLineup(S, from);
   setExpectations(S);
-  if (S.sec) { S.sec.back = []; S.sec.f0 = S.clubs[cid].funds; }
+  if (S.sec) { S.sec.back = []; S.sec.f0 = S.clubs[cid].funds; S.sec.notes = S.sec.notes.filter(n => !/^spon/.test(n.k)); }
+  sponJob(S);
   news(S, `${S.clubs[cid].name}の新監督に就任。目標は「${S.clubs[cid].target.jp}」。`, 'big');
 }
 
@@ -3095,8 +3374,9 @@ function endSeason(S) {
   if (verdict === 'champion' || verdict === 'met') S.board = clamp(S.board + B.met, 0, 100);
   else if (verdict === 'near') S.board = clamp(S.board + B.near, 0, 100);
   else if (verdict === 'missed') S.board = clamp(S.board - (B.perPos ? Math.min(B.missMax, B.perPos * (myPos - target.pos)) : B.missMax), 0, 100);
+  const spon = sponSettle(S);
   const cups = S.cups ? Object.fromEntries(['ec', 'lc'].filter(k => S.cups[k]).map(k => [k, { champ: S.cups[k].champ, runner: S.cups[k].runner, my: cupResult(S, k, S.my) }])) : null;
-  S.seasonEnd = { label: seasonLabel(S.season), champ, myPos, rel, scorers, verdict, prize: PRIZE[myPos - 1] || 0, pts: t[myPos - 1].pts, target: target.jp, cups };
+  S.seasonEnd = { label: seasonLabel(S.season), champ, myPos, rel, scorers, verdict, prize: PRIZE[myPos - 1] || 0, pts: t[myPos - 1].pts, target: target.jp, cups, spon };
   S.history.unshift({ season: seasonLabel(S.season), club: S.my, pos: myPos, pts: t[myPos - 1].pts, champ, verdict, ec: cups && cups.ec ? cups.ec.my : null, lc: cups && cups.lc ? cups.lc.my : null });
   decideRetirements(S);
   news(S, `${seasonLabel(S.season)}シーズン終了。優勝は${S.clubs[champ].name}。${S.clubs[S.my].short}は${myPos}位。`, 'big');
@@ -3193,6 +3473,7 @@ function rollover(S) {
     for (let i = 0; i < k; i++) {
       const pt = intakePot(S, cid, lv);
       const pr = genPlayer(S, cid, { age: 18, foreign: false, ovr: Math.round(base + INTAKE.ovr + lv * INTAKE.lvO) + ri(-2, 2), pot: pt.pot, cap: pt.cap });
+      pr.yo = cid;   // ユース出身 (2026-10-15: earlier academy players aren't marked)
       if (cid === S.my) { news(S, `ユースから${pr.name}（${pr.pos}）がトップ昇格。`, 'grow'); track(S, pr); }
     }
     // ユースの逸材: now and then a 16-17-year-old with a huge ceiling (a better academy finds them more often)
@@ -3200,7 +3481,7 @@ function rollover(S) {
     if (R() < gemP) {
       const pt = gemPot(lv);
       const pr = genPlayer(S, cid, { age: 16, foreign: false, pos: wpick(['DF', 'MF', 'FW'], x => ({ DF: 2.6, MF: 3.4, FW: 2.6 })[x]), ovr: base - 10 + Math.round(lv / 2) + ri(-2, 2), pot: pt.pot, cap: pt.cap, sty: pick(['tech', 'tech', 'speed', 'phys', '']) });
-      pr.gem = true;
+      pr.gem = true; pr.yo = cid;
       if (cid === S.my) { news(S, `ユースの逸材、${pr.name}（${age(pr, S.date)}歳・${pr.pos}）がトップ昇格。早くから注目されてきた才能だ。`, 'big'); track(S, pr); }
     }
   }
@@ -3230,7 +3511,7 @@ function rollover(S) {
   setExpectations(S);
   if (promoted.length) news(S, `J2から${promoted.map(c => S.clubs[c].short).join('・')}が昇格。`, 'info');
   news(S, `${seasonLabel(S.season)}シーズンへ。開幕は${jdate(S.fixtures[0].date)}。`, 'big');
-  if (!fireMe) { S.board = clamp(Math.round(55 + (S.board - 55) * B.keep), 0, 100); S.boardWarn = 0; }
+  if (!fireMe) { S.board = clamp(Math.round(55 + (S.board - 55) * B.keep), 0, 100); S.boardWarn = 0; sponOffer(S, { stop: true }); }
   if (fireMe) fire(S, myRelegated ? 'J2降格の責任' : '目標未達');
   else news(S, `新シーズンの目標は「${S.clubs[S.my].target.jp}」。`, 'board');
 }
@@ -3612,6 +3893,7 @@ const API = {
   D, jdate, FORMATIONS, ROLE, DPOS, DP_CAT, DP_JP, LEARN_MAX, PLAY_MAX, ppOf, apt, roleApt, posValues, learnRate, learnWeeks, MENTALITY, PRESS, TRAINING, FACILITY, ATTR, ATTR_SHOW, FOCUS, INTENS,
   calcOvr, roleScore, bestRoles, devPreview, migrate, weekly, power, presStars, presLabel,
   newGame, seasonForDate, seasonLabel, squad, strength, table, position, age, ovr, value, wage, money, attrs,
+  SPON, sponOf, sponOn, sponDeals, sponEst, sponP, sponTarget, sponOffer, sponPending, sponRec, sponPick, sponAuto, sponLook, sponStat, sponNow, sponCheck, sponMonthly, sponMonth, sponSettle, sponJob, sponText, sponShort, payMonths, attendance,
   SEC, secOf, secName, setSecName, secPost, secNotes, secSeen, secDone, secFix, secSwap, secSwapAll, secTook, secReturns, secRestore, secKeep, secMonth, bigMatch, matchStory,
   autoLineup, autoBench, benchSwap, benchRemove, lineupIssues, BENCH_SIZE, PRESET_MAX, savePreset, loadPreset, presetStatus, renamePreset, deletePreset, presetsOf, fillEmpty, clubRating, validateLineup, effective, posPenalty, available, nextComp, compOf, susIn, setSus, susList, bansOf, banHits, addBan, serveBan, banSweep, banPending, COMP_JP, CARD, RED, teamRating,
   createMatch, stepMatch, simulateFull, finishMatch, doSub, benchOptions, onPitch, setMentality, bestSubFor, setCounter, mentLabel,

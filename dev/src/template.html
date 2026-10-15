@@ -791,6 +791,62 @@ html.ios-app { min-height: calc(var(--apph) + 1px); }
 .rating.hi { background: color-mix(in srgb, var(--win) 22%, transparent); color: var(--win); }
 .rating.lo { background: color-mix(in srgb, var(--loss) 18%, transparent); color: var(--loss); }
 
+/* スポンサー契約 (2026-10-15, ユーザーの選んだ案A＋B): each offer is a contract on paper pinned to the board with a magnet; a
+   signed one gets a vermilion seal with its place on the kit (胸・背中・袖), and the kit in the club's pattern shows who is
+   where. The paper is cream on both boards. */
+.sp-logo { --lc: #888; flex: none; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-family: var(--f-display); font-size: 14px; color: #fff;
+  background: radial-gradient(circle at 34% 28%, rgba(255,255,255,.45) 0, rgba(255,255,255,0) 48%), var(--lc); box-shadow: inset 0 0 0 2.5px rgba(255,255,255,.85), 0 2px 0 rgba(0,0,0,.3); }
+.sp-logo.sm { width: 22px; height: 22px; font-size: 11px; box-shadow: inset 0 0 0 2px rgba(255,255,255,.85), 0 1px 0 rgba(0,0,0,.3); }
+.sp-lv { display: inline-flex; gap: 3px; flex: none; } .sp-lv i { width: 8px; height: 8px; border-radius: 50%; background: currentColor; opacity: .22; } .sp-lv i.on { opacity: 1; }
+.sp-cnt { font-family: var(--f-chalk); font-size: 14px; color: var(--accent); white-space: nowrap; }
+.sp-sum { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 2px 8px; font-size: 11px; color: var(--muted); }
+.sp-sum b { color: var(--ink); font-size: 13px; margin-left: 2px; }
+.sp-paper { position: relative; display: block; width: 100%; text-align: left; background-color: #F3ECD8; color: #2B2620; border-radius: 3px; padding: 13px 14px 11px; margin-top: 6px;
+  background-image: repeating-linear-gradient(180deg, transparent 0 25px, rgba(60,80,120,.10) 25px 26px); box-shadow: 0 1px 0 rgba(0,0,0,.2), 0 8px 14px rgba(0,0,0,.24); }
+.sp-paper::before { content: ''; position: absolute; left: 50%; top: -8px; width: 16px; height: 16px; margin-left: -8px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, rgba(255,255,255,.55) 0, rgba(255,255,255,0) 50%), var(--lc); box-shadow: 0 2px 0 rgba(0,0,0,.35); }
+.sp-paper.on { box-shadow: 0 0 0 2.5px #C42A22, 0 1px 0 rgba(0,0,0,.2), 0 8px 14px rgba(0,0,0,.24); }
+.sp-main { display: block; width: 100%; text-align: left; color: inherit; }
+.sp-paper .h { display: flex; align-items: center; gap: 9px; } .sp-paper .h b { font-size: 14px; flex: 1; min-width: 0; }
+.sp-paper .h .sp-lv { color: #8A2A22; }
+.sp-paper .cond { display: block; font-family: var(--f-display); font-weight: 400; font-size: 18px; line-height: 1.3; margin: 8px 0 6px; letter-spacing: .01em; padding-right: 62px; word-break: keep-all; overflow-wrap: anywhere; }
+.sp-paper .money { display: flex; flex-wrap: wrap; gap: 2px 14px; font-size: 12px; color: #5C5446; } .sp-paper .money b { color: #2B2620; font-size: 14px; margin-left: 3px; } .sp-paper .money b.bn { color: #A3271F; }
+.sp-paper .tap { position: absolute; right: 12px; bottom: 10px; font-size: 11px; color: #7A715F; }
+.sp-seal { position: absolute; right: 12px; top: 34px; width: 62px; height: 62px; border-radius: 50%; border: 3px solid #C42A22; color: #C42A22; display: grid; place-items: center; text-align: center;
+  font-family: var(--f-display); font-size: 22px; line-height: 1; transform: rotate(-14deg); opacity: .9; background: rgba(196,42,34,.05); pointer-events: none; }
+.sp-seal small { display: block; font-family: var(--f-body); font-size: 9px; font-weight: 700; margin-top: 2px; letter-spacing: .1em; }
+.sp-mv { display: flex; gap: 6px; margin-top: 8px; align-items: center; font-size: 11px; color: #6D6555; }
+.sp-mv button { display: inline-grid; place-items: center; min-width: 44px; height: 30px; padding: 0 8px; border-radius: 6px; font-family: var(--f-display); font-size: 12px; color: #6D6555; border: 1.5px solid rgba(43,38,32,.25); }
+.sp-mv button[aria-pressed="true"] { background: #C42A22; border-color: #C42A22; color: #fff; }
+.sp-kits { display: flex; justify-content: center; gap: 18px; padding: 4px 0 0; }
+.sp-kit { position: relative; width: 108px; flex: none; text-align: center; }
+.sp-kit .sp-body { display: block; position: relative; filter: drop-shadow(0 4px 0 rgba(0,0,0,.28)); }
+.sp-shirt { display: block; width: 100%; aspect-ratio: 140 / 128; background: var(--pat, var(--c1)); clip-path: polygon(31% 0, 17% 5%, 0 27%, 11% 45%, 23% 38%, 23% 100%, 77% 100%, 77% 38%, 89% 45%, 100% 27%, 83% 5%, 69% 0, 60% 7%, 50% 9%, 40% 7%); }
+.sp-slot { position: absolute; display: grid; place-items: center; overflow: hidden; white-space: nowrap; text-align: center; font-weight: 900; color: #18233A; background: #fff; border-radius: 3px; line-height: 1.1;
+  box-shadow: 0 1px 0 rgba(0,0,0,.25); padding: 0 2px; font-size: 9px; }
+.sp-slot.empty { background: rgba(0,0,0,.18); border: 1.5px dashed rgba(255,255,255,.9); color: #fff; font-weight: 700; box-shadow: none; }
+.sp-slot.chest { left: 26%; top: 41%; width: 48%; height: 15%; }
+.sp-slot.sleeve { left: 80%; top: 15%; width: 15%; height: 13%; font-family: var(--f-display); font-weight: 400; }
+.sp-slot.back { left: 23%; top: 24%; width: 54%; height: 16%; }
+.sp-kit .cap { display: block; margin-top: 4px; font-family: var(--f-chalk); font-size: 13px; color: var(--muted); }
+@media (max-height: 700px) { .sp-kit:not(.mini) { width: 88px; } .sp-kit:not(.mini) .sp-slot { font-size: 7.5px; } .sp-kits { gap: 14px; padding-top: 0; } }   /* iPhone SE: the first contract shows on opening */
+.sp-kit.mini { width: 78px; } .sp-kit.mini .sp-slot { font-size: 6.5px; border-radius: 2px; } .sp-kit.mini .sp-slot.sleeve { font-size: 7px; }
+.sp-home { display: grid; gap: 10px; }
+.sp-head { display: flex; align-items: center; gap: 10px; }
+.sp-row { position: relative; display: block; width: 100%; text-align: left; background: #F3ECD8; color: #2B2620; border-radius: 3px; padding: 9px 12px 10px; box-shadow: 0 1px 0 rgba(0,0,0,.2), 0 5px 10px rgba(0,0,0,.2); }
+.sp-row .h { display: flex; align-items: center; gap: 8px; font-size: 13px; } .sp-row .h b { flex: 1; min-width: 0; font-family: var(--f-display); font-weight: 400; font-size: 14px; }
+.sp-row .h .n { font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; }
+.sp-row.fail { opacity: .72; } .sp-row.fail .h b { text-decoration: line-through; text-decoration-color: rgba(43,38,32,.55); }
+.sp-tag { flex: none; display: inline-grid; place-items: center; min-width: 34px; height: 22px; padding: 0 5px; border-radius: 5px; font-family: var(--f-display); font-size: 11px; color: var(--kt, #fff); background: var(--k1, #1E2942); box-shadow: 0 1px 0 rgba(0,0,0,.3); }
+.sp-bar { position: relative; height: 7px; border-radius: 4px; background: rgba(43,38,32,.13); margin-top: 7px; overflow: hidden; }
+.sp-bar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; background: #3D6FB8; }
+.sp-bar.warn i { background: #C8473E; } .sp-bar.done i { background: #2E9C64; } .sp-bar.fail i { background: #8E877A; }
+.sp-row .sub { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; color: #6D6555; margin-top: 4px; } .sp-row .sub span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sp-row .sub .w { color: #B3352B; font-weight: 700; } .sp-row .sub span:last-child { white-space: nowrap; }
+.sp-mini-seal { position: absolute; right: 8px; top: 4px; width: 44px; height: 44px; border-radius: 50%; border: 2.5px solid #C42A22; color: #C42A22; display: grid; place-items: center; font-family: var(--f-display); font-size: 13px; transform: rotate(-12deg); background: rgba(243,236,216,.7); pointer-events: none; }
+.sp-res { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.sp-res li { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.sp-res li .t { flex: 1; min-width: 0; } .sp-res li .t small { display: block; font-size: 11px; color: var(--muted); }
+
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 </style>
 <div id="root"></div>

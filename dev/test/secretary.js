@@ -20,7 +20,7 @@ const fresh = () => { for (const p of E.squad(S, S.my)) { p.inj = 0; delete p.ba
 
 /* new game */
 const S = E.newGame(DATA, 'yokohamafm', 'テスト', '2026-10-14');
-ok(S.v === 13 && E.secName(S) === 'あき' && E.secNotes(S).length === 1 && E.secNotes(S)[0].k === 'hello', 'new game: v13, the secretary あき says hello');
+ok(S.v >= 13 && E.secName(S) === 'あき' && E.secNotes(S)[0].k === 'hello' && E.secNotes(S).every(n => n.k === 'hello' || n.k === 'spon'), 'new game: v13+, the secretary あき says hello (the sponsor offers under it, 2026-10-15)');
 ok(!E.secFix(S).items.length && !E.secReturns(S).length, 'nothing to fix at the start');
 const c = S.clubs[S.my]; const F = () => E.FORMATIONS[c.tac.form];
 const comp = E.nextComp(S, S.my);
@@ -149,7 +149,7 @@ ok(!S.sec.back.length && S.sec.f0 === S.clubs[other].funds, 'new job: memories g
 /* old saves */
 const O = clone(E.newGame(DATA, 'kashima', 'テスト', '2026-10-14')); delete O.sec; O.v = 12;
 const M = E.migrate(O, DATA);
-ok(M.v === 13 && E.secName(M) === 'あき' && M.sec.notes.length === 1 && M.sec.notes[0].data.old && M.sec.f0 === M.clubs[M.my].funds, 'v12 → v13: she introduces herself');
+ok(M.v >= 13 && E.secName(M) === 'あき' && M.sec.notes.length === 1 && M.sec.notes[0].data.old && M.sec.f0 === M.clubs[M.my].funds, 'v12 → v13: she introduces herself');
 E.migrate(M, DATA); ok(M.sec.notes.length === 1, 'migrating twice: one hello');
 {
   const tmp = path.join(require('os').tmpdir(), 'engine_be3e2da_' + process.pid + '.js');
@@ -163,7 +163,7 @@ E.migrate(M, DATA); ok(M.sec.notes.length === 1, 'migrating twice: one hello');
       else if (st.stop === 'inbox') A.inbox.forEach(y => { y.seen = true; if (y.type === 'offer') old.rejectOffer(A, y.id); });
     }
     const B = E.migrate(clone(A), DATA);
-    ok(B.v === 13 && B.sec && B.sec.notes[0].k === 'hello', `be3e2da save (${A.date}): migrated to v13`);
+    ok(B.v >= 13 && B.sec && B.sec.notes[0].k === 'hello', `be3e2da save (${A.date}): migrated to v13+`);
     const bc = B.clubs[B.my]; const p = B.players[bc.tac.xi[3]]; p.inj = 5;
     const n = E.secSwapAll(B).length;
     ok(n === 1 && !E.lineupIssues(B, B.my).block, 'be3e2da save: one tap fixes the team');

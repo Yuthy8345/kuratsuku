@@ -30,7 +30,7 @@ async def main():
         async def has(sel): return await page.locator(sel).count() > 0
         async def click(sel, w=120):
             await page.locator(sel).first.click(); await page.wait_for_timeout(w)
-        stats = {'matches': 0, 'offers': 0, 'ret': 0, 'cele': 0, 'reborn': 0, 'jobs': 0, 'closed': 0, 'xi': 0, 'taps': 0, 'xi_left': 0, 'tours': 0, 'stuck': 0, 'nt': 0, 'sec': 0}
+        stats = {'matches': 0, 'offers': 0, 'ret': 0, 'cele': 0, 'reborn': 0, 'jobs': 0, 'closed': 0, 'xi': 0, 'taps': 0, 'xi_left': 0, 'tours': 0, 'stuck': 0, 'nt': 0, 'sec': 0, 'spon': 0}
         unknown = {}
         seasons = 0; t0 = time.time(); it = 0
         async def resolve():
@@ -50,6 +50,9 @@ async def main():
                     await click('#sheet [data-act="toTactics"]', 200); stats['xi'] += 1; stats['xi_left'] += 1; stats['taps'] += 2
                     if await has('[data-act="fillEmpty"]'): await click('[data-act="fillEmpty"]', 150); stats['taps'] += 1
                     await click('[data-act="autoXI"]', 150)
+                elif await has('#sheet [data-act="spSign"]'):   # スポンサー契約 (2026-10-15): sign her three
+                    if stats['spon'] == 0: await page.screenshot(path=str(OUT / 'spon.png'))
+                    await click('#sheet [data-act="spSign"]', 250); stats['spon'] += 1
                 elif await has('#sheet .sec-head'):
                     stats['sec'] += 1
                     if await has('#sheet [data-act="secAll"]'): await click('#sheet [data-act="secAll"]', 200)
@@ -78,6 +81,7 @@ async def main():
             """visit every tab and sub-view, open a player sheet and a team sheet"""
             stats['tours'] += 1
             await resolve()
+            await page.wait_for_timeout(450); await resolve()   # a pop-up that opens a moment later (the farewells → 解任 → offers)
             for tab in ['home', 'squad', 'tactics', 'league', 'club']:
                 await click(f'[data-act="tab"][data-tab="{tab}"]', 60)
                 if tab == 'squad':

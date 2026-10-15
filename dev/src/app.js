@@ -372,6 +372,7 @@ function viewHome() {
     const f = S.fixtures.find(x => x.id === S.lastResult.fid);
     if (f && f.played) out.push(`<button class="card" data-act="fxDetail" data-id="${f.id}" style="text-align:left;display:grid;gap:4px"><div class="eyebrow">前の試合の結果</div><div class="row"><span class="res res-${S.lastResult.res}">${{ W: '勝', D: '分', L: '敗' }[S.lastResult.res]}</span><b>${esc(S.clubs[f.h].short)} ${f.hg} - ${f.ag} ${esc(S.clubs[f.a].short)}${pkText(f)}</b><span class="spacer"></span><span class="small muted">${E.fxLabel(f)}</span></div></button>`);
   }
+  out.push(sponCard('home'));
   // board + mini table
   const c = S.clubs[S.my];
   const t = E.table(S); const me = t.findIndex(r => r.id === S.my);
@@ -822,11 +823,38 @@ const SEC_VIEW = {
       return `<dl class="kv sec-kv"><dt>順位</dt><dd>${d.rank == null ? '開幕前' : d.rank === 1 ? '首位' : `${d.rank}位（首位 ${esc(S.clubs[d.lead] ? S.clubs[d.lead].short : '')}と勝点${d.gap}差）`}</dd>
         <dt>次の大一番</dt><dd>${f && S.clubs[opp] ? `${jdw(f.date)} ${esc(S.clubs[opp].short)}戦・${esc(d.big.tag)}${f.played ? '（終了）' : ''}` : 'この1か月はありません'}</dd>
         <dt>資金</dt><dd>${E.money(d.funds)}${d.delta == null ? '' : `（先月から ${d.delta >= 0 ? '+' : ''}${E.money(d.delta)}）`}</dd>
-        <dt>若手</dt><dd>${top.length ? `${top.join('、')}${d.youth > top.length ? ` ほか${d.youth - top.length}人` : ''}が成長` : '先月から目立った変化はありません'}</dd></dl>
+        <dt>若手</dt><dd>${top.length ? `${top.join('、')}${d.youth > top.length ? ` ほか${d.youth - top.length}人` : ''}が成長` : '先月から目立った変化はありません'}</dd>
+        ${d.sp ? `<dt>スポンサー</dt><dd>${[d.sp.done ? `達成${d.sp.done}` : '', d.sp.n - d.sp.done - d.sp.fail ? `進行中${d.sp.n - d.sp.done - d.sp.fail}` : '', d.sp.fail ? `届かず${d.sp.fail}` : ''].filter(Boolean).join('・')}${d.sp.got ? `（ボーナス ${E.money(d.sp.got)}）` : ''}</dd>` : ''}</dl>
         ${y ? '<button class="btn ghost block" data-act="youthOpen" style="min-height:40px">若手の成長レポート</button>' : ''}`;
     },
   },
 };
+// スポンサー契約 (2026-10-15): the offers, her pick at kick-off, a condition met or missed
+const spDeal = x => ({ k: x.k, n: x.n });
+Object.assign(SEC_VIEW, {
+  spon: {
+    bubble: n => n.data.auto ? `スポンサーは、おすすめの${(S.spon && S.spon.deals || []).length}社と契約しました ›` : `今季のスポンサー候補が${E.sponPending(S) ? S.spon.offer.length : 5}社来ています ›`,
+    title: n => n.data.auto ? 'スポンサーと契約しました' : 'スポンサー候補',
+    body: n => {
+      if (!n.data.auto) return E.sponPending(S) ? `<p class="small" style="margin:0">今季のスポンサー候補が${S.spon.offer.length}社来ています。ユニフォームの胸・背中・袖に3社まで選べます。選ばないまま開幕戦を迎えると、おすすめの3社と契約します。</p><button class="btn primary block" data-act="sponOpen" style="min-height:44px">スポンサーを選ぶ</button>` : '<p class="small" style="margin:0">今季のスポンサーは決まっています。</p>';
+      const ds = (S.spon && S.spon.s === n.data.s ? S.spon.deals : []).slice().sort((a, b) => a.slot - b.slot);
+      return `<p class="small" style="margin:0">開幕戦までに選ばれなかったので、達成しやすい3社と契約しておきました。</p><ul class="sp-res">${ds.map(d => `<li>${spTag(d.slot)}${spLogo(d, true)}<span class="t"><b>${esc(E.sponShort(d))}</b><small>${esc(d.co)}</small></span></li>`).join('')}</ul>`;
+    },
+    done: 'わかりました',
+  },
+  sponHit: {
+    bubble: n => `${n.data.co}との約束を達成！ ボーナス${E.money(n.data.got)}が入りました ›`,
+    title: () => 'スポンサーとの約束を達成',
+    body: n => `<p class="small" style="margin:0">${esc(n.data.co)}との約束「${esc(E.sponShort(spDeal(n.data)))}」を達成しました。ボーナス <b>${E.money(n.data.got)}</b> が入りました。</p>`,
+    done: 'わかりました',
+  },
+  sponMiss: {
+    bubble: n => `${n.data.co}との約束「${E.sponShort(spDeal(n.data))}」には届きませんでした ›`,
+    title: () => 'スポンサーとの約束',
+    body: n => `<p class="small" style="margin:0">${esc(n.data.co)}との約束「${esc(E.sponShort(spDeal(n.data)))}」は、今季はもう届きません。保証の額はそのまま入ります。</p>`,
+    done: 'わかりました',
+  },
+});
 const secView = n => SEC_VIEW[n.k] || { bubble: () => `${E.SEC.role}からのお知らせ ›`, title: () => 'お知らせ', body: x => `<p class="small" style="margin:0">${esc(x.data.text || '')}</p>`, done: 'わかりました' };
 // what she has to say now, most pressing first
 function secItems() {
@@ -848,7 +876,7 @@ function secBand(si) {
   let say;
   if (si.fix) say = `<button class="sec-bub" data-act="secOpen"><b>${secFixLine(si.fix)} ›</b><small>${esc(secWho())}</small></button>`;
   else if (si.back.length) { const m = si.back[0]; say = `<div class="sec-bub"><button class="sec-bub-t" data-act="secOpen"><b>${backLine(m)}</b><small>${backSub(m)}</small></button><button class="btn primary sec-bub-do" data-act="secBack" data-id="${m.out}">戻す</button></div>`; }
-  else { const n = si.unseen[0]; say = `<button class="sec-bub" data-act="secOpen"><b>${n ? esc(secView(n).bubble(n)) : `${esc(secWho())}からの連絡 ›`}</b><small>${esc(secWho())}${si.unseen.length > 1 ? `・ほか${si.unseen.length - 1}件` : ''}</small></button>`; }
+  else { const n = si.unseen[0]; say = `<button class="sec-bub" data-act="${n && n.k === 'spon' && E.sponPending(S) ? 'sponOpen' : 'secOpen'}"><b>${n ? esc(secView(n).bubble(n)) : `${esc(secWho())}からの連絡 ›`}</b><small>${esc(secWho())}${si.unseen.length > 1 ? `・ほか${si.unseen.length - 1}件` : ''}</small></button>`; }
   return `<div class="sec-band" id="sec-float"><button class="sec-mag" data-act="secOpen" aria-label="${esc(secWho())}の連絡（${si.n}件）">${akiMag('md', si.n)}</button>${say}</div>`;
 }
 // other tabs: just the magnet and a count, put beside the switch bar by secPlace (the bar gets shorter, so the magnet
@@ -913,6 +941,106 @@ function secCard() {
   return `<section class="card sec-card"><div class="row" style="gap:12px">${akiMag('md')}<div style="min-width:0;flex:1"><div class="eyebrow">クラブスタッフ</div><b class="sec-name">${esc(secWho())}</b></div><button class="btn ghost sec-rename" data-act="secName" data-back="club">名前を変える</button></div>
     <p class="fine" style="margin:0">試合に出られない選手の代わり、戻ってきた選手、月のはじめのまとめを知らせます。メンバーは、監督が押すまで変わりません。</p>
     <button class="btn ghost block" data-act="secOpen">連絡を見る</button></section>`;
+}
+
+/* ---------- スポンサー契約 (2026-10-15, ユーザーの選んだ案A＋B) ----------
+   The offers are contracts on paper pinned to the board; tapping one signs it into the next free place on the kit (胸 → 背中
+   → 袖, the seal shows where), 「場所」 moves it, tapping again takes it out. The secretary's three are filled in to start
+   with. The kit is drawn in the club's colours and pattern (EMB). Progress: sponCard (home and クラブ → 経営). */
+const spF = s => E.SPON.slot[s].f;
+const spSlotJp = s => E.SPON.slot[s].jp;
+const spSeal = s => ['胸', '背', '袖'][s];
+const spLogo = (d, sm) => `<span class="sp-logo${sm ? ' sm' : ''}" style="--lc:${d.col}" aria-hidden="true">${esc(d.mk)}</span>`;
+const spDots = lv => `<span class="sp-lv" role="img" aria-label="難しさ ${lv}">${[1, 2, 3].map(i => `<i class="${i <= lv ? 'on' : ''}"></i>`).join('')}</span>`;
+const spM = v => E.money(v).replace('円', '');
+// a condition breaks only between its phrases (リーグ戦で｜勝点61以上), never inside a word
+const spCond = d => esc(E.sponText(d)).replace(/(で|を)/g, '$1<wbr>').replace(/ /g, '<wbr>');
+// the kit: the front carries the chest and the sleeve, the back the back; by = [chest, back, sleeve] (a contract or null)
+function spKit(back, by, mini) {
+  const v = kitVars(S.my, S.clubs[S.my]);
+  const slot = (k, s) => { const d = by[s]; if (!d && mini) return ''; return `<span class="sp-slot ${k}${d ? '' : ' empty'}">${d ? esc(k === 'sleeve' ? d.mk : d.br || d.co) : spSlotJp(s)}</span>`; };
+  return `<span class="sp-kit${mini ? ' mini' : ''}" aria-hidden="true"><span class="sp-body"><span class="sp-shirt${v.cls}" style="${v.st}"></span>${back ? slot('back', 1) : slot('chest', 0) + slot('sleeve', 2)}</span>${mini ? '' : `<span class="cap">${back ? '背中' : '胸・袖'}</span>`}</span>`;
+}
+const spTag = s => { const c = S.clubs[S.my]; return `<span class="sp-tag" style="--k1:${c.c1};--kt:${lum(c.c1) > 0.6 ? '#141414' : '#ffffff'}">${spSlotJp(s)}</span>`; };
+// the pick (slot order), kept while the sheet is open; starts as the secretary's three
+function spPick() {
+  const ids = new Set(S.spon.offer.map(x => x.id));
+  if (!UI.spk || UI.spk.s !== S.season || UI.spk.pick.some(id => id != null && !ids.has(id))) { const r = E.sponRec(S); UI.spk = { s: S.season, pick: [0, 1, 2].map(i => r[i] != null ? r[i] : null) }; }
+  return UI.spk.pick;
+}
+function sheetSpon(back, fid) {
+  if (!E.sponPending(S)) { if (back === 'pre' && fid) return sheetPrematch(fid); closeSheet(); render(); return; }
+  sheetState = { type: 'spon', back, fid };
+  E.sponLook(S); const nt = E.secNotes(S).find(n => n.k === 'spon'); if (nt) nt.seen = true;
+  const sp = S.spon, c = S.clubs[S.my], pick = spPick();
+  const by = pick.map(id => id == null ? null : sp.offer.find(x => x.id === id));
+  const n = by.filter(Boolean).length;
+  const base = Math.round(c.spon * E.SPON.base) * sp.months;
+  const G = by.reduce((a, d, s) => a + (d ? Math.round(d.g * spF(s)) : 0), 0), B = by.reduce((a, d, s) => a + (d ? Math.round(d.b * spF(s)) : 0), 0);
+  const cards = sp.offer.map(d => {
+    const s = pick.indexOf(d.id), f = s < 0 ? 1 : spF(s);
+    return `<div class="sp-paper${s >= 0 ? ' on' : ''}" style="--lc:${d.col}">
+      <button class="sp-main" data-act="spTap" data-id="${d.id}" aria-pressed="${s >= 0}" aria-label="${esc(d.co)}：${esc(E.sponText(d))}">
+        <span class="h">${spLogo(d)}<b>${esc(d.co)}</b>${spDots(d.lv)}</span>
+        <span class="cond">${spCond(d)}</span>
+        <span class="money"><span>保証<b>${spM(Math.round(d.g * f))}</b></span><span>達成ボーナス<b class="bn">${spM(Math.round(d.b * f))}</b></span></span>
+      </button>
+      ${s >= 0 ? `<span class="sp-seal">${spSeal(s)}<small>契約</small></span><div class="sp-mv">場所 ${[0, 1, 2].map(k => `<button data-act="spSlot" data-id="${d.id}" data-s="${k}" aria-pressed="${k === s}">${spSlotJp(k)}</button>`).join('')}</div>` : '<span class="tap">タップで契約</span>'}
+    </div>`;
+  }).join('');
+  openSheet(`<div class="sec-head">${akiMag('md')}<div style="min-width:0;flex:1"><div class="eyebrow">${E.SEC.role}からの連絡</div><b class="sec-name">${esc(secWho())}</b></div></div>
+    <p class="small" style="margin:0">${E.seasonLabel(S.season)}のスポンサー候補が${sp.offer.length}社。ユニフォームの<b>胸・背中・袖</b>に1社ずつ、3社まで選べます（胸は1.2倍、袖は0.8倍）。保証は毎月、ボーナスは条件を達成した日に入ります。</p>
+    <div class="sp-kits">${spKit(false, by)}${spKit(true, by)}</div>
+    <div class="row"><span class="eyebrow">${E.seasonLabel(S.season)} スポンサー候補</span><span class="spacer"></span><span class="sp-cnt">契約 ${n} / ${E.SPON.max}社</span></div>
+    ${cards}
+    <p class="fine" style="margin:4px 0 0">${secNm()}のおすすめ（達成しやすい3社）を入れてあります。もう一度タップすると外れます。●の数は難しさで、難しい約束ほどボーナスが大きくなります。選ばないまま開幕戦を迎えると、おすすめの3社と契約します。</p>`,
+    `<div class="sp-sum"><span>基本スポンサー<b>${spM(base)}</b></span><span>保証 計<b>${spM(G)}</b></span><span>ボーナス 最大<b>${spM(B)}</b></span></div>
+    <button class="btn primary block" data-act="spSign" style="min-height:54px;font-size:16px" ${n ? '' : 'disabled'}>${n ? `この${n}社と契約する` : '1社以上選んでください'}</button>
+    ${back === 'pre' && fid ? `<button class="btn ghost block" data-act="secPre" data-id="${fid}">試合前に戻る</button>` : '<button class="btn ghost block" data-act="closeSheet">あとで決める</button>'}`);
+  render();
+}
+// what a contract shows: the count, what's left, and how the bar looks
+function spLine(d, st) {
+  const r = E.sponNow(S, d, st), left = d.n - r.now;
+  let num = r.now == null ? '—' : `${r.now} / ${d.n}`, note = '', warn = false;
+  switch (d.k) {
+    case 'pts': note = `あと${left}`; break;
+    case 'gf': note = `あと${left}点`; break;
+    case 'cs': note = `あと${left}試合`; break;
+    case 'u23': note = `あと${left}回`; break;
+    case 'yo': note = `あと${left}人`; break;
+    case 'hl': num = `${r.now}敗`; note = left <= 0 ? 'もう負けられない' : `あと${left}敗まで`; warn = left <= 1; break;
+    case 'rank': num = r.now == null ? '—' : `${r.now}位`; note = r.now == null ? '開幕前' : r.now <= d.n ? 'いまは圏内' : `${d.n}位まであと${r.now - d.n}`; warn = r.now != null && r.now > d.n; break;
+    case 'att': num = r.now == null ? '—' : `${r.now.toLocaleString('ja-JP')}人`; note = r.now == null ? 'ホーム開幕前' : `目標 ${d.n.toLocaleString('ja-JP')}人`; warn = r.now != null && r.now < d.n; break;
+    case 'cup': { const x = ['ec', 'lc'].map(k => E.cupResult(S, k, S.my)); num = ''; note = x.includes('勝ち残り') ? '勝ち残り' : '敗退'; break; }
+  }
+  if (r.st === 'done') note = '達成'; else if (r.st === 'fail') note = '届かず';
+  return { r, num, note, cls: r.st === 'done' ? 'done' : r.st === 'fail' ? 'fail' : warn ? 'warn' : '' };
+}
+// the season's contracts (home and クラブ → 経営); club: also says how the money comes in
+function sponCard(where) {
+  const sp = S.spon; if (!sp || sp.s !== S.season || S.fired) return '';
+  const c = S.clubs[S.my];
+  if (sp.old) return where === 'club' ? `<section class="card" style="display:grid;gap:6px"><div class="eyebrow">スポンサー契約</div><p class="small" style="margin:0">今季はこれまでどおりの固定のスポンサー収入です。来季からはシーズン前に${esc(secNm())}がスポンサー候補を持ってきます。</p></section>` : '';
+  if (E.sponPending(S)) return `<section class="card sp-home"><div class="sp-head"><div style="flex:1;min-width:0"><div class="eyebrow">スポンサー契約</div><b>候補が${sp.offer.length}社来ています</b><div class="small muted" style="margin-top:2px">胸・背中・袖に3社まで。選ばないまま開幕戦を迎えると、${esc(secNm())}のおすすめの3社と契約します。</div></div>${spKit(false, [null, null, null], true)}</div><button class="btn primary block" data-act="sponOpen">スポンサーを選ぶ</button></section>`;
+  const deals = sp.deals.slice().sort((a, b) => a.slot - b.slot); if (!deals.length) return '';
+  const st = E.sponStat(S), by = [0, 1, 2].map(s => deals.find(d => d.slot === s) || null);
+  const got = deals.reduce((a, d) => a + d.got, 0), open = deals.filter(d => d.st === 'run').reduce((a, d) => a + Math.round(d.b * spF(d.slot)), 0);
+  const mo = E.sponMonth(S);
+  return `<section class="card sp-home"><div class="sp-head"><div style="flex:1;min-width:0"><div class="eyebrow">ユニフォームのスポンサー</div><div class="small muted" style="margin-top:2px">${got ? `ボーナス 獲得 ${spM(got)}` : 'ボーナスはまだ'}${open ? `／あと最大 ${spM(open)}` : ''}</div></div>${spKit(false, by, true)}</div>
+    ${deals.map(d => { const L = spLine(d, st); return `<div class="sp-row ${L.r.st === 'fail' ? 'fail' : ''}"><div class="h">${spTag(d.slot)}${spLogo(d, true)}<b>${esc(E.sponShort(d))}</b>${L.r.st === 'done' ? '' : `<span class="n">${L.num}</span>`}</div>
+      <div class="sp-bar ${L.cls}"><i style="width:${L.r.st === 'fail' ? 100 : L.r.pct}%"></i></div><div class="sub"><span>${esc(d.co)}・ボーナス ${spM(Math.round(d.b * spF(d.slot)))}</span><span class="${L.cls === 'warn' || L.cls === 'fail' ? 'w' : ''}">${L.note}</span></div>${L.r.st === 'done' ? '<span class="sp-mini-seal">達成</span>' : ''}</div>`; }).join('')}
+    <p class="fine" style="margin:0">基本スポンサー 月${spM(mo.base)}・保証 月${spM(mo.guar)}${where === 'club' ? `（保証は受け取り済み ${spM(deals.reduce((a, d) => a + d.paid, 0))}／${spM(deals.reduce((a, d) => a + Math.round(d.g * spF(d.slot)), 0))}）` : ''}。ボーナスは条件を達成した日に入ります。</p></section>`;
+}
+// the season review
+function sponReview(sp) {
+  if (!sp || !sp.deals || !sp.deals.length) return '';
+  return `<div><div class="eyebrow" style="margin-bottom:6px">スポンサー契約</div><ul class="sp-res">${sp.deals.slice().sort((a, b) => a.slot - b.slot).map(d => `<li>${spTag(d.slot)}${spLogo(d, true)}<span class="t"><b>${esc(E.sponShort(d))}</b><small>${esc(d.co)}</small></span><span class="chip ${d.st === 'done' ? 'ok' : ''}">${d.st === 'done' ? `達成 +${spM(d.got)}` : '届かず'}</span></li>`).join('')}</ul>
+    <p class="fine" style="margin:6px 0 0">保証 計${spM(sp.guar)}・ボーナス 計${spM(sp.bonus)}。次のシーズンへ進むと、${esc(secNm())}が新しいスポンサー候補を持ってきます。</p></div>`;
+}
+// the pre-match sheet, when the season starts without a choice
+function spPreLine(fid) {
+  return `<div class="sec-line" style="margin-top:0">${akiMag('sm')}<p><b>スポンサーがまだ決まっていません。</b><span class="small">このままキックオフすると、おすすめの3社と契約します。</span></p></div><button class="btn ghost block" data-act="sponOpen" data-back="pre" data-fid="${fid}">スポンサーを選ぶ</button>`;
 }
 
 function sheetTrain(id) {
@@ -1265,10 +1393,11 @@ function viewClub() {
         <div class="small">${titlesText(c)}${c.o10 ? '・Jリーグ創設メンバー' : ''}</div>
         <p class="fine">格が高いほど試合終盤に粘り強く、選手も移籍に応じやすくなります。その分フロントの期待も高くなります。リーグ優勝や上位で上がり、降格で下がります。直近15年（2011年以降）のタイトルは上乗せして評価しています。天皇杯とアジアのタイトルは前身チーム時代を含みます。</p>
       </section>
+      ${sponCard('club')}
       <section class="card" style="display:grid;gap:10px">
         <div class="row"><div class="eyebrow">資金</div><span class="spacer"></span><b style="font-family:var(--f-display);font-weight:400;font-size:22px" class="${c.funds < 0 ? 'o-low' : ''}">${E.money(c.funds)}</b></div>
         <dl class="kv"><dt>入場料収入</dt><dd>${E.money(fin.gate)}</dd><dt>スポンサー収入</dt><dd>${E.money(fin.spon)}</dd><dt>賞金</dt><dd>${E.money(fin.prize)}</dd><dt>移籍収支</dt><dd>${fin.trans >= 0 ? '+' : ''}${E.money(fin.trans)}</dd><dt>人件費</dt><dd>-${E.money(fin.wages)}</dd><dt>施設投資</dt><dd>-${E.money(fin.fac)}</dd></dl>
-        <div class="small muted">今季の収支 ${inc - exp >= 0 ? '+' : ''}${E.money(inc - exp)}　／　年俸総額 ${E.money(wages)}・月のスポンサー収入 ${E.money(c.spon)}</div>
+        <div class="small muted">今季の収支 ${inc - exp >= 0 ? '+' : ''}${E.money(inc - exp)}　／　年俸総額 ${E.money(wages)}・月のスポンサー収入 ${(m => E.money(m.base + m.guar))(E.sponMonth(S))}</div>
       </section>
       <h3 class="sec-h">クラブ施設<small>レベル1〜5</small></h3>
       <ul class="list">${Object.entries(E.FACILITY).map(([k, f]) => { const lv = c.fac[k]; const cost = E.facCost(lv); return `<li><div class="row" style="padding:12px;gap:12px"><div style="flex:1;min-width:0"><b>${f.jp}</b>　<span class="stars">${'■'.repeat(lv)}${'□'.repeat(5 - lv)}</span><div class="small muted">${f.desc}</div></div>${lv < 5 ? `<button class="btn" data-act="upgrade" data-k="${k}" ${c.funds < cost ? 'disabled' : ''}>強化<br><span class="small">${E.money(cost)}</span></button>` : '<span class="chip ok">最大</span>'}</div></li>`; }).join('')}</ul>
@@ -1428,6 +1557,7 @@ function sheetPrematch(fid) {
   openSheet(`<div class="eyebrow">${E.fxLabel(f)}・${jdw(f.date)}・${f.neutral ? '国立競技場' : f.h === S.my ? 'ホーム' : 'アウェイ'}</div>
     <h2>vs ${esc(o.name)}</h2>
     ${story ? `<div class="row wrap">${story}</div>` : ''}
+    ${E.sponPending(S) ? spPreLine(fid) : ''}
     <div class="plans small"><div><b>${esc(c.short)}</b> ${c.tac.form}・${esc(E.mentLabel(c.tac))}${E.tacLabel(c.tac) ? '・' + esc(E.tacLabel(c.tac)) : ''}</div><div><b>${esc(o.short)}</b> ${o.tac.form}${o.tac.ment !== 'bal' || o.tac.ctr ? '・' + esc(E.mentLabel(o.tac)) : ''}${E.tacLabel(o.tac) ? '・' + esc(E.tacLabel(o.tac)) : ''}</div></div>
     <div style="display:grid;gap:8px">${row('攻撃', me.att, op.att)}${row('中盤', me.mid, op.mid)}${row('守備', me.def, op.def)}</div>
     <button class="btn ghost block" data-act="team" data-id="${opp}" data-back="pre" data-fid="${fid}">${esc(o.short)}を詳しく見る</button>
@@ -1446,6 +1576,7 @@ function sheetSeasonEnd() {
   openSheet(`<div class="led"><div class="ln"><span>${se.label} FINAL</span><span>${esc(S.clubs[S.my].abbr || '')}</span></div><div class="ln"><span class="big">${se.myPos}位</span><span class="big">${se.pts}pt</span></div><div class="ln"><span>${VERDICT[se.verdict]}</span><span>目標 ${esc(se.target.replace(/（.*）/, ''))}</span></div></div>
     <dl class="kv"><dt>優勝</dt><dd>${esc(S.clubs[se.champ].name)}</dd><dt>J2降格</dt><dd>${se.rel.map(id => esc(S.clubs[id].short)).join('・')}</dd><dt>順位賞金</dt><dd>${E.money(se.prize)}</dd><dt>フロントの信頼</dt><dd>${S.board}</dd></dl>
     ${se.cups ? `<dl class="kv">${Object.entries(se.cups).map(([k, x]) => `<dt>${E.CUPS[k].jp}</dt><dd>${x.champ ? `優勝 ${esc(S.clubs[x.champ].short)}` : '—'}　<span class="muted">${esc(S.clubs[S.my].short)}：${esc(x.my || '—')}</span></dd>`).join('')}</dl>` : ''}
+    ${sponReview(se.spon)}
     <div><div class="eyebrow" style="margin-bottom:6px">得点王争い</div><ul class="list">${se.scorers.map((x, i) => `<li><div class="row" style="padding:9px 12px"><b class="tnum">${i + 1}</b>${kit(x.club, 'sm')}<span>${esc(x.name)}</span><span class="spacer"></span><b class="tnum">${x.g}点</b></div></li>`).join('')}</ul></div>
     <p class="fine">次のシーズンに進むと、ベテランの引退、ユースからの昇格、J2との入れ替えが行われます。オフシーズン（6〜8月）は移籍期間です。</p>`,
     '<button class="btn primary block" data-act="nextSeason" style="min-height:54px">次のシーズンへ</button><button class="btn ghost block" data-act="closeSheet">あとで</button>');
@@ -1717,6 +1848,7 @@ function refreshSheet() {
   if (s.type === 'num') return sheetNum(s.id, s.sel);
   if (s.type === 'plan') return sheetPlan();
   if (s.type === 'sec') return sheetSec(s.back, s.fid);
+  if (s.type === 'spon') return sheetSpon(s.back, s.fid);
   if (s.type === 'youth') return sheetYouth(s.back);
   if (s.type === 'team') return sheetTeam(s.id, s.tab, s.back);
   if (s.type === 'cele') return sheetCele();
@@ -1947,7 +2079,7 @@ function go() {
   if (st.stop === 'match') sheetPrematch(st.fid);
   else if (st.stop === 'inbox') { const it = S.inbox.find(x => x.type !== 'youth'); UI.tab = 'home'; render(); window.scrollTo(0, 0); toast(it && it.type === 'scout' ? 'スカウトが戻りました' : it && it.type === 'nt' ? '代表メンバーが発表されました' : '移籍オファーが届きました'); }
   else if (st.stop === 'note') { if (/フロント/.test(st.text)) { UI.tab = 'home'; render(); window.scrollTo(0, 0); } toast(st.text); }
-  else if (st.stop === 'sec') { UI.tab = 'home'; render(); window.scrollTo(0, 0); sheetSec(); }
+  else if (st.stop === 'sec') { UI.tab = 'home'; render(); window.scrollTo(0, 0); if (E.sponPending(S) && E.secNotes(S).some(n => n.k === 'spon' && !n.seen)) sheetSpon(); else sheetSec(); }
   else if (st.stop === 'cele') { persist(true); UI.tab = 'home'; render(); window.scrollTo(0, 0); sheetCele(); }
   else if (st.stop === 'seasonEnd') { persist(true); render(); sheetSeasonEnd(); }
   else if (st.stop === 'fired') { persist(true); render(); sheetFired(); }
@@ -2099,6 +2231,26 @@ const ACT = {
     if (sheetState && sheetState.back === 'club') { closeSheet(); render(); } else { const b = UI.secBack || {}; sheetSec(b.back, b.fid); }
   },
   secPre(d) { sheetPrematch(Number(d.id)); },
+  sponOpen(d) { sheetSpon(d.back, d.fid ? Number(d.fid) : null); },
+  // tap a contract: in (the next free place: 胸 → 背中 → 袖) or out
+  spTap(d) {
+    const pick = spPick(), id = Number(d.id), s = pick.indexOf(id);
+    if (s >= 0) pick[s] = null;
+    else { const f = pick.indexOf(null); if (f < 0) return toast('3社まで。外してから選んでください'); pick[f] = id; }
+    refreshSheet();
+  },
+  // move a contract to another place (whoever was there takes its place)
+  spSlot(d) {
+    const pick = spPick(), id = Number(d.id), to = Number(d.s), s = pick.indexOf(id); if (s < 0 || s === to) return;
+    [pick[s], pick[to]] = [pick[to], pick[s]]; refreshSheet();
+  },
+  spSign() {
+    const st = sheetState || {}; const pick = spPick(); const n = pick.filter(x => x != null).length;
+    if (!n || !E.sponPick(S, pick)) return;
+    UI.spk = null; persist(true);
+    toast(`スポンサー${n}社と契約しました`);
+    if (st.back === 'pre' && st.fid) sheetPrematch(st.fid); else { closeSheet(); render(); }
+  },
   youthOpen() { sheetYouth('sec'); },
   youthDone(d) { const it = S.inbox.find(x => x.id === Number(d.id)); if (it) it.done = true; persist(false); render(); },
   unshort(d) { const p = S.players[d.id]; E.unshort(S, Number(d.id)); persist(false); toast(`${p ? p.name : '選手'}をショートリストから外しました`); refreshSheet(); render(); },

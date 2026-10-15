@@ -23,7 +23,7 @@ async def main():
         async def has(sel): return await page.locator(sel).count() > 0
         async def click(sel, w=120):
             await page.locator(sel).first.click(); await page.wait_for_timeout(w)
-        st = {'matches': 0, 'offers': 0, 'xi': 0, 'ret': 0, 'cele': 0, 'reborn': 0, 'jobs': 0, 'closed': 0, 'seasons': 0}
+        st = {'matches': 0, 'offers': 0, 'xi': 0, 'ret': 0, 'cele': 0, 'reborn': 0, 'jobs': 0, 'closed': 0, 'seasons': 0, 'spon': 0}
         # every pop-up the game can show, as in e2e.py. stop_at_end: leave the season review open (for its screenshot)
         async def resolve(stop_at_end=False):
             for _ in range(15):
@@ -46,6 +46,7 @@ async def main():
                     await click('#sheet [data-act="nextSeason"]', 500); st['seasons'] += 1
                 elif await has('#sheet [data-act="job"]'):
                     await page.screenshot(path=str(OUT/'s-fired.png')); await click('#sheet [data-act="job"]', 250); st['jobs'] += 1
+                elif await has('#sheet [data-act="spSign"]'): await click('#sheet [data-act="spSign"]', 250); st['spon'] += 1   # スポンサー契約: her three
                 elif await has('#sheet [data-act="closeSheet"]'): await click('#sheet [data-act="closeSheet"]', 120); st['closed'] += 1
                 else:
                     txt = (await page.locator('#sheet').inner_text())[:80].replace('\n', ' ')
