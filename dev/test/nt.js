@@ -187,7 +187,7 @@ const seen = { calls: [], awayIn: 0, matchesInWindow: 0, lcInWindow: 0, sameDay:
     }
     const before = O.fixtures.filter(f => !f.cup && f.date === '2026-11-14').length;
     const S2 = E.migrate(JSON.parse(JSON.stringify(O)), DATA);
-    ok(before === 10 && S2.v === 11, 'old save had a round on 11/14 (in the window); now v11');
+    ok(before === 10 && S2.v >= 11, 'old save had a round on 11/14 (in the window); now v11+');
     const lg = S2.fixtures.filter(f => !f.cup && !f.played);
     ok(!lg.some(f => E.inNtWindow(2026, f.date)), 'old save: unplayed rounds moved out of the windows');
     ok(lg.filter(f => f.r === 15).every(f => f.date === '2026-11-21') && lg.filter(f => f.r === 16).every(f => f.date === '2026-11-25'), 'old save: 第15節 11/21, 第16節 11/25 (the real dates)');

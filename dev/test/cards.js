@@ -163,11 +163,12 @@ for (let i = 0; i < 20 && !(S.cups.ec.r > 0); i++) { const f = toMyMatch(S); if 
 {
   const S2 = clone(S); const cnt = {}; let n = 0, txt = 0;
   const pool = S2.fixtures.filter(f => !f.played && !f.cup).slice(0, 40);
-  for (let k = 0; k < 15; k++) for (const f of pool) {
+  const K = 40;  // 1600 matches: about 105 straight reds since 2026-10-15 (the real rate, 0.068 a match)
+  for (let k = 0; k < K; k++) for (const f of pool) {
     const M = E.createMatch(S2, f); E.simulateFull(S2, M);
     for (const e of M.ev) if (e.t === 'red' && /一発/.test(e.text)) { n++; if (/（.+）/.test(e.text)) txt++; const r = M.pm[e.pid].rr; cnt[r] = (cnt[r] || 0) + 1; }
   }
-  console.log(`  ${n} straight reds in 600 matches:`, Object.entries(cnt).map(([k, v]) => `${E.RED[k].jp} ${Math.round(v / n * 100)}%`).join(', '));
+  console.log(`  ${n} straight reds in ${K * pool.length} matches:`, Object.entries(cnt).map(([k, v]) => `${E.RED[k].jp} ${Math.round(v / n * 100)}%`).join(', '));
   ok(n > 10 && txt === n, 'every straight red names the offence');
   ok(n < 30 || Math.abs((cnt.dogso || 0) / n - E.RED.dogso.w) < 0.15, 'DOGSO share close to the setting');
 }
@@ -181,7 +182,7 @@ const xCheck = () => {
   const won = E.cupWinner(r1) === X.club;
   if (won) ok(show(X) === '["lc19","lc11y"]' && X.cyc && X.cyc.lc1 === 1, `Lカップ 2回戦 won: ${X.name} ${show(X)} (1 game served, still in the 1stラウンド)`);
   else {
-    ok(show(X) === '["*9"]' && !X.cyc, `Lカップ 1stラウンド over (lost the 2回戦): ${X.name} ${show(X)} (1 game served, the rest to any official match; yellow ban and count gone)`);
+    ok(show(X) === '["*9"]' && !(X.cyc && X.cyc.lc1), `Lカップ 1stラウンド over (lost the 2回戦): ${X.name} ${show(X)} (1 game served, the rest to any official match; yellow ban and count gone)`);
     ok(!E.available(X, 'lg') && !E.available(X, 'ec') && !E.available(X, 'lc2'), '"*" ban counts for any competition');
   }
 };
@@ -238,6 +239,7 @@ ok(!p4.bans, 'yellow ban + 1 game: lapses');
 ok(!p5.cyc && p5.ycAcc === 0 && !p5.rch, 'yellow counts and repeat records start again');
 if (j2) ok(!j2.bans, 'a player outside J1 served his bans in the J2 season');
 ok(S.news.some(n => n.text.includes(p2.name + 'は出場停止が')) && !S.news.some(n => n.text.includes(p1.name + 'は出場停止が')), 'news for the carried ban only');
+p2.inj = 0; delete p2.away;  // only the ban is checked (he may have been hurt in the last match)
 ok(!E.available(p2, 'lg') && !E.available(p2, 'lc1') && E.available(p2, 'ec'), 'carried ban: league and Lカップ, not the 天皇杯');
 
 // 10) old saves

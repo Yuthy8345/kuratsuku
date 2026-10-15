@@ -975,6 +975,64 @@ const FAM = '佐藤 鈴木 高橋 田中 伊藤 渡辺 山本 中村 小林 加�
 const GIV = '翔 蓮 大翔 陽翔 湊 悠真 颯太 陸 蒼 樹 大和 悠斗 陽太 海斗 颯 隼 拓海 健太 優斗 翼 航 匠 智也 亮 大輝 涼 和真 瑛太 奏太 晴 晃 光 誠 駿 慶 将 一輝 遼 雄大 健人 怜 春樹 直人 康平 圭 大地 宗一郎 柊 律 琉生 瑛士 隆之介 恭平 泰河 凌 碧 響 朔 啓太 伸也'.split(' ');
 const FOR_F = 'ガブリエウ ルーカス ペドロ ラファエウ ヴィトール ジョアン カイオ ブルーノ ディエゴ レアンドロ マルコス エリク フェリペ イゴール ヘナン ダニエウ'.split(' ');
 const FOR_L = 'シウバ サントス ソウザ オリヴェイラ ペレイラ アウメイダ フェヘイラ ロドリゲス コスタ カルヴァーリョ ゴメス マルチンス アラウージョ バホス メンデス'.split(' ');
+// A generated player never shares a name with a real player (2026-10-15): the pools above give 25 real names (佐々木 翔,
+// 遠藤 航, 田中 碧…), so a new game had about one 架空選手 named like a J1 player, and an old save could lose a player
+// abroad to one. Reserved: every real player in the data (J1 and abroad, retired or not, set by newGame / migrate) and the
+// legends' names; a new name also avoids everyone in the game. Names compare without the space.
+const nameKey = s => String(s || '').replace(/\s/g, '');
+let REAL_NAMES = null, REAL_SRC = null, RESERVED = null;
+function realNames(DATA) {
+  if (DATA && DATA !== REAL_SRC && (DATA.players || DATA.abroad)) {
+    REAL_SRC = DATA; REAL_NAMES = new Set(); RESERVED = null;
+    for (const d of (DATA.players || []).concat((DATA.abroad && DATA.abroad.players) || [])) REAL_NAMES.add(nameKey(d.name));
+  }
+  return REAL_NAMES || new Set();
+}
+// real players and the legends (fixed for the data)
+function reservedBase() {
+  if (!RESERVED) { RESERVED = new Set(realNames()); for (const list of Object.values(LEGENDS)) for (const L of list) RESERVED.add(nameKey(L.name)); }
+  return RESERVED;
+}
+// …and the real players in this game (an old save may keep one the data no longer has)
+function reservedNames(S) {
+  const r = new Set(reservedBase());
+  for (const p of Object.values(S.players)) if (!p.gen) r.add(nameKey(p.name));
+  return r;
+}
+// the names in the game, kept per S.players (built once, then each new name is added; a name that left the game only
+// stays avoided). A loaded or cloned save is a new object, so it is built again.
+const GAME_NAMES = new WeakMap();
+function gameNames(S) {
+  let g = GAME_NAMES.get(S.players);
+  if (!g) { g = new Set(Object.values(S.players).map(p => nameKey(p.name))); GAME_NAMES.set(S.players, g); }
+  return g;
+}
+// a fresh name (Japanese or the generated foreign style): not reserved and not in the game. If the pool is nearly used
+// up it settles for a name that only another generated player has.
+function freshName(S, foreign) {
+  const res = reservedBase(), inGame = gameNames(S);
+  const draw = () => foreign ? pick(FOR_F) + ' ' + pick(FOR_L) : pick(FAM) + ' ' + pick(GIV);
+  let name = draw();
+  for (let i = 0; i < 80 && (res.has(nameKey(name)) || inGame.has(nameKey(name))); i++) name = draw();
+  for (let i = 0; i < 80 && res.has(nameKey(name)); i++) name = draw();
+  inGame.add(nameKey(name));
+  return name;
+}
+// rename a generated player everywhere his name is kept next to his id (saved tactics, season records, the farewell
+// cards, the national-team log). News already written keeps the old name.
+function renamePlayer(S, p, name) {
+  const old = p.name, parts = name.split(' ');
+  p.name = name; p.short = p.nat && p.nat !== 'JPN' ? parts[parts.length - 1] : parts[0];
+  for (const pr of S.presets || []) for (const [ids, ns] of [[pr.xi, pr.xn], [pr.bench, pr.bn]]) if (ids && ns) ids.forEach((id, i) => { if (id === p.id && ns[i] === old) ns[i] = name; });
+  const walk = o => {
+    if (!o || typeof o !== 'object') return;
+    if (Array.isArray(o)) { o.forEach(walk); return; }
+    if ((o.id === p.id || o.pid === p.id) && o.name === old) { o.name = name; if (o.short != null) o.short = p.short; }
+    for (const v of Object.values(o)) if (v && typeof v === 'object') walk(v);
+  };
+  walk(S.history); walk(S.nt); walk(S.seasonEnd);
+  return old;
+}
 
 /* ---------- derived player numbers ---------- */
 function age(p, date) {
@@ -1125,6 +1183,7 @@ function learnRate(S, p) {
 }
 function learnWeeks(S, p, dp) { const cur = apt(p, dp); return cur >= LEARN_MAX ? 0 : Math.ceil((LEARN_MAX - cur) / learnRate(S, p)); }
 function migrate(S, DATA) {
+  realNames(DATA);
   for (const p of Object.values(S.players)) if (!p.at) initAttrs(p);
   // data corrections (e.g. verified birthdates) flow into existing saves
   if (DATA && DATA.players) for (const d of DATA.players) { const q = S.players[d.id]; if (q && q.name === d.name && q.birth !== d.birth) q.birth = d.birth; }
@@ -1257,7 +1316,23 @@ function migrate(S, DATA) {
     for (const e of ntEvents(S.season - 1).concat(ntEvents(S.season))) if (S.date >= e.from) S.nt.done[e.k] = 1;
     if (!S.fired) news(S, '各国の代表選考が始まる。クラブで活躍した選手は代表に選ばれることがある（代表ウィークはリーグ戦が中断）。', 'nt');
   }
-  S.v = Math.max(S.v || 1, 11);
+  // v12 (2026-10-15): a generated player named like a real one (J1 or abroad) gets a new name (news when he is mine),
+  // and the players abroad a name clash kept out join: in the first season every missing one (nobody has retired yet),
+  // later only those whose name a generated player had (the rest may have retired).
+  if ((S.v || 1) < 12) {
+    const res = reservedNames(S); const clash = new Set(); const mine = [];
+    for (const p of Object.values(S.players)) {
+      if (!p.gen || !res.has(nameKey(p.name)) || p.reborn) continue;
+      clash.add(nameKey(p.name));
+      const old = renamePlayer(S, p, freshName(S, p.nat && p.nat !== 'JPN'));
+      if (p.club === S.my || (p.loan && p.loan.from === S.my)) mine.push(`${old} → ${p.name}`);
+    }
+    if (mine.length && !S.fired) news(S, `実在の選手と同じ名前だった架空の選手の名前を変えた（${mine.join('、')}）。能力・背番号・成績はそのまま。`, 'info');
+    const first = DATA && DATA.start && S.season === D.y(DATA.start);
+    const n = addAbroad(S, DATA, d => first || clash.has(nameKey(d.name)));
+    if (n && !S.fired) news(S, `移籍市場の海外組に、これまで加わっていなかった選手（${n}人）が加わった。`, 'transfer');
+  }
+  S.v = Math.max(S.v || 1, 12);
   return S;
 }
 // old saves: the season's unplayed league rounds go to the real 2026/27 dates (a round whose date has passed goes to the
@@ -1433,6 +1508,7 @@ function seasonLabel(y) { return y + '/' + String((y + 1) % 100).padStart(2, '0'
 
 function newGame(DATA, clubId, managerName, todayISO) {
   const sy = D.y(DATA.start);
+  realNames(DATA);
   const S = {
     v: 1, created: todayISO, startedFrom: todayISO,
     season: sy, date: DATA.start, my: clubId, manager: managerName || '監督',
@@ -1448,7 +1524,7 @@ function newGame(DATA, clubId, managerName, todayISO) {
     initAttrs(S.players[p.id]);
   }
   addAbroad(S, DATA);
-  S.v = 11; S.presV = 4; S.presets = []; S.nt = { done: {}, res: [], log: [] };
+  S.v = 12; S.presV = 4; S.presets = []; S.nt = { done: {}, res: [], log: [] };
   for (const p of squad(S, clubId)) track(S, p);
   for (const id of S.order) autoLineup(S, id);
   S.fixtures = genFixtures(S.order, DATA.round1, sy);
@@ -1625,6 +1701,13 @@ function posPenalty(p, role) {
    p.rch = {comp: [reasons]} this season (for repeats). Old saves: p.sus / p.csus become league / cup bans (bansOf). */
 const COMP_JP = { lg: 'リーグ', ec: '天皇杯', lc1: 'Lカップ', lc2: 'Lカップ', '*': '公式戦', J: 'リーグ・Lカップ' };
 const CARD = { lgYc: 4, cupYc: 2 };
+// how often cards are shown in a match (2026-10-15, to the real J1). Per side and minute: a yellow (yc, ×high with a high
+// press), else a straight red (red). A player already booked is picked for a yellow `again` times as often (he plays
+// carefully): without it two yellows in one match came 10 times as often as in reality.
+// Real J1 2024 + 2025 (J.League Data Site, 反則ポイント; 760 matches, both teams): yellows shown 2.56 a match (the two of a
+// second-yellow red included), sent off 0.103 (second yellow 0.034, straight red 0.068); a club's season 48.6 / 1.95.
+// Before: 0.021 / 1 / 0.0005 → yellows 3.95, sent off 0.44 (second yellow 0.35, straight 0.09). Measure: dev/test/cardrate.js
+const CARDS = { yc: 0.0134, high: 1.25, again: 0.16, red: 0.00036 };
 // straight reds: share among sending-offs (w), the games the committee gives ([games, weight]; the first is the JFA minimum),
 // whether a second one of the same kind in the same competition doubles it (rep). The shares and the extra games are estimates.
 const RED = {
@@ -2051,14 +2134,14 @@ function stepMatch(S, M) {
   for (const k of ['h', 'a']) {
     const sd = M[k];
     if (R() < 0.13) M.st[k].fo++;
-    if (R() < 0.021 * (sd.press === 'high' ? 1.25 : 1)) {
-      const pl = wpick(onPitch(sd).filter(s => s.role !== 'GK'), s => ROLE[s.role].d + 0.3);
+    if (R() < CARDS.yc * (sd.press === 'high' ? CARDS.high : 1)) {
+      const pl = wpick(onPitch(sd).filter(s => s.role !== 'GK'), s => (ROLE[s.role].d + 0.3) * (M.pm[s.pid].yc ? CARDS.again : 1));
       if (pl) {
         const pm = M.pm[pl.pid];
         if (pm.yc >= 1) { pm.yc++; pm.rc = 1; sd.sent.push(pl.pid); pm.rt -= 1.5; push({ t: 'red', side: k, pid: pl.pid, text: `${pname(S, pl.pid)}に2枚目のイエロー、退場` }); }
         else { pm.yc = 1; pm.rt -= 0.3; push({ t: 'yc', side: k, pid: pl.pid, text: `${pname(S, pl.pid)}にイエローカード` }); }
       }
-    } else if (R() < 0.0005) {
+    } else if (R() < CARDS.red) {
       const pl = pick(onPitch(sd).filter(s => s.role !== 'GK'));
       const rr = wpick(Object.keys(RED), r => RED[r].w);
       if (pl) { M.pm[pl.pid].rc = 1; M.pm[pl.pid].rr = rr; M.pm[pl.pid].rt -= 2; sd.sent.push(pl.pid); push({ t: 'red', side: k, pid: pl.pid, text: `${pname(S, pl.pid)}に一発レッド！退場（${RED[rr].feed}）` }); }
@@ -2611,7 +2694,8 @@ function abroadOf(S, p) { const c = p && S.clubs[p.club]; return c && c.ab ? c.a
 function isAbroadClub(S, cid) { return !!(S.clubs[cid] && S.clubs[cid].ab); }
 // what it costs to buy him (the market value, with the overseas premium)
 function price(S, p) { const v = value(p, S.date); const ab = abroadOf(S, p); return ab ? Math.round(v * ABROAD.fee(ab.lv) / 100) * 100 : v; }
-function addAbroad(S, DATA) {
+// only (optional): which of the missing players to add (an old save adds back only those a name clash kept out)
+function addAbroad(S, DATA, only) {
   const A = DATA && DATA.abroad; if (!A) return 0;
   let n = 0;
   for (const c of A.clubs) {
@@ -2620,9 +2704,11 @@ function addAbroad(S, DATA) {
     S.clubs[c.id].ab = { cc: c.cc, lg: c.lg, lv: c.lv };
     S.clubs[c.id].fac.train = c.lv >= 4.5 ? 4 : c.lv >= 3 ? 3 : 2;
   }
-  const names = new Set(Object.values(S.players).map(p => p.name));
+  // the same real player already in the game (an older save, before the data moved him abroad). Generated players don't
+  // count: until 2026-10-15 one of them could carry a real name and keep the real player out.
+  const names = new Set(Object.values(S.players).filter(p => !p.gen).map(p => nameKey(p.name)));
   for (const d of A.players) {
-    if (S.players[d.id] || names.has(d.name) || !S.clubs[d.club]) continue;
+    if (S.players[d.id] || names.has(nameKey(d.name)) || !S.clubs[d.club] || (only && !only(d))) continue;
     const p = { ...d, cond: 100, form: 6.5, inj: 0, sus: 0, ycAcc: 0, listed: false, st: blankStats(), hist: [], joined: S.date };
     delete p.fix;
     initAttrs(p); S.players[p.id] = p; n++;
@@ -3035,7 +3121,7 @@ function bidBlock(S, pid) {
 function genPlayer(S, cid, opts) {
   const o = opts || {};
   const foreign = o.foreign != null ? o.foreign : R() < 0.1;
-  const name = foreign ? pick(FOR_F) + ' ' + pick(FOR_L) : pick(FAM) + ' ' + pick(GIV);
+  const name = freshName(S, foreign);
   const a = o.age || ri(19, 31);
   const by = D.y(S.date) - a - (D.m(S.date) < 6 ? 1 : 0);
   const birth = by + '-' + String(ri(1, 12)).padStart(2, '0') + '-' + String(ri(1, 28)).padStart(2, '0');
@@ -4113,8 +4199,8 @@ const API = {
   NUM_MAX, numOpen, numNext, setNum, checkTitle, leagueLeft, progressCups,
   NATIONS, NT, natJp, ntName, ntEvents, ntWindows, inNtWindow, ntNow, inNtBreak, recentNt, ntScore, ntForm, ntDay, ntCall, ntPower, abShare, EURO, euroWanted, euroOffer, euroDay, seasonDates, cupSchedule, J1_2026, AC_2027,
   LC_OLD, LC_STAGE, cupNames, roundName, fxEn, cupDepth, cupFinal, tieLegs, tieAgg, lcNew, lc1Alive,
-  ABROAD, abroadOf, isAbroadClub, price, addAbroad, abroadReluct,
-  BOARD, BOARD_LV, boardLv, tenure, CUPS, CUP_PRIZE, NATIONAL, fxLabel, cupResult, cupWinner, hypeMatch, HYPE, SUB_RATE, subRate, STYLE, GROW, RARE, INTAKE, potCap, clubBase, devWeek, shareFor, LOAN, GEM, REBORN, LEGENDS, legendOf, rebornCheck, makeReborn, rebornNum, myLoans, loanCan, loanOptions, loanOut, growthOutlook, weeksLeft, yearsTo, bigGame, rivalry, SCOUT, sendScout, playShare, marketList, ensureFreeAgents, upgrade, facCost, takeJob, rollover, endSeason, news, fire,
+  ABROAD, abroadOf, isAbroadClub, price, addAbroad, abroadReluct, nameKey, realNames, reservedNames, freshName, renamePlayer, genPlayer,
+  CARDS, BOARD, BOARD_LV, boardLv, tenure, CUPS, CUP_PRIZE, NATIONAL, fxLabel, cupResult, cupWinner, hypeMatch, HYPE, SUB_RATE, subRate, STYLE, GROW, RARE, INTAKE, potCap, clubBase, devWeek, shareFor, LOAN, GEM, REBORN, LEGENDS, legendOf, rebornCheck, makeReborn, rebornNum, myLoans, loanCan, loanOptions, loanOut, growthOutlook, weeksLeft, yearsTo, bigGame, rivalry, SCOUT, sendScout, playShare, marketList, ensureFreeAgents, upgrade, facCost, takeJob, rollover, endSeason, news, fire,
 };
 if (typeof module !== 'undefined' && module.exports) module.exports = API; else root.Engine = API;
 })(typeof window !== 'undefined' ? window : globalThis);
