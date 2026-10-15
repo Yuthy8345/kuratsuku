@@ -9,3 +9,7 @@ dev/test/mock_hometown/out/
 dev/test/mock_hometown/save.json
 dev/test/mock_hometown/page.html
 dev/test/mock_hometown/mock_*.html
+dev/test/mock_link/out/
+dev/test/mock_link/save.json
+dev/test/mock_link/data.json
+dev/test/mock_link/page.html
