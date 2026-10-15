@@ -984,6 +984,72 @@ html.ios-app { min-height: calc(var(--apph) + 1px); }
 .res-town { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; font-size: 12px; color: var(--muted); }
 
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+/* キャンプ (2026-10-16, 作業7, 案A: 北海道・九州・沖縄 in chalk on the board, the destinations as magnets; the report reviews the 14 days) */
+.cp-dots { display: inline-flex; gap: 3px; } .cp-dots i { width: 9px; height: 9px; border-radius: 50%; background: color-mix(in srgb, var(--ink) 18%, transparent); }
+.cp-dots i.on { background: var(--accent-bg); box-shadow: 0 1px 0 rgba(0,0,0,.3); } .cp-dots.warn i.on { background: var(--loss); }
+.cp-meters { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 14px; }
+.cp-meters > div { display: grid; grid-template-columns: auto auto 1fr; align-items: center; gap: 2px 8px; }
+.cp-meters .l { font-size: 12px; font-weight: 700; color: var(--muted); }
+.cp-meters small { grid-column: 1 / -1; font-size: 12px; font-weight: 700; line-height: 1.3; }
+.cp-rec { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border-radius: 12px; background: color-mix(in srgb, var(--accent-bg) 12%, transparent); border: 1px solid color-mix(in srgb, var(--accent-bg) 40%, transparent); }
+.cp-rec p { margin: 0; font-size: 13px; line-height: 1.55; } .cp-rec b { color: var(--accent); }
+.cp-abs { display: flex; align-items: center; gap: 10px; } .cp-abs > span { display: grid; min-width: 0; } .cp-abs b { font-size: 13px; } .cp-abs small { font-size: 12px; color: var(--muted); line-height: 1.4; }
+.cpA-map { position: relative; aspect-ratio: 360 / 300; border-radius: 12px; overflow: hidden; background: radial-gradient(ellipse at 55% 45%, var(--pitch2) 0%, var(--pitch) 75%); box-shadow: inset 0 0 0 1px var(--line), inset 0 0 40px rgba(0,0,0,.18); }
+.cpA-svg, .cpA-ringw { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.cpA-land { fill: color-mix(in srgb, var(--pitch-line) 9%, transparent); stroke: var(--pitch-line); stroke-width: 1.4; stroke-linejoin: round; }
+.cpA-inset { fill: none; stroke: var(--pitch-line); stroke-width: 1; stroke-dasharray: 3 5; opacity: .6; }
+.cpA-air { fill: none; stroke: var(--pitch-line); stroke-width: 1.2; stroke-dasharray: 2 6; opacity: .55; }
+.cpA-ring { fill: none; stroke: var(--accent-bg); stroke-width: 2.4; stroke-linecap: round; }
+.cpA-note { position: absolute; font-family: var(--f-chalk); font-size: 12px; color: var(--pitch-ink); opacity: .75; white-space: nowrap; pointer-events: none; } .cpA-note.faint { opacity: .4; }
+.cpA-tok { position: absolute; transform: translate(-50%, -21px); display: grid; justify-items: center; gap: 3px; }
+.cpA-tok.r { grid-auto-flow: column; align-items: center; gap: 6px; transform: translate(-21px, -21px); } .cpA-tok.r .cpA-lbl { justify-items: start; }
+.cpA-tok:active .cpA-mag, .cpA-tok:active .kit { transform: translateY(2px); }
+.cpA-mag { flex: none; width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; font-family: var(--f-display); font-size: 18px; color: #fff; border: 3px solid rgba(255,255,255,.88); background: radial-gradient(circle at 34% 28%, rgba(255,255,255,.45) 0%, rgba(255,255,255,0) 50%), var(--dc); box-shadow: 0 3px 0 rgba(0,0,0,.35), 0 6px 10px rgba(0,0,0,.25); }
+.cpA-mag.sm { width: 36px; height: 36px; font-size: 15px; }
+.cpA-tok .kit.lg { width: 42px; height: 42px; }
+.cpA-tok.on .cpA-mag, .cpA-tok.on .kit { box-shadow: 0 0 0 3px var(--accent-bg), 0 3px 0 rgba(0,0,0,.35), 0 0 22px 6px rgba(242,194,48,.45); }
+.cpA-lbl { display: grid; justify-items: center; padding: 1px 7px 2px; border-radius: 6px; background: rgba(0,0,0,.58); color: #fff; line-height: 1.2; white-space: nowrap; }
+.cpA-lbl b { font-size: 12px; } .cpA-lbl b small { font-size: 10px; font-weight: 700; } .cpA-lbl > small { font-size: 10px; opacity: .85; font-weight: 700; }
+.cpA-tok.on .cpA-lbl { background: var(--accent-bg); color: var(--on-accent); }
+.cpA-pick { display: grid; gap: 10px; border-color: color-mix(in srgb, var(--accent-bg) 55%, var(--line)); }
+.cpA-ph, .cp-hh { display: flex; align-items: center; gap: 10px; }
+.cpA-ph .nm { display: flex; align-items: center; gap: 6px; font-family: var(--f-display); font-weight: 400; font-size: 19px; line-height: 1.2; } .cpA-ph .nm .chip { font-family: var(--f-body); }
+.cpA-ph small { font-size: 12px; color: var(--muted); }
+.cpA-ph .cost { font-family: var(--f-display); font-weight: 400; font-size: 17px; white-space: nowrap; }
+.cpA-rh h2 { margin-top: 2px; } .cpA-rh h2 small { font-family: var(--f-body); font-size: 13px; font-weight: 700; }
+.cpA-sec { display: grid; gap: 10px; } .cpA-go { border-color: color-mix(in srgb, var(--win) 45%, var(--line)); }
+.cp-pitch { aspect-ratio: 4 / 4.6; } .cp-pitch .tok { pointer-events: none; } .cp-pitch .tok .lbl { font-size: 10px; }
+.cp-cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }   /* the 14 days in two weeks */
+.cp-cal > div { display: grid; justify-items: center; gap: 1px; padding: 5px 0 4px; border-radius: 7px; background: color-mix(in srgb, var(--ink) 6%, transparent); border: 1px solid var(--line); min-width: 0; }
+.cp-cal b { font-size: 11px; line-height: 1.1; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.cp-cal small { font-size: 10px; color: var(--muted); line-height: 1.1; } .cp-cal .sat small { color: var(--zone-top); } .cp-cal .sun small { color: var(--loss); }
+.cp-cal .ics { display: flex; flex-direction: column; gap: 2px; min-height: 36px; align-items: center; padding-top: 3px; }
+.cp-cal i, .cp-calleg i { width: 16px; height: 16px; display: grid; place-items: center; border-radius: 50%; }
+.cp-cal i svg, .cp-calleg i svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.cp-cal i.ball, .cp-calleg i.ball { color: var(--ink); background: color-mix(in srgb, var(--ink) 14%, transparent); }
+.cp-cal i.join, .cp-calleg i.join { color: #fff; background: var(--zone-top); } .cp-cal i.inj, .cp-calleg i.inj { color: #fff; background: var(--loss); }
+.cp-cal i.inj svg, .cp-calleg i.inj svg { fill: currentColor; stroke: none; }
+.cp-calleg { display: flex; gap: 12px; flex-wrap: wrap; font-size: 11px; color: var(--muted); margin-top: -6px; } .cp-calleg span { display: inline-flex; align-items: center; gap: 5px; }
+.cp-grow { display: grid; gap: 6px; }
+.cp-grow .r { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto 44px; align-items: center; gap: 9px; }
+.cp-grow .n { display: grid; min-width: 0; } .cp-grow .n b { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .cp-grow .n small { font-size: 11px; color: var(--muted); }
+.cp-grow .v { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; } .cp-grow .v i { font-style: normal; margin: 0 2px; }
+.cp-grow .d { font-family: var(--f-display); font-weight: 400; font-size: 17px; color: var(--win); text-align: right; }
+.cp-ev { display: grid; gap: 8px; }
+.cp-ev .r { display: grid; grid-template-columns: 30px 1fr; gap: 10px; align-items: start; }
+.cp-ev .ic { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; color: #fff; box-shadow: var(--mag-shadow); }
+.cp-ev .ic svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.cp-ev .ev-pot .ic { background: #2E9D5B; } .cp-ev .ev-pos .ic { background: #7A5BD0; } .cp-ev .ev-inj .ic { background: var(--loss); } .cp-ev .ev-lk .ic, .cp-ev .ev-mentor .ic { background: #E09A14; } .cp-ev .ev-join .ic { background: var(--zone-top); }
+.cp-ev .ev-inj .ic svg { fill: currentColor; stroke: none; }
+.cp-ev .t { display: grid; min-width: 0; } .cp-ev .t small { font-size: 11px; color: var(--muted); line-height: 1.2; } .cp-ev .t b { font-size: 13px; line-height: 1.4; } .cp-ev .t em { font-style: normal; font-size: 12px; font-weight: 700; color: var(--accent); }
+.cp-ev .ev-inj .t em { color: var(--loss); }
+.cp-pmt { display: grid; gap: 4px; }
+.cp-pmt .r { display: grid; grid-template-columns: 36px 1fr auto 24px; align-items: center; gap: 8px; font-size: 13px; }
+.cp-pmt small { color: var(--muted); font-size: 11px; } .cp-pmt b { font-family: var(--f-display); font-weight: 400; font-size: 15px; font-variant-numeric: tabular-nums; }
+.cp-pmt i { font-style: normal; font-size: 11px; font-weight: 900; text-align: center; border-radius: 5px; line-height: 20px; }
+.cp-pmt i.w { background: color-mix(in srgb, var(--win) 22%, transparent); color: var(--win); } .cp-pmt i.l { background: color-mix(in srgb, var(--loss) 18%, transparent); color: var(--loss); } .cp-pmt i.d { background: var(--surface2); color: var(--muted); }
+.cp-home { display: grid; gap: 10px; } .cp-hh b { display: block; font-size: 15px; }
+.cp-prog { position: relative; height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; } .cp-prog i { position: absolute; inset: 0 auto 0 0; border-radius: 4px; background: var(--accent-bg); }
 </style>
 <div id="root"></div>
 <div id="scrim" class="scrim" hidden></div>
@@ -1613,7 +1679,13 @@ function migrate(S, DATA) {
     for (const p of Object.values(S.players)) if (!p.bp && p.nat === 'JPN') { if (!p.gen) { if (dp[p.id]) p.bp = dp[p.id]; } else p.bp = bpFor(p.id, p.yo && S.clubs[p.yo] ? S.clubs[p.yo].area : null); }
     linkEstimate(S);
   }
-  S.v = Math.max(S.v || 1, 16);
+  // v17 (2026-10-16): キャンプ. The summer camp of 2026/27 was before the game began, so a save of that season has none
+  // (campPlan); from the next season on it goes as in a new game.
+  if ((S.v || 1) < 17) {
+    for (const c of Object.values(S.clubs)) if (c.fin && c.fin.camp == null) c.fin.camp = 0;
+    if (S.fixtures && S.fixtures.length) S.camp = campPlan(S);
+  }
+  S.v = Math.max(S.v || 1, 17);
   return S;
 }
 // old saves: the season's unplayed league rounds go to the real 2026/27 dates (a round whose date has passed goes to the
@@ -1654,8 +1726,10 @@ function posValues(p) {
   });
 }
 function bestRoles(p, n) { return posValues(p).sort((a, b) => b.v - a.v).slice(0, n || 3); }
-// growth for one week; dry=true returns the expected change without touching the player
-function devWeek(S, p, dry) {
+// growth for one week; dry=true returns the expected change without touching the player. opt.g (キャンプ, 2026-10-16): that
+// many weeks' growth at once, without the week's ageing, 開花 or position training (the camp adds training, not time)
+function devWeek(S, p, dry, opt) {
+  const camp = opt && opt.g;
   const c = S.clubs[p.club]; if (!c) return null;
   const a = age(p, S.date); const isMy = p.club === S.my;
   const tf = isMy ? (p.tf || 'auto') : 'auto';
@@ -1680,9 +1754,10 @@ function devWeek(S, p, dry) {
     g = Math.min(gap * k / 4.33 * (1 + (fac - 2) * 0.12), rb ? rb.gMax : GROW.gMax) * playing * trg * it.g;
     if (a <= TOWN.b.dorm.age && !p.loan && built(c, 'dorm')) g *= TOWN.b.dorm.young;   // 選手寮
     if (p.learn) g *= 0.75;
+    if (camp) g *= camp;
   }
   // 開花: playing young players raise their own ceiling (how much depends on minutes and how well they play)
-  if (!dry && a <= 23 && !abroadOf(S, p)) {
+  if (!dry && !camp && a <= 23 && !abroadOf(S, p)) {
     const sh = shareFor(S, p);
     if (sh != null && sh >= GROW.bloomMin) {
       const apps = p.st.apps || 0, avg = apps ? p.st.rt / apps : 6.5;
@@ -1703,12 +1778,12 @@ function devWeek(S, p, dry) {
     at[i] = Math.min(aMax, at[i] + T * d[i] * mult);
   }
   // ageing: legs go first, the head keeps improving for a while
-  if (a >= 30) {
+  if (a >= 30 && !camp) {
     const r1 = dry ? 1 : 0.5 + R(), r2 = dry ? 1 : 0.5 + R();
     for (const i of [4, 5, 6]) at[i] -= (a - 29) * 0.025 * r1;
     for (const i of [0, 1, 2, 3, 8]) at[i] -= (a - 29) * 0.008 * r2;
   }
-  if (a >= 24 && a <= 33 && at[7] < p.pot + 6) at[7] += 0.012;
+  if (a >= 24 && a <= 33 && at[7] < p.pot + 6 && !camp) at[7] += 0.012;
   for (let i = 0; i < 9; i++) at[i] = clamp(at[i], 15, aMax);
   const before = p.ovr;
   const nOvr = calcOvr({ pos: p.pos, at });
@@ -1717,7 +1792,7 @@ function devWeek(S, p, dry) {
   p.ovr = clamp(calcOvr(p), 30, ovrMax(p));
   if (p.ovr > p.pot) p.pot = Math.ceil(p.ovr);
   // position retraining: aptitude in the chosen position climbs toward LEARN_MAX
-  if (p.learn) {
+  if (p.learn && !camp) {
     const dp = p.learn.pos;
     if (!DP_CAT[dp] || dp === ppOf(p) || dp === 'GK' || p.pos === 'GK') p.learn = null;
     else {
@@ -1806,7 +1881,7 @@ function newGame(DATA, clubId, managerName, todayISO) {
     initAttrs(S.players[p.id]);
   }
   addAbroad(S, DATA);
-  S.v = 16; S.presV = 4; S.presets = []; S.nt = { done: {}, res: [], log: [] };
+  S.v = 17; S.presV = 4; S.presets = []; S.nt = { done: {}, res: [], log: [] };
   secOf(S).f0 = S.clubs[clubId].funds;
   for (const p of squad(S, clubId)) track(S, p);
   for (const id of S.order) autoLineup(S, id);
@@ -1832,7 +1907,7 @@ function addClub(S, c, guest) {
     pres: c.pres || 2, titles: Object.assign({ j1: 0, lc: 0, ec: 0, acl: 0 }, c.titles || {}), o10: !!c.o10,
     funds: startFunds, fac: { train: 2, youth: 2, medical: 2, scout: 1 },
     tac: { form: FORMATIONS[c.form] ? c.form : '4-4-2', ment: 'bal', press: 'mid', ...TAC_DEF, xi: [], bench: [] },
-    fin: { gate: 0, spon: 0, wages: 0, trans: 0, prize: 0, fac: 0, up: 0 },
+    fin: { gate: 0, spon: 0, wages: 0, trans: 0, prize: 0, fac: 0, up: 0, camp: 0 },
   };
   fansInit(S.clubs[c.id]);
   if (!guest && !S.order.includes(c.id)) S.order.push(c.id);
@@ -3478,6 +3553,7 @@ function advance(S, maxDays) {
     if (S.fired) return { stop: 'fired' };
     if (S.inbox.filter(x => !x.seen).length > before) return { stop: 'inbox' };
     if (S._stopNote) { const n = S._stopNote; S._stopNote = null; return { stop: 'note', text: n }; }
+    if (S.camp && S.camp.show === 1) { S.camp.show = 2; return { stop: 'camp' }; }   // the camp report
     if (S.sec && S.sec.stop) { S.sec.stop = false; return { stop: 'sec' }; }
   }
   return { stop: 'limit' };
@@ -3509,6 +3585,7 @@ function nextDay(S) {
   if (isIn) transferDay(S);
   ntDay(S);
   euroDay(S);
+  campDay(S);   // after the national teams: a player back from the アジアカップ joins the camp that day
   // board patience
   { const B = boardLv(S);
     if (S.board <= B.fireMid && S.fixtures.filter(f => f.played && !f.cup && (f.h === S.my || f.a === S.my)).length >= B.fireAfter) {
@@ -4343,6 +4420,7 @@ function takeJob(S, cid) {
   if (S.sec) { S.sec.back = []; S.sec.f0 = S.clubs[cid].funds; S.sec.notes = S.sec.notes.filter(n => !/^spon/.test(n.k) && n.k !== 'built'); }
   if (S.clubs[from]) delete S.clubs[from].fanH; fansLog(S);
   sponJob(S);
+  campJob(S);
   news(S, `${S.clubs[cid].name}の新監督に就任。目標は「${S.clubs[cid].target.jp}」。`, 'big');
 }
 
@@ -4971,7 +5049,8 @@ function rollover(S) {
   // new season
   S.season += 1;
   S.date = newDate;
-  for (const cid of S.order) { const c = S.clubs[cid]; c.fin = { gate: 0, spon: 0, wages: 0, trans: 0, prize: 0, fac: 0, up: 0 }; }
+  for (const cid of S.order) { const c = S.clubs[cid]; c.fin = { gate: 0, spon: 0, wages: 0, trans: 0, prize: 0, fac: 0, up: 0, camp: 0 }; }
+  delete S.camp;   // next winter's camp is planned from the new fixtures
   for (const p of Object.values(S.players)) p.cond = 100;
   S.fixtures = genFixtures(S.order, null, S.season);
   S.inbox = S.inbox.filter(x => !x.done).slice(0, 20);
@@ -5363,6 +5442,252 @@ function euroOffer(S, p) {
   }
 }
 
+/* ---------- キャンプ (2026-10-16, 作業7, ユーザーの選んだ案A＝作戦ボードの地図、行き先はマグネット) ----------
+   With the autumn-spring season (2026/27〜) the clubs' camp moved to the summer before the August opening: in July 2026
+   the J1 clubs camped about 7/5〜7/26 for one to three weeks (横浜FM 宮崎 7/12〜25), most in 北海道 (8 J1 clubs), then
+   宮崎 (5) and 沖縄; nobody had announced a camp in the winter break (checked 2026-10-16, see HANDOFF). So every J1 club
+   goes to a camp of CAMP.len (14) days that ends CAMP.gap (13) days before its first league match of the season
+   (2027/28: 7/12〜7/25 for the 8/7 opening). The game starts on 2026-08-07, after that summer's camps: the first camp is
+   in the second season. CAMP.ask (21) days before it the secretary asks where (note 'camp', she stops the days); if
+   nothing is chosen by the first day she takes 北海道 (CAMP.std). The cost is paid on the first day. Every day of the camp
+   a player of a J1 club who is there counts a day (not injured, not away with his national team — he joins the day he is
+   back —, not on loan; a summer signing from the day he arrives); a minor injury now and then (inj over the whole camp,
+   3〜14 days). At 宮崎 the injured come along: their rehab runs twice as fast.
+   At the end (campEnd) the effects are scaled by his days / CAMP.len: growth (wk weeks of devWeek at once, no ageing),
+   連携 (pm practice matches for the XI: neighbours LINK.adj, the other pairs LINK.far, the curve of linkMatch), 調子
+   (p.form += form). My club also gets a few できごと (a youngster's 伸びしろ +1, a new position's aptitude, two players
+   click, a veteran and a youngster) and practice-match results, all in the report (S.camp.rep; the days stop with
+   {stop: 'camp'}). Every AI club does the standard camp (北海道: cost, growth, 連携, 調子, injuries; no できごと), so the
+   league stays level and only my club chooses. (The first version, the same day, put it in the winter break 1/24〜2/2;
+   the user asked to match the real calendar.)
+   S.camp = { s: season, ask, from, to, re (the opening), st: null|'run'|'done', dest, auto, club, paid, dd {pid: days},
+   out {pid: why}, ev [], rep, show, skip } */
+const CAMP = {
+  ask: 21, len: 14, gap: 13, std: 'hok', link: 'oki', inj: [3, 14],
+  keys: ['hok', 'miya', 'oki', 'abr', 'none'],
+  d: {
+    hok: { jp: '北海道', cost: 5000, wk: 3, pm: 4, form: 0.3, inj: 0.02, ev: [1, 2] },
+    miya: { jp: '宮崎', cost: 4000, wk: 3, pm: 3, form: 0.2, inj: 0.03, ev: [1, 2], rehab: 2 },
+    oki: { jp: '沖縄', cost: 6000, wk: 3, pm: 5, form: 0.2, inj: 0.04, ev: [2, 3], pos: 2 },
+    abr: { jp: '海外', sub: 'スペイン', cost: 18000, wk: 6, pm: 4, form: -0.2, inj: 0.06, ev: [2, 3], pot: 2 },
+    none: { jp: '行かない', cost: 0, wk: 0, pm: 0, form: 0, inj: 0, ev: [0, 0] },
+  },
+};
+// the dates of the season's camp: before its first league match. A season already under way (a new game starts on
+// 2026-08-07) has none.
+function campPlan(S) {
+  const lg = S.fixtures.filter(f => !f.cup && f.date >= S.season + '-07-01').map(f => f.date).sort();
+  if (!lg.length) return { s: S.season, skip: true };
+  const to = D.add(lg[0], -CAMP.gap), from = D.add(to, -(CAMP.len - 1));
+  const C = { s: S.season, ask: D.add(from, -CAMP.ask), from, to, re: lg[0], st: null, dest: null };
+  if (S.date >= from) C.skip = true;
+  return C;
+}
+function campOf(S) { if (!S.camp || S.camp.s !== S.season) S.camp = campPlan(S); return S.camp; }
+// still to choose (her question is open)
+function campPending(S) { const C = campOf(S); return !C.skip && !C.st && !C.dest && S.date >= C.ask && S.date < C.from; }
+// the manager picks (or changes) the destination before the camp starts
+function campPick(S, k) {
+  const C = campOf(S), T = CAMP.d[k];
+  if (!T) return { ok: false, msg: '行き先が正しくありません' };
+  if (C.skip || C.st) return { ok: false, msg: 'キャンプはもう始まっています' };
+  if (T.cost && S.clubs[S.my].funds < T.cost) return { ok: false, msg: `資金が足りません（あと${money(T.cost - S.clubs[S.my].funds)}）` };
+  C.dest = k; C.auto = false;
+  if (S.sec) S.sec.notes = S.sec.notes.filter(n => n.k !== 'camp');
+  return { ok: true, msg: k === 'none' ? '今年はキャンプに行きません' : `${T.jp}キャンプに決めました` };
+}
+// who can't come (as things stand today): with the national team, injured past the first day, out on loan
+function campAbsent(S) {
+  const C = campOf(S), out = [];
+  if (C.skip || !C.from) return out;
+  const lead = Math.max(0, D.diff(C.from, S.date));
+  for (const p of squad(S, S.my)) {
+    if (p.away) out.push({ pid: p.id, why: 'nt', cc: p.away.cc });
+    else if (p.inj > lead) out.push({ pid: p.id, why: 'inj', left: p.inj - lead });
+  }
+  for (const p of myLoans(S)) out.push({ pid: p.id, why: 'loan', to: p.loan.to });
+  return out;
+}
+// her suggestion: 宮崎 when a regular would heal in time only there (the rehab), 沖縄 while the XI's 連携 is low (the most
+// practice matches), 海外 for a rich club with young regulars, 北海道 otherwise
+function campRec(S) {
+  const C = campOf(S), c = S.clubs[S.my]; if (C.skip || !C.from) return { k: CAMP.std };
+  const rk = CAMP.keys.find(k => CAMP.d[k].rehab);
+  const xi = c.tac.xi.filter(Boolean), lead = Math.max(0, D.diff(C.from, S.date)), left = D.diff(C.re, S.date), extra = CAMP.len * (CAMP.d[rk].rehab - 1);
+  const hurt = xi.map(id => S.players[id]).filter(p => p && !p.away && p.inj > lead && p.inj > left && p.inj - extra <= left);   // back for the opening only with the rehab
+  if (hurt.length) return { k: rk, why: 'rehab', pid: hurt[0].id };
+  const L = linkEval(S, S.my, c.tac.form, c.tac.xi);
+  if (L.n && L.avg < 50) return { k: CAMP.link, why: 'link', v: Math.floor(L.avg) };
+  const young = xi.filter(id => S.players[id] && age(S.players[id], S.date) <= 21).length;
+  if (young >= 2 && c.funds >= 150000) return { k: 'abr', why: 'young', n: young };
+  return { k: CAMP.std, why: 'std' };
+}
+function campDay(S) {
+  if (S.fired) return;
+  const C = campOf(S); if (C.skip || !C.from) return;
+  const d = S.date;
+  if (!C.asked && d >= C.ask && d < C.from) {
+    C.asked = true;
+    if (!C.dest && S.clubs[S.my]) secPost(S, 'camp', { s: S.season }, { stop: true });
+  }
+  if (d < C.from || C.st === 'done') return;
+  if (!C.st) campStart(S);
+  campCount(S);
+  if (d >= C.to) campEnd(S);
+}
+function campStart(S) {
+  const C = S.camp, my = S.clubs[S.my];
+  if (!C.dest) { C.dest = CAMP.std; C.auto = true; }
+  C.st = 'run'; C.club = S.my; C.dd = {}; C.out = {}; C.first = {}; C.ev = [];
+  const T = CAMP.d[C.dest];
+  for (const cid of S.order) {
+    const c = S.clubs[cid], cost = cid === S.my ? T.cost : CAMP.d[CAMP.std].cost;
+    if (cost) { c.funds -= cost; c.fin.camp = (c.fin.camp || 0) + cost; }
+  }
+  C.paid = T.cost;
+  for (const p of squad(S, S.my)) if (p.away || p.inj > 0) C.out[p.id] = p.away ? 'nt' : 'inj';
+  if (S.sec) S.sec.notes = S.sec.notes.filter(n => n.k !== 'camp');
+  if (C.dest === 'none') news(S, '今年は夏のキャンプに行かず、クラブハウスで調整する。', 'info');
+  else news(S, `${T.jp}${T.sub ? `（${T.sub}）` : ''}キャンプがスタート（〜${jdate(C.to)}）。${C.auto ? `行き先が決まらなかったので、標準の${CAMP.d[CAMP.std].jp}に。` : ''}費用 ${money(T.cost)}。`, 'big');
+}
+// one day of the camp for every J1 club: who is there, a knock now and then, 沖縄's rehab
+function campCount(S) {
+  const C = S.camp;
+  for (const cid of S.order) {
+    const mine = cid === S.my && C.club === S.my, T = CAMP.d[mine ? C.dest : CAMP.std];
+    if (mine && C.dest === 'none') continue;
+    for (const p of squad(S, cid)) {
+      if (mine && T.rehab && p.inj > 0 && !p.away) {   // 宮崎: the injured come along and heal faster
+        p.inj = Math.max(0, p.inj - (T.rehab - 1)); C.reh = (C.reh || 0) + 1;
+        if (p.inj === 0) news(S, `${p.name}が負傷から復帰（${T.jp}でリハビリ）。`, 'info');
+        if (p.inj > 0) continue;
+      }
+      if (p.inj > 0 || p.away) continue;
+      if (mine && C.dd[p.id] == null && S.date > C.from) { C.first[p.id] = S.date; C.ev.push({ k: 'join', d: S.date, pid: p.id, why: C.out[p.id] || 'new' }); }
+      C.dd[p.id] = (C.dd[p.id] || 0) + 1;
+      if (T.inj && R() < T.inj / CAMP.len) {
+        p.inj = ri(CAMP.inj[0], CAMP.inj[1]);
+        if (mine) { C.ev.push({ k: 'inj', d: S.date, pid: p.id, n: p.inj, back: D.add(S.date, p.inj) }); news(S, `${p.name}がキャンプ中に負傷。全治およそ${p.inj}日。`, 'warn'); }
+      }
+    }
+  }
+}
+// practice for the XI's pairs: n matches of pm at the camp, each the curve of linkMatch (a fraction at the end)
+function campLinks(S, cid, pm, share) {
+  const c = S.clubs[cid], lk = c.lk || (c.lk = {}), xi = c.tac.xi, F = FORMATIONS[c.tac.form];
+  if (!pm || !F) return [];
+  const adj = new Set(linkAdj(c.tac.form).map(([i, j]) => i * 32 + j)), out = [];
+  for (let i = 0; i < xi.length; i++) for (let j = i + 1; j < xi.length; j++) {
+    const a = S.players[xi[i]], b = S.players[xi[j]]; if (!a || !b || a.club !== cid || b.club !== cid) continue;
+    const key = lkKey(a.id, b.id), e = lk[key] || [0, 0], v0 = e[0], rate = adj.has(i * 32 + j) ? LINK.adj : LINK.far;
+    const n = pm * Math.min(share(a), share(b));
+    if (n <= 0) { if (adj.has(i * 32 + j)) out.push([a.id, b.id, v0, v0]); continue; }   // one of them wasn't there
+    let v = v0;
+    for (let m = 0; m < Math.ceil(n); m++) v = Math.min(100, v + Math.min(1, n - m) * rate * Math.max(LINK.floor, 1 - v / LINK.top));
+    lk[key] = [Math.round(v * 10) / 10, e[1]];
+    if (adj.has(i * 32 + j)) out.push([a.id, b.id, v0, lk[key][0]]);
+  }
+  return out;
+}
+const linkAdd = (S, cid, a, b, x) => { const c = S.clubs[cid], lk = c.lk || (c.lk = {}), key = lkKey(a, b), e = lk[key] || [0, 0]; const v0 = e[0]; lk[key] = [Math.round(Math.min(100, v0 + x) * 10) / 10, e[1]]; return [v0, lk[key][0]]; };
+function campEnd(S) {
+  const C = S.camp; C.st = 'done';
+  for (const cid of S.order) {
+    const mine = cid === S.my && C.club === S.my, k = mine ? C.dest : CAMP.std, T = CAMP.d[k];
+    const share = p => Math.min(1, (C.dd[p.id] || 0) / CAMP.len);
+    const sq = squad(S, cid), c = S.clubs[cid];
+    const L0 = mine ? linkEval(S, cid, c.tac.form, c.tac.xi) : null;
+    const grow = [];
+    for (const p of sq) {
+      const f = share(p); if (!f || !p.at) continue;
+      const a = p.ovr;
+      if (T.wk) devWeek(S, p, false, { g: T.wk * f });
+      if (T.form) p.form = clamp(p.form + T.form * f, 3, 9.5);
+      if (mine) grow.push({ pid: p.id, a: r1(a), b: r1(p.ovr), d: p.ovr - a });
+    }
+    const lk = campLinks(S, cid, T.pm, share);
+    if (!mine) continue;
+    const ev = campEvents(S, T, share);
+    const L1 = linkEval(S, cid, c.tac.form, c.tac.xi, { near: true });
+    const had = new Set(L0.combos.map(x => x.k));
+    const xiPairs = new Map(lk.map(x => [lkKey(x[0], x[1]), x]));
+    for (const e of ev) if (e.k === 'lk' || e.k === 'mentor') { const x = xiPairs.get(lkKey(e.pid, e.q)); if (x) x[3] = e.b; }
+    const avg = l => l.length ? l.reduce((s, x) => s + x, 0) / l.length : 0;
+    grow.sort((x, y) => y.d - x.d);
+    const snap = it => ({ k: it.k, jp: it.jp, cond: it.cond, val: Math.floor(it.val * 10) / 10, need: it.need, who: it.who, num: it.num, att: it.att, mid: it.mid, def: it.def, all: it.all });
+    C.rep = {
+      k, auto: !!C.auto, from: C.from, to: C.to, re: C.re, cost: C.paid || 0, n: sq.filter(p => C.dd[p.id]).length,
+      grow: grow.slice(0, 5).map(({ pid, a, b }) => ({ pid, a, b })), gsum: r1(grow.reduce((s, x) => s + x.d, 0)),
+      form: c.tac.form, xi: c.tac.xi.slice(), lk: [...xiPairs.values()].map(x => [x[0], x[1], r1(x[2]), r1(x[3])]),
+      avg0: r1(L0.avg), avg1: r1(L1.avg), fm: T.form,
+      cb: L1.combos.filter(x => !had.has(x.k)).map(snap), near: L1.near.slice(0, 2).map(snap),
+      ev: C.ev.concat(ev).sort((a, b) => a.d.localeCompare(b.d)), pm: campMatches(S, k),
+      none: sq.filter(p => !C.dd[p.id]).map(p => ({ pid: p.id, why: p.away ? 'nt' : p.inj > 0 ? 'inj' : C.out[p.id] || 'inj' })),
+    };
+    if (k !== 'none') { C.show = 1; news(S, `${T.jp}キャンプが終了。チーム全体で +${C.rep.gsum}、連携の平均 ${Math.floor(C.rep.avg0)} → ${Math.floor(C.rep.avg1)}。`, 'grow'); }
+  }
+  delete C.dd; delete C.first;
+}
+// my club's できごと: a youngster shows himself (伸びしろ +1), a new position clicks (+15 aptitude), two players click
+// (+10 連携), a veteran takes a youngster under his wing (+8). 沖縄 favours positions, 海外 the youngsters.
+function campEvents(S, T, share) {
+  const C = S.camp, c = S.clubs[S.my], out = [], used = new Set();
+  const n = ri(T.ev[0], T.ev[1]); if (!n) return out;
+  const here = squad(S, S.my).filter(p => share(p) >= 0.5 && p.inj <= 0);
+  const day = () => D.add(C.from, ri(1, CAMP.len - 1));
+  const xi = c.tac.xi;
+  const kinds = { pot: T.pot || 1, pos: T.pos || 1, lk: 1, mentor: 0.6 };
+  for (let t = 0; t < n; t++) {
+    const k = wpick(Object.keys(kinds), x => kinds[x]); kinds[k] = 0;   // each kind once
+    if (k === 'pot') {
+      const p = pick(here.filter(p => !used.has(p.id) && age(p, S.date) <= 21 && p.pot + 1 <= potCap(p)));
+      if (!p) continue; used.add(p.id); const a = Math.round(p.pot); p.pot = Math.min(potCap(p), p.pot + 1);
+      out.push({ k, d: day(), pid: p.id, a, b: Math.round(p.pot), t: ri(0, 2) });
+    } else if (k === 'pos') {
+      const cand = [];
+      for (const p of here) { if (used.has(p.id) || p.pos === 'GK') continue; for (const dp of DPOS) { if (dp === 'GK' || dp === ppOf(p)) continue; const v = apt(p, dp); if (v >= 40 && v < 80) cand.push({ p, dp, v }); } }
+      const x = wpick(cand, z => z.v - 30); if (!x) continue; used.add(x.p.id);
+      x.p.ap = x.p.ap || {}; x.p.ap[x.dp] = Math.min(LEARN_MAX, Math.round(x.v) + 15);
+      out.push({ k, d: day(), pid: x.p.id, dp: x.dp, a: Math.round(x.v), b: x.p.ap[x.dp] });
+    } else if (k === 'lk') {
+      const pr = linkAdj(c.tac.form).map(([i, j]) => [S.players[xi[i]], S.players[xi[j]]]).filter(([a, b]) => a && b && here.includes(a) && here.includes(b) && !used.has(a.id) && !used.has(b.id))
+        .map(([a, b]) => ({ a, b, v: linkOf(S, S.my, a.id, b.id) })).filter(x => x.v >= 45 && x.v < 90).sort((x, y) => y.v - x.v);
+      const x = pr[0]; if (!x) continue; used.add(x.a.id); used.add(x.b.id);
+      const [a, b] = linkAdd(S, S.my, x.a.id, x.b.id, 10);
+      out.push({ k, d: day(), pid: x.a.id, q: x.b.id, a: Math.floor(a), b: Math.floor(b) });
+    } else if (k === 'mentor') {
+      const old = pick(here.filter(p => age(p, S.date) >= 32 && !used.has(p.id))), yg = old && pick(here.filter(p => age(p, S.date) <= 21 && !used.has(p.id) && p.pos === old.pos));
+      if (!old || !yg) continue; used.add(old.id); used.add(yg.id);
+      const [a, b] = linkAdd(S, S.my, old.id, yg.id, 8);
+      out.push({ k, d: day(), pid: old.id, q: yg.id, a: Math.floor(a), b: Math.floor(b) });
+    }
+  }
+  return out;
+}
+// the practice matches (for the report; the 連携 they bring is in campLinks): J2 clubs and a 大学選抜 at home, Spanish clubs abroad
+function campMatches(S, k) {
+  const T = CAMP.d[k], C = S.camp; if (!T.pm) return [];
+  const me = strength(S, S.my);
+  let pool;
+  if (k === 'abr') pool = Object.values(S.clubs).filter(c => c.ab && c.ab.cc === 'ESP').map(c => ({ cid: c.id, s: 60 + c.ab.lv * 4.5 }));
+  else pool = Object.values(S.clubs).filter(c => !c.ab && !S.order.includes(c.id) && squad(S, c.id).length >= 18).map(c => ({ cid: c.id, s: strength(S, c.id) }));
+  const out = [];
+  for (let i = 0; i < T.pm; i++) {
+    const o = (i === 0 && k !== 'abr') || !pool.length ? { cid: null, s: 61 } : pool.splice(Math.floor(R() * pool.length), 1)[0];
+    const df = me - o.s, pois = l => { let x = 0, q = Math.exp(-l), t = q, u = R(); while (u > t && x < 9) { x++; q *= l / x; t += q; } return x; };
+    out.push({ d: D.add(C.from, Math.min(CAMP.len - 1, Math.round((i + 0.5) * CAMP.len / T.pm))), cid: o.cid, gf: pois(clamp(1.4 + df * 0.09, 0.4, 3.6)), ga: pois(clamp(1.1 - df * 0.07, 0.25, 3)) });
+  }
+  return out;
+}
+// the report was seen
+function campSeen(S) { if (S.camp) S.camp.show = 0; }
+// a new job: before the camp the new club chooses again; during it the new club does the standard camp (no report)
+function campJob(S) {
+  const C = S.camp; if (!C || C.s !== S.season) return;
+  if (S.sec) S.sec.notes = S.sec.notes.filter(n => n.k !== 'camp');
+  if (!C.st) { C.dest = null; C.auto = false; C.asked = false; }
+}
+
 /* ---------- export ---------- */
 const API = {
   D, jdate, FORMATIONS, ROLE, DPOS, DP_CAT, DP_JP, LEARN_MAX, PLAY_MAX, ppOf, apt, roleApt, posValues, learnRate, learnWeeks, MENTALITY, PRESS, TRAINING, FACILITY, ATTR, ATTR_SHOW, FOCUS, INTENS,
@@ -5371,6 +5696,7 @@ const API = {
   SPON, sponOf, sponOn, sponDeals, sponEst, sponP, sponTarget, sponOffer, sponPending, sponRec, sponPick, sponAuto, sponLook, sponStat, sponNow, sponCheck, sponMonthly, sponMonth, sponSettle, sponJob, sponText, sponShort, payMonths, attendance,
   SEC, secOf, secName, setSecName, secPost, secNotes, secSeen, secDone, secFix, secSwap, secSwapAll, secTook, secReturns, secRestore, secKeep, secMonth, bigMatch, matchStory,
   autoLineup, autoBench, benchSwap, benchRemove, lineupIssues, BENCH_SIZE, PRESET_MAX, savePreset, loadPreset, presetStatus, renamePreset, deletePreset, presetsOf, fillEmpty, clubRating, validateLineup, effective, posPenalty, available, nextComp, compOf, susIn, setSus, susList, bansOf, banHits, addBan, serveBan, banSweep, banPending, COMP_JP, CARD, RED, teamRating,
+  CAMP, campPlan, campOf, campPending, campPick, campAbsent, campRec, campDay, campSeen, campJob,
   LINK, COMBO, linkAdj, linkOf, linkEval, linkLive, linkMatch, linkPartners, linkEstimate, linkSweep, linkDrop, comboText, bpFor, moveP,
   createMatch, stepMatch, simulateFull, finishMatch, doSub, benchOptions, onPitch, setMentality, bestSubFor, setCounter, mentLabel,
   advance, nextDay, simAIToday, myFixtureToday, nextMyFixture, todaysFixtures, inWindow, windowEnd, nextWindowStart,
@@ -6209,6 +6535,7 @@ function viewHome() {
       <p class="fine" style="margin:0">タップして伸びしろを確認し、契約できます。</p></section>`);
   }
   const nc = ntCard(); if (nc) out.push(nc);
+  out.push(campCard());
   const offers = S.inbox.filter(x => x.type === 'offer' && !x.done);
   if (offers.length) { out.push(`<h3 class="sec-h">移籍オファー<small>${offers.length}件</small></h3>`); offers.forEach(o => { out.push(offerCard(o)); o.seen = true; }); }
   if (S.lastResult) {
@@ -6723,6 +7050,16 @@ Object.assign(SEC_VIEW, {
     done: 'わかりました',
   },
 });
+// キャンプ (2026-10-16): her question on 1/4 (it stops the days)
+Object.assign(SEC_VIEW, {
+  camp: {
+    bubble: () => E.campPending(S) ? '夏のキャンプの行き先を決めましょう ›' : 'キャンプの行き先は決まっています ›',
+    title: () => '夏のキャンプ',
+    body: () => { const C = E.campOf(S);
+      return E.campPending(S) ? `<p class="small" style="margin:0">${jdw(C.from)}〜${jdw(C.to)}の${E.CAMP.len}日間、開幕前の夏のキャンプに行きます。行き先を決めてください。決めないままだと${E.CAMP.d[E.CAMP.std].jp}（標準）にします。</p><button class="btn primary block" data-act="campOpen" style="min-height:44px">行き先を選ぶ</button>` : '<p class="small" style="margin:0">キャンプの行き先は決まっています。</p>'; },
+    done: 'わかりました',
+  },
+});
 const secView = n => SEC_VIEW[n.k] || { bubble: () => `${E.SEC.role}からのお知らせ ›`, title: () => 'お知らせ', body: x => `<p class="small" style="margin:0">${esc(x.data.text || '')}</p>`, done: 'わかりました' };
 // what she has to say now, most pressing first
 function secItems() {
@@ -6744,7 +7081,7 @@ function secBand(si) {
   let say;
   if (si.fix) say = `<button class="sec-bub" data-act="secOpen"><b>${secFixLine(si.fix)} ›</b><small>${esc(secWho())}</small></button>`;
   else if (si.back.length) { const m = si.back[0]; say = `<div class="sec-bub"><button class="sec-bub-t" data-act="secOpen"><b>${backLine(m)}</b><small>${backSub(m)}</small></button><button class="btn primary sec-bub-do" data-act="secBack" data-id="${m.out}">戻す</button></div>`; }
-  else { const n = si.unseen[0]; say = `<button class="sec-bub" data-act="${n && n.k === 'spon' && E.sponPending(S) ? 'sponOpen' : 'secOpen'}"><b>${n ? esc(secView(n).bubble(n)) : `${esc(secWho())}からの連絡 ›`}</b><small>${esc(secWho())}${si.unseen.length > 1 ? `・ほか${si.unseen.length - 1}件` : ''}</small></button>`; }
+  else { const n = si.unseen[0]; say = `<button class="sec-bub" data-act="${n && n.k === 'spon' && E.sponPending(S) ? 'sponOpen' : n && n.k === 'camp' && E.campPending(S) ? 'campOpen' : 'secOpen'}"><b>${n ? esc(secView(n).bubble(n)) : `${esc(secWho())}からの連絡 ›`}</b><small>${esc(secWho())}${si.unseen.length > 1 ? `・ほか${si.unseen.length - 1}件` : ''}</small></button>`; }
   return `<div class="sec-band" id="sec-float"><button class="sec-mag" data-act="secOpen" aria-label="${esc(secWho())}の連絡（${si.n}件）">${akiMag('md', si.n)}</button>${say}</div>`;
 }
 // other tabs: just the magnet and a count, put beside the switch bar by secPlace (the bar gets shorter, so the magnet
@@ -7517,7 +7854,7 @@ function viewClub() {
   const v = UI.cl.view; let body = '';
   const c = S.clubs[S.my];
   if (v === 'main') {
-    const fin = c.fin; const inc = fin.gate + fin.spon + fin.prize + Math.max(0, fin.trans); const exp = fin.wages + fin.fac + (fin.up || 0) + Math.max(0, -fin.trans);
+    const fin = c.fin; const inc = fin.gate + fin.spon + fin.prize + Math.max(0, fin.trans); const exp = fin.wages + fin.fac + (fin.up || 0) + (fin.camp || 0) + Math.max(0, -fin.trans);
     const wages = E.squad(S, S.my).reduce((a, p) => a + E.wage(p), 0);
     body = `<section class="card" style="display:grid;gap:10px">
         <div class="row"><div class="eyebrow">フロントの信頼</div><span class="spacer"></span><b class="tnum">${S.board} / 100</b></div>
@@ -7535,7 +7872,7 @@ function viewClub() {
       ${sponCard('club')}
       <section class="card" style="display:grid;gap:10px">
         <div class="row"><div class="eyebrow">資金</div><span class="spacer"></span><b style="font-family:var(--f-display);font-weight:400;font-size:22px" class="${c.funds < 0 ? 'o-low' : ''}">${E.money(c.funds)}</b></div>
-        <dl class="kv"><dt>入場料収入</dt><dd>${E.money(fin.gate)}</dd><dt>スポンサー収入</dt><dd>${E.money(fin.spon)}</dd><dt>賞金</dt><dd>${E.money(fin.prize)}</dd><dt>移籍収支</dt><dd>${fin.trans >= 0 ? '+' : ''}${E.money(fin.trans)}</dd><dt>人件費</dt><dd>-${E.money(fin.wages)}</dd><dt>施設・建設</dt><dd>-${E.money(fin.fac)}</dd><dt>維持費</dt><dd>-${E.money(fin.up || 0)}</dd></dl>
+        <dl class="kv"><dt>入場料収入</dt><dd>${E.money(fin.gate)}</dd><dt>スポンサー収入</dt><dd>${E.money(fin.spon)}</dd><dt>賞金</dt><dd>${E.money(fin.prize)}</dd><dt>移籍収支</dt><dd>${fin.trans >= 0 ? '+' : ''}${E.money(fin.trans)}</dd><dt>人件費</dt><dd>-${E.money(fin.wages)}</dd><dt>施設・建設</dt><dd>-${E.money(fin.fac)}</dd><dt>維持費</dt><dd>-${E.money(fin.up || 0)}</dd>${fin.camp ? `<dt>キャンプ</dt><dd>-${E.money(fin.camp)}</dd>` : ''}</dl>
         <div class="small muted">今季の収支 ${inc - exp >= 0 ? '+' : ''}${E.money(inc - exp)}　／　年俸総額 ${E.money(wages)}・月のスポンサー収入 ${(m => E.money(m.base + m.guar))(E.sponMonth(S))}・月の維持費 ${E.money(E.townUpkeep(c))}</div>
       </section>
       <h3 class="sec-h">施設とスタジアム</h3>
@@ -7985,6 +8322,7 @@ function openSheet(body, foot) {
 function closeSheet() {
   // a celebration closed by tapping outside counts as seen (the next one, if any, comes up)
   if (sheetState && sheetState.type === 'cele' && S && S.cele && S.cele.length) { S.cele.shift(); persist(false); if (S.cele.length) setTimeout(sheetCele, 300); }
+  if (sheetState && sheetState.type === 'campRep' && S) { E.campSeen(S); persist(false); }   // the camp report closed by tapping outside
   sheetEl.classList.remove('on'); scrimEl.classList.remove('on'); sheetState = null;
   if (sheetOpen) { sheetOpen = false; unlockScroll(); }
   setTimeout(() => { if (!sheetEl.classList.contains('on')) { sheetEl.hidden = true; scrimEl.hidden = true; sheetEl.innerHTML = ''; } }, 230);
@@ -8003,6 +8341,8 @@ function refreshSheet() {
   if (s.type === 'plan') return sheetPlan();
   if (s.type === 'sec') return sheetSec(s.back, s.fid);
   if (s.type === 'spon') return sheetSpon(s.back, s.fid);
+  if (s.type === 'camp') return sheetCamp();
+  if (s.type === 'campRep') return sheetCampRep();
   if (s.type === 'youth') return sheetYouth(s.back);
   if (s.type === 'town') return sheetTown(s.k);
   if (s.type === 'team') return sheetTeam(s.id, s.tab, s.back);
@@ -8229,6 +8569,188 @@ function sheetMatchTactics() {
     '<button class="btn primary block" data-act="closeSheet">試合に戻る</button>');
 }
 
+/* ---------- キャンプ (2026-10-16, 作業7, ユーザーの選んだ案A＝作戦ボードの地図) ----------
+   Three weeks before the summer camp (2027/28: 6/21 for 7/12〜25) her question opens a sheet with a chalk map on the
+   board, each region in its own dashed frame (北海道, 九州, 沖縄; scales differ): the destinations are magnets (海外 with a
+   dotted flight line off the board, 行かない is the club's own magnet), the chosen one gets a yellow chalk ring and its
+   card underneath (cost, 14 days, 成長・連携・調子・ケガ as dots and words, a line). Her suggestion and who can't come
+   follow. At the end, the camp report: the 14 days in two rows (practice matches, who joined, knocks), the XI's chalk
+   lines after the camp (yellow = past 70 at the camp), new combos and the nearest ones, who grew, what happened, the
+   practice matches and how the team goes into the opening. Home: a card from her question until the opening. */
+const CP_COL = { hok: '#2F6FB0', miya: '#2E8B57', oki: '#1C8FB5', abr: '#D99A1E', none: '#7F868C' };
+const CP_CH = { hok: '北', miya: '宮', oki: '沖', abr: '海' };
+const CP_TXT = {
+  hok: { tag: '標準', dots: [2, 2, 3, 0], injT: 'ほとんどない', line: '夏でも涼しく、練習の質を保てる。J1でいちばん多くのクラブが選ぶので練習試合の相手も多い。ほかのクラブもここと同じだけのキャンプをします。' },
+  miya: { dots: [2, 2, 2, 1], injT: '少ない', line: '施設が整っていて、費用がいちばん安い。負傷中の選手も連れて行き、リハビリが2倍の速さで進む。' },
+  oki: { dots: [2, 3, 2, 2], injT: '少し多い', line: '多くのクラブが集まり、練習試合がいちばん多い。暑さで調子の上がり方は控えめ。新しいポジションを試す「できごと」も起きやすい。' },
+  abr: { dots: [3, 2, 0, 3], injT: '多い', line: '欧州のクラブと練習試合。若手がいちばん伸び、アピールする若手も出やすい。費用が大きく、長旅の疲れが開幕まで残る。' },
+  none: { dots: [0, 0, 0, 0], injT: 'なし', line: 'クラブハウスで調整。お金はかからないが、ほかのクラブより一歩遅れる。' },
+};
+// 北海道, 九州 and 沖縄 in chalk, each in its own frame on the 360×300 board (lon/lat → the frame; the scales differ)
+const CP_HK = [[141.94, 45.52], [142.5, 45.0], [143.4, 44.35], [144.25, 44.0], [144.9, 44.15], [145.33, 44.34], [145.15, 43.95], [145.3, 43.6], [145.82, 43.38], [145.25, 43.15], [144.4, 42.98], [143.7, 42.62], [143.25, 41.93], [142.6, 42.25], [141.6, 42.62], [140.97, 42.32], [140.75, 42.55], [140.37, 42.5], [140.28, 42.25], [140.58, 42.1], [140.82, 42.0], [141.15, 41.82], [140.75, 41.75], [140.45, 41.6], [140.22, 41.42], [140.08, 41.8], [139.85, 42.15], [139.8, 42.5], [140.35, 43.3], [140.95, 43.2], [141.35, 43.2], [141.65, 43.85], [141.75, 44.45], [141.68, 45.0]];
+const CP_KY = [[130.96, 33.96], [131.03, 33.86], [131.17, 33.63], [131.43, 33.57], [131.66, 33.66], [131.74, 33.47], [131.6, 33.3], [131.86, 33.27], [131.86, 33.06], [132.06, 32.93], [131.88, 32.8], [131.72, 32.58], [131.63, 32.42], [131.5, 32.12], [131.47, 31.92], [131.4, 31.6], [131.33, 31.37], [131.06, 31.42], [130.95, 31.23], [130.8, 31.08], [130.66, 30.99], [130.7, 31.25], [130.78, 31.45], [130.75, 31.68], [130.57, 31.6], [130.55, 31.4], [130.65, 31.22], [130.52, 31.17], [130.3, 31.25], [130.18, 31.4], [130.28, 31.7], [130.2, 31.98], [130.38, 32.17], [130.55, 32.45], [130.62, 32.65], [130.55, 32.8], [130.5, 32.95], [130.42, 33.05], [130.3, 33.15], [130.2, 33.05], [130.25, 32.88], [130.37, 32.77], [130.3, 32.6], [130.15, 32.62], [130.1, 32.78], [130.0, 32.86], [129.85, 32.72], [129.8, 32.58], [129.73, 32.8], [129.65, 33.0], [129.7, 33.15], [129.6, 33.3], [129.88, 33.43], [130.18, 33.58], [130.38, 33.62], [130.5, 33.85], [130.75, 33.92]];
+const CP_OK = [[127.68, 26.08], [127.67, 26.21], [127.71, 26.44], [127.86, 26.52], [127.86, 26.68], [127.97, 26.62], [128.12, 26.75], [128.26, 26.87], [128.33, 26.75], [128.25, 26.62], [128.05, 26.5], [127.98, 26.32], [127.82, 26.17]];
+const cpHx = lon => 264 + (lon - 142.8) * 22.5, cpHy = lat => 80 - (lat - 43.47) * 30;     // 北海道: top right
+const cpKx = lon => 91 + (lon - 130.85) * 35.3, cpKy = lat => 214 - (lat - 32.49) * 42;     // 九州: bottom left
+const cpOx = lon => 227 + (lon - 128.0) * 103, cpOy = lat => 238 - (lat - 26.47) * 115;     // 沖縄: bottom middle
+const CP_FRAME = [['北海道', 180, 8, 172, 146], ['九州', 10, 150, 164, 142], ['沖縄', 184, 176, 88, 116]];
+// a closed Catmull-Rom curve through the points: drawn by hand rather than ruled
+function cpPath(pts, fx, fy) {
+  const q = pts.map(([a, b]) => [fx(a), fy(b)]), n = q.length, f = v => v.toFixed(1);
+  let d = `M${f(q[0][0])} ${f(q[0][1])}`;
+  for (let i = 0; i < n; i++) { const p0 = q[(i - 1 + n) % n], p1 = q[i], p2 = q[(i + 1) % n], p3 = q[(i + 2) % n];
+    d += ` C${f(p1[0] + (p2[0] - p0[0]) / 6)} ${f(p1[1] + (p2[1] - p0[1]) / 6)} ${f(p2[0] - (p3[0] - p1[0]) / 6)} ${f(p2[1] - (p3[1] - p1[1]) / 6)} ${f(p2[0])} ${f(p2[1])}`; }
+  return d + ' Z';
+}
+const CP_POS = { hok: [cpHx(142.75), cpHy(43.4)], miya: [cpKx(131.42), cpKy(31.91)], oki: [cpOx(127.98), cpOy(26.58)], abr: [66, 46], none: [320, 232] };
+let cpMapSvg = null;
+function cpMap() {
+  if (!cpMapSvg) {
+    const [ax, ay] = CP_POS.abr;
+    cpMapSvg = `<svg viewBox="0 0 360 300" class="cpA-svg" aria-hidden="true"><defs><filter id="cp-chalk"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" seed="4"/><feDisplacementMap in="SourceGraphic" scale="1.6"/></filter></defs>
+      <g filter="url(#cp-chalk)">${CP_FRAME.map(([, x, y, w, h]) => `<rect class="cpA-inset" x="${x}" y="${y}" width="${w}" height="${h}" rx="6"/>`).join('')}<path class="cpA-land" d="${cpPath(CP_HK, cpHx, cpHy)}"/><path class="cpA-land" d="${cpPath(CP_KY, cpKx, cpKy)}"/><path class="cpA-land" d="${cpPath(CP_OK, cpOx, cpOy)}"/><path class="cpA-air" d="M ${ax - 22} ${ay - 6} C ${ax - 40} ${ay - 18}, ${ax - 52} ${ay - 30}, -4 ${ay - 40}"/></g></svg>`;
+  }
+  return cpMapSvg;
+}
+const cpPct = (x, y) => `left:${(x / 360 * 100).toFixed(2)}%;top:${(y / 300 * 100).toFixed(2)}%`;
+const cpMoney = v => v ? E.money(v).replace(/円$/, '') : '0円';
+const cpDots = (n, warn) => `<span class="cp-dots${warn ? ' warn' : ''}" aria-hidden="true">${[1, 2, 3].map(i => `<i class="${i <= n ? 'on' : ''}"></i>`).join('')}</span>`;
+function cpMeters(k) {
+  const T = E.CAMP.d[k], X = CP_TXT[k];
+  const fm = T.form ? `開幕時 ${T.form > 0 ? '+' : '−'}${Math.abs(T.form)}` : '±0';
+  const rows = [['成長', T.wk ? `${T.wk}週間分` : 'なし'], ['連携', T.pm ? `練習試合${T.pm}試合分` : 'なし'], ['調子', fm], ['ケガ', X.injT]];
+  return `<div class="cp-meters">${rows.map(([l, t], i) => `<div><span class="l">${l}</span>${cpDots(X.dots[i], i === 3 || (i === 2 && T.form < 0))}<small>${t}</small></div>`).join('')}</div>`;
+}
+const cpMag = (k, cls) => k === 'none' ? kit(S.my, 'lg') : `<span class="cpA-mag${cls ? ' ' + cls : ''}" style="--dc:${CP_COL[k]}">${CP_CH[k]}</span>`;
+// the first league match after the break (for the lines that count down to it)
+function cpRestart(C) { return S.fixtures.find(f => !f.cup && f.date === C.re && (f.h === S.my || f.a === S.my)); }
+const cpPeriod = C => `${jdw(C.from)}〜${jdw(C.to)}`;
+function cpRecLine(r) {
+  const p = r.pid && S.players[r.pid];
+  const jp = E.CAMP.d[r.k].jp;
+  if (r.why === 'rehab' && p) return `<b>おすすめは${jp}です。</b>${esc(p.short)}のリハビリが進み、開幕に間に合います。`;
+  if (r.why === 'link') return `<b>おすすめは${jp}です。</b>連携の平均がまだ${r.v}なので、練習試合で深めましょう。`;
+  if (r.why === 'young') return `<b>おすすめは${jp}です。</b>若い先発が${r.n}人いて、資金にも余裕があります。`;
+  return `<b>おすすめは${jp}です。</b>いつもどおりの準備で十分だと思います。`;
+}
+function cpAbsent(C) {
+  const out = E.campAbsent(S); if (!out.length) return '';
+  const row = x => { const p = S.players[x.pid]; if (!p) return '';
+    const t = x.why === 'nt' ? `${/^ac/.test(((S.nt || {}).cur || {}).k || '') ? 'アジアカップ' : '代表'}に参加中（${esc(E.natJp(x.cc))}代表）。戻ったら途中から合流` : x.why === 'inj' ? `負傷中（キャンプインの日にあと${x.left}日）。${E.CAMP.d[E.CAMP.keys.find(k => E.CAMP.d[k].rehab)].jp}なら連れて行き、リハビリが2倍の速さに` : `${esc(S.clubs[x.to] ? S.clubs[x.to].short : 'J2')}へ期限付き移籍中`;
+    return `<div class="cp-abs">${SEC_MAG(p, x.why === 'inj')}<span><b>${esc(p.name)}</b><small>${t}</small></span></div>`; };
+  return `<section class="sec-sec"><h4>キャンプに来られない選手</h4>${out.map(row).join('')}</section>`;
+}
+function sheetCamp() {
+  const C = E.campOf(S); if (C.skip || C.st || !C.from) { closeSheet(); render(); return; }
+  sheetState = { type: 'camp' };
+  const nt = E.secNotes(S).find(n => n.k === 'camp'); if (nt) nt.seen = true;
+  const rec = E.campRec(S);
+  if (!UI.cmp || UI.cmp.s !== S.season || !E.CAMP.d[UI.cmp.k]) UI.cmp = { s: S.season, k: C.dest || rec.k };
+  const k = UI.cmp.k, T = E.CAMP.d[k], c = S.clubs[S.my], f = cpRestart(C), opp = f && S.clubs[f.h === S.my ? f.a : f.h];
+  const decided = C.dest && !C.auto;
+  const tok = x => { const [px, py] = CP_POS[x], X = E.CAMP.d[x], on = x === k;
+    return `<button class="cpA-tok${on ? ' on' : ''}" style="${cpPct(px, py)}" data-act="campSel" data-k="${x}" aria-pressed="${on}" aria-label="${X.jp}${X.cost ? '・' + E.money(X.cost) : ''}">${cpMag(x)}<span class="cpA-lbl"><b>${X.jp}${X.sub ? `<small>（${X.sub}）</small>` : ''}</b><small>${X.cost ? cpMoney(X.cost) : 'クラブで調整'}</small></span></button>`; };
+  const [kx, ky] = CP_POS[k];
+  const ring = k === 'none' ? '' : `<svg class="cpA-ringw" viewBox="0 0 360 300" aria-hidden="true"><path class="cpA-ring" d="M ${kx - 30} ${ky - 2} C ${kx - 30} ${ky - 30}, ${kx + 30} ${ky - 30}, ${kx + 30} ${ky - 2} S ${kx - 20} ${ky + 30}, ${kx - 32} ${ky - 8}" filter="url(#cp-chalk)"/></svg>`;
+  const map = `<div class="cpA-map">${cpMap()}${ring}${CP_FRAME.map(([t, x, y]) => `<span class="cpA-note" style="${cpPct(x + 6, y + 3)}">${t}</span>`).join('')}<span class="cpA-note faint" style="${cpPct(16, 122)}">縮尺はそれぞれ別</span>${E.CAMP.keys.map(tok).join('')}</div>`;
+  const card = `<section class="card cpA-pick"><div class="cpA-ph">${cpMag(k, 'sm')}<div style="flex:1;min-width:0"><b class="nm">${k === 'none' ? '今年は行かない' : `${T.jp}キャンプ`}${CP_TXT[k].tag ? `<span class="chip acc">${CP_TXT[k].tag}</span>` : ''}</b><small>${k === 'none' ? `${cpPeriod(C)}はクラブで調整` : `${cpPeriod(C)}・${E.CAMP.len}日間`}</small></div><b class="cost">${T.cost ? E.money(T.cost) : '0円'}</b></div>
+    ${cpMeters(k)}<p class="small" style="margin:0">${CP_TXT[k].line}</p></section>`;
+  const intro = decided ? `<p class="small" style="margin:0">夏のキャンプは<b>${E.CAMP.d[C.dest].jp}</b>${C.dest === 'none' ? '（行かない）' : ''}に決まっています。${jd(C.from)}のキャンプインまでなら変えられます。</p>`
+    : `<p class="small" style="margin:0">開幕前の夏のキャンプの行き先を決めましょう。<b>${cpPeriod(C)}の${E.CAMP.len}日間</b>で、開幕（${f && opp ? `${jd(f.date)} ${esc(opp.short)}戦` : jd(C.re)}）の${D_GAP(C)}日前に戻ります。</p>`;
+  const short = T.cost > c.funds;
+  const foot = (k === C.dest && decided ? `<button class="btn primary block" style="min-height:54px;font-size:16px" disabled>${k === 'none' ? '行かないことに決まっています' : `${T.jp}に決まっています`}</button>`
+      : `<button class="btn primary block" style="min-height:54px;font-size:16px" data-act="campPick" data-k="${k}" ${short ? 'disabled' : ''}>${short ? `資金が足りません（あと${E.money(T.cost - c.funds)}）` : k === 'none' ? '今年は行かない' : `${T.jp}に${decided ? '変更する' : '決める'}（${E.money(T.cost)}）`}</button>`)
+    + `<button class="btn ghost block" data-act="closeSheet">${decided ? '閉じる' : 'あとで決める'}</button>`;
+  openSheet(`<div class="sec-head">${akiMag('md')}<div style="min-width:0;flex:1"><div class="eyebrow">${E.SEC.role}からの連絡</div><b class="sec-name">${esc(secWho())}</b></div></div>
+    ${intro}${map}${card}<div class="cp-rec">${akiMag('sm')}<p>${cpRecLine(rec)}</p></div>${cpAbsent(C)}
+    <p class="fine" style="margin:0">決めないまま${jd(C.from)}になると、${E.CAMP.d[E.CAMP.std].jp}（標準）にします。費用はキャンプインの日に払います。ほかのクラブも${E.CAMP.d[E.CAMP.std].jp}と同じだけのキャンプをします。</p>`, foot);
+  render();
+}
+const D_GAP = C => E.D.diff(C.re, C.to);
+// the camp report
+const CP_IC = {
+  pot: '<svg viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg>',
+  pos: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 4v4M12 16v4M4 12h4M16 12h4"/></svg>',
+  inj: '<svg viewBox="0 0 24 24"><path d="M10 4h4v6h6v4h-6v6h-4v-6H4v-4h6z"/></svg>',
+  lk: '<svg viewBox="0 0 24 24"><path d="M9 15l6-6M8 11l-2 2a3.5 3.5 0 0 0 5 5l2-2M16 13l2-2a3.5 3.5 0 0 0-5-5l-2 2"/></svg>',
+  mentor: '<svg viewBox="0 0 24 24"><circle cx="8" cy="6.5" r="3"/><path d="M3 21v-4a5 5 0 0 1 10 0v4"/><circle cx="17.5" cy="11" r="2.2"/><path d="M14 21v-3a3.5 3.5 0 0 1 7 0v3"/></svg>',
+  join: '<svg viewBox="0 0 24 24"><path d="M4 12h13M12 6l6 6-6 6"/></svg>',
+  ball: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8l3.5 2.5-1.3 4h-4.4l-1.3-4z"/></svg>',
+};
+const CP_POT = ['紅白戦でアピール', '練習試合でゴール', 'コーチ陣の評価が急上昇'];
+function cpEv(e, r) {
+  const p = S.players[e.pid], q = e.q && S.players[e.q]; if (!p) return '';
+  const nm = x => esc(x.short);
+  let t = '', fx = '';
+  if (e.k === 'inj') { t = `${nm(p)}　練習中に負傷`; fx = `全治${e.n}日（${jd(e.back)}に復帰）`; }
+  else if (e.k === 'join') { const n = E.D.diff(r.to, e.d) + 1; t = `${nm(p)}　${e.why === 'nt' ? '代表から戻って合流' : e.why === 'inj' ? 'ケガが治って合流' : '新しく加わって合流'}`; fx = `${n}日間`; }
+  else if (e.k === 'pot') { t = `${nm(p)}　${CP_POT[e.t || 0]}`; fx = `伸びしろ ${e.a} → ${e.b}`; }
+  else if (e.k === 'pos') { t = `${nm(p)}　${e.dp}の練習で手応え`; fx = `${e.dp}の適性 ${e.a} → ${e.b}`; }
+  else if (e.k === 'lk' && q) { t = `${nm(p)}・${nm(q)}　息が合ってきた`; fx = `連携 ${e.a} → ${e.b}`; }
+  else if (e.k === 'mentor' && q) { t = `${nm(p)}が${nm(q)}に付きっきりで指導`; fx = `連携 ${e.a} → ${e.b}`; }
+  else return '';
+  return `<div class="r ev-${e.k}"><span class="ic">${CP_IC[e.k]}</span><span class="t"><small>${jdw(e.d)}</small><b>${t}</b><em>${fx}</em></span></div>`;
+}
+function sheetCampRep() {
+  const C = S.camp, r = C && C.rep; if (!r) return;
+  sheetState = { type: 'campRep' };
+  const T = E.CAMP.d[r.k], c = S.clubs[S.my], kv = `--k1:${c.c1};--k2:${c.c2};--kt:${lum(c.c1) > 0.6 ? '#141414' : '#ffffff'}`;
+  const days = Array.from({ length: E.CAMP.len }, (_, i) => E.D.add(r.from, i));
+  const pmD = new Set(r.pm.map(m => m.d));
+  const cal = `<div class="cp-cal">${days.map(d => { const w = E.D.dow(d), ev = r.ev.filter(e => e.d === d && (e.k === 'inj' || e.k === 'join'));
+    return `<div class="${w === 6 ? 'sat' : w === 0 ? 'sun' : ''}"><b>${jd(d)}</b><small>${'日月火水木金土'[w]}</small><span class="ics">${pmD.has(d) ? `<i class="ball">${CP_IC.ball}</i>` : ''}${[...new Set(ev.map(e => e.k))].map(k => `<i class="${k}">${CP_IC[k]}</i>`).join('')}</span></div>`; }).join('')}</div>
+    <div class="cp-calleg"><span><i class="ball">${CP_IC.ball}</i>練習試合</span><span><i class="join">${CP_IC.join}</i>合流</span><span><i class="inj">${CP_IC.inj}</i>ケガ</span></div>`;
+  // the board: the XI at the end of the camp, its chalk lines after it (yellow = past 70 at the camp)
+  const F = E.FORMATIONS[r.form] || [], topY = y => 88 - (y - 7) * 1.04;
+  const idx = new Map(r.xi.map((id, i) => [id, i]));
+  const tier = v => v >= 90 ? 't4' : v >= 70 ? 't3' : v >= 40 ? 't2' : 't1';
+  let lines = '', up = 0;
+  for (const [a, b, v0, v1] of r.lk) {
+    const i = idx.get(a), j = idx.get(b); if (i == null || j == null || !F[i] || !F[j]) continue;
+    const hi = v1 >= 70 && v0 < 70; if (hi) up++;
+    const xy = `x1="${F[i][1]}" y1="${(topY(F[i][2]) * 1.275).toFixed(2)}" x2="${F[j][1]}" y2="${(topY(F[j][2]) * 1.275).toFixed(2)}"`;
+    lines += (hi ? `<line class="glow" ${xy}/>` : '') + `<line class="${tier(v1)}${hi ? ' cb' : ''}" ${xy}/>`;
+  }
+  const toks = r.xi.map((id, i) => { const p = S.players[id]; if (!p || !F[i]) return ''; return `<div class="tok" style="left:${F[i][1]}%;top:${topY(F[i][2])}%;${kv}"><span class="shirt">${p.num}</span><span class="lbl">${esc(p.short)}</span></div>`; }).join('');
+  const board = `<div class="pitch cp-pitch">${PITCH_SVG}<svg class="lk-lines" viewBox="0 0 100 127.5" preserveAspectRatio="none" aria-hidden="true"><defs><filter id="cp-lk" filterUnits="userSpaceOnUse" x="-5" y="-5" width="110" height="137.5"><feTurbulence type="fractalNoise" baseFrequency="3" numOctaves="2" seed="7"/><feDisplacementMap in="SourceGraphic" scale=".5"/></filter></defs><g filter="url(#cp-lk)">${lines}</g></svg>${toks}</div>`;
+  const plates = r.cb.map(it => `<div class="lk-plate"><span class="ic">${lkIc(it.k)}</span><span class="nm"><b>${esc(it.jp)}</b><small>キャンプで組めるようになった・${lkWho(it)}</small></span><span class="lk-fx">${lkFx(it)}</span></div>`).join('');
+  const near = r.near.map(it => `<div class="lk-wrow"><span><b>${esc(it.jp)}</b>${esc(it.cond)}</span><span class="pg"><span class="lk-bar"><i style="width:${Math.min(100, Math.floor(it.val / it.need * 100))}%"></i></span><span>${lkProg(it)}</span></span></div>`).join('');
+  const growRows = r.grow.map(g => { const p = S.players[g.pid]; if (!p) return ''; return `<div class="r">${SEC_MAG(p)}<span class="n"><b>${esc(p.name)}</b><small>${E.age(p, S.date)}歳・${dpOf(p)}</small></span><span class="v">${g.a.toFixed(1)}<i>→</i>${g.b.toFixed(1)}</span><b class="d">+${(g.b - g.a).toFixed(1)}</b></div>`; }).join('');
+  const ev = r.ev.map(e => cpEv(e, r)).filter(Boolean).join('');
+  const w = r.pm.filter(m => m.gf > m.ga).length, l = r.pm.filter(m => m.gf < m.ga).length, dr = r.pm.length - w - l;
+  const pm = r.pm.map(m => { const res = m.gf > m.ga ? ['w', '勝'] : m.gf < m.ga ? ['l', '負'] : ['d', '分'];
+    return `<div class="r"><small>${jd(m.d)}</small><span>${m.cid && S.clubs[m.cid] ? esc(S.clubs[m.cid].short) : '大学選抜'}</span><b>${m.gf}-${m.ga}</b><i class="${res[0]}">${res[1]}</i></div>`; }).join('');
+  const f = S.fixtures.find(x => !x.cup && x.date === r.re && (x.h === S.my || x.a === S.my)), opp = f && S.clubs[f.h === S.my ? f.a : f.h];
+  const left = E.D.diff(r.re, S.date);
+  const back = r.fm > 0 ? `調子が上がって戻ってきました（開幕から数試合 <b>調子 +${r.fm}</b>）。` : r.fm < 0 ? `長旅の疲れが少し残っています（開幕から数試合 <b>調子 −${-r.fm}</b>）。` : '';
+  const none = r.none.length ? `<p class="fine" style="margin:0">参加できなかった選手: ${r.none.map(x => S.players[x.pid] ? esc(S.players[x.pid].short) : '').filter(Boolean).join('・')}</p>` : '';
+  openSheet(`<div class="cpA-rh"><div class="eyebrow">キャンプ・レポート</div><h2>${T.jp}キャンプ${T.sub ? `<small>（${T.sub}）</small>` : ''}</h2><div class="small muted">${jdw(r.from)}〜${jdw(r.to)}・${E.CAMP.len}日間・参加${r.n}人・費用${E.money(r.cost)}</div>${r.auto ? `<p class="fine" style="margin:4px 0 0">行き先が決まらなかったので、標準の${E.CAMP.d[E.CAMP.std].jp}に行きました。</p>` : ''}</div>
+    ${cal}
+    <section class="card cpA-sec"><div class="lk-head"><span class="eyebrow">連携</span><span class="lk-sum">平均 ${Math.floor(r.avg0)} → <b>${Math.floor(r.avg1)}</b><span class="lk-plus">+${Math.max(0, Math.floor(r.avg1) - Math.floor(r.avg0))}</span></span></div>
+      ${board}<p class="fine" style="margin:0">${up ? `黄色の線は、キャンプで70を超えた組（${up}組）。` : ''}先発の組に練習試合${T.pm}試合分。</p>${plates}${near}</section>
+    <section class="card cpA-sec"><div class="lk-head"><span class="eyebrow">伸びた選手</span><span class="lk-sum">チーム全体で <b>+${r.gsum.toFixed(1)}</b></span></div><div class="cp-grow">${growRows}</div></section>
+    ${ev ? `<section class="card cpA-sec"><div class="eyebrow">できごと</div><div class="cp-ev">${ev}</div></section>` : ''}
+    ${pm ? `<section class="card cpA-sec"><div class="lk-head"><span class="eyebrow">練習試合</span><span class="lk-sum">${w}勝${dr}分${l}敗</span></div><div class="cp-pmt">${pm}</div></section>` : ''}
+    <section class="card cpA-sec cpA-go"><div class="eyebrow">開幕に向けて</div><p class="small" style="margin:0">${back}${f && opp ? `開幕は ${jdw(f.date)} ${esc(opp.short)}戦${left > 0 ? `、あと${left}日です` : ''}。` : ''}</p>${none}</section>`,
+    '<button class="btn primary block" style="min-height:54px;font-size:16px" data-act="campRepDone">わかりました</button>');
+  const b = sheetEl.querySelector('.sheet-body'); if (b) b.scrollTop = 0;
+}
+// home: from her question until the first match after the break
+function campCard() {
+  if (!S || S.fired || S.seasonEnd) return '';
+  const C = E.campOf(S); if (C.skip || !C.from || S.date < C.ask || S.date > C.re) return '';
+  if (C.club && C.club !== S.my) return '';
+  const T = C.dest && E.CAMP.d[C.dest];
+  if (!C.st) {
+    if (!C.dest) return `<section class="card cp-home"><div class="cp-hh"><span class="cpA-mag sm" style="--dc:#5F6B66">？</span><div style="flex:1;min-width:0"><div class="eyebrow">夏のキャンプ</div><b>行き先がまだ決まっていません</b><div class="small muted">${cpPeriod(C)}。決めないと${E.CAMP.d[E.CAMP.std].jp}（標準）になります</div></div></div><button class="btn primary block" data-act="campOpen">行き先を選ぶ</button></section>`;
+    return `<section class="card cp-home"><div class="cp-hh">${cpMag(C.dest, 'sm')}<div style="flex:1;min-width:0"><div class="eyebrow">夏のキャンプ</div><b>${C.dest === 'none' ? '今年は行かない' : `${T.jp}キャンプ`}</b><div class="small muted">${cpPeriod(C)}${T.cost ? `・${E.money(T.cost)}` : ''}</div></div><button class="btn ghost" data-act="campOpen" style="min-height:40px">変更</button></div></section>`;
+  }
+  if (C.st === 'run') { const n = E.D.diff(S.date, C.from) + 1;
+    return `<section class="card cp-home"><div class="cp-hh">${cpMag(C.dest, 'sm')}<div style="flex:1;min-width:0"><div class="eyebrow">夏のキャンプ</div><b>${C.dest === 'none' ? 'クラブで調整中' : `${T.jp}キャンプ中`}</b><div class="small muted">${n}日目／${E.CAMP.len}日・${jd(C.to)}まで</div></div></div><div class="cp-prog"><i style="width:${n / E.CAMP.len * 100}%"></i></div></section>`; }
+  if (!C.rep || C.rep.k === 'none') return '';
+  return `<section class="card cp-home"><div class="cp-hh">${cpMag(C.rep.k, 'sm')}<div style="flex:1;min-width:0"><div class="eyebrow">夏のキャンプ</div><b>${E.CAMP.d[C.rep.k].jp}キャンプ 終了</b><div class="small muted">チーム全体で +${C.rep.gsum.toFixed(1)}・連携の平均 ${Math.floor(C.rep.avg0)} → ${Math.floor(C.rep.avg1)}</div></div></div><button class="btn ghost block" data-act="campRep">キャンプ・レポートを見る</button></section>`;
+}
+
 /* ---------- actions ---------- */
 function go() {
   if (S.fired) return sheetFired();
@@ -8240,7 +8762,8 @@ function go() {
   if (st.stop === 'match') sheetPrematch(st.fid);
   else if (st.stop === 'inbox') { const it = S.inbox.find(x => x.type !== 'youth'); UI.tab = 'home'; render(); window.scrollTo(0, 0); toast(it && it.type === 'scout' ? 'スカウトが戻りました' : it && it.type === 'nt' ? '代表メンバーが発表されました' : '移籍オファーが届きました'); }
   else if (st.stop === 'note') { if (/フロント/.test(st.text)) { UI.tab = 'home'; render(); window.scrollTo(0, 0); } toast(st.text); }
-  else if (st.stop === 'sec') { UI.tab = 'home'; render(); window.scrollTo(0, 0); if (E.sponPending(S) && E.secNotes(S).some(n => n.k === 'spon' && !n.seen)) sheetSpon(); else sheetSec(); }
+  else if (st.stop === 'sec') { UI.tab = 'home'; render(); window.scrollTo(0, 0); if (E.sponPending(S) && E.secNotes(S).some(n => n.k === 'spon' && !n.seen)) sheetSpon(); else if (E.campPending(S) && E.secNotes(S).some(n => n.k === 'camp' && !n.seen)) sheetCamp(); else sheetSec(); }
+  else if (st.stop === 'camp') { persist(true); UI.tab = 'home'; render(); window.scrollTo(0, 0); sheetCampRep(); }
   else if (st.stop === 'cele') { persist(true); UI.tab = 'home'; render(); window.scrollTo(0, 0); sheetCele(); }
   else if (st.stop === 'seasonEnd') { persist(true); render(); sheetSeasonEnd(); }
   else if (st.stop === 'fired') { persist(true); render(); sheetFired(); }
@@ -8393,6 +8916,11 @@ const ACT = {
   },
   secPre(d) { sheetPrematch(Number(d.id)); },
   sponOpen(d) { sheetSpon(d.back, d.fid ? Number(d.fid) : null); },
+  campOpen() { sheetCamp(); },
+  campSel(d) { if (UI.cmp) UI.cmp.k = d.k; refreshSheet(); },
+  campPick(d) { const r = E.campPick(S, d.k); toast(r.msg); if (!r.ok) return; persist(false); closeSheet(); render(); },
+  campRep() { sheetCampRep(); },
+  campRepDone() { E.campSeen(S); persist(false); closeSheet(); render(); },
   // tap a contract: in (the next free place: 胸 → 背中 → 袖) or out
   spTap(d) {
     const pick = spPick(), id = Number(d.id), s = pick.indexOf(id);
