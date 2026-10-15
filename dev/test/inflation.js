@@ -2,7 +2,8 @@
 // 転生 players keep their places, does my club run away with the league?
 // The manager plays like a youth-minded human: the academy and training ground are upgraded whenever money allows,
 // the auto-picked XI plays every match. Prints one line a season.
-// usage: node test/inflation.js <club> <seasons> <runs>   (ENG=path to test another engine)
+// usage: node test/inflation.js <club> <seasons> <runs>   (ENG=path to test another engine; TOWN=all: my club starts with
+//        every one-off building of ホームタウン — クラブハウス・選手寮・室内練習場 among them — to see they barely move the team)
 const E = require(process.env.ENG || '../src/engine.js'); const DATA = require('../data.json');
 const club = process.argv[2] || 'yokohamafm', N = +(process.argv[3] || 8), runs = +(process.argv[4] || 1);
 const real = new Set(DATA.players.map(p => p.id));
@@ -11,6 +12,7 @@ const f1 = x => x.toFixed(1);
 const agg = [];  // per season: summed over runs
 for (let r = 0; r < runs; r++) {
   const S = E.newGame(DATA, club, 't', '2026-10-12'); S.settings.boardLv = 'easy';
+  if (process.env.TOWN === 'all' && E.townOf) for (const k of Object.keys(E.TOWN.b)) if (k !== 'exp') E.townOf(S.clubs[S.my]).b[k] = S.date;
   const origin = {};  // pid → real / intake / gem / reborn / other
   for (const p of Object.values(S.players)) origin[p.id] = real.has(p.id) ? 'real' : 'other';
   const tag = () => { for (const p of Object.values(S.players)) if (!origin[p.id]) origin[p.id] = p.reborn ? 'reborn' : p.gem ? 'gem' : (p.gen && E.age(p, S.date) <= 18 && S.clubs[p.club]) ? 'intake' : 'other'; };

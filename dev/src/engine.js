@@ -202,7 +202,6 @@ function ovrMax(p) { return potCap(p) > 95 ? potCap(p) + 5 : 95; }
 const FACILITY = {
   train: { jp: '練習場', desc: '選手の成長スピードが上がる' },
   youth: { jp: 'ユース', desc: '昇格してくる若手の質と人数が上がる' },
-  stadium: { jp: 'スタジアム設備', desc: '観客動員と入場料収入が増える' },
   medical: { jp: 'メディカル', desc: '疲労回復が早まり、ケガが減る' },
   scout: { jp: 'スカウト網', desc: 'スカウトが見つける若手の伸びしろが大きくなる' },
 };
@@ -593,7 +592,19 @@ function migrate(S, DATA) {
   }
   // v14 (2026-10-15): sponsor contracts. This season stays on the old fixed sponsors; the offers come with the next one.
   if ((S.v || 1) < 14 && !S.spon) S.spon = { s: S.season, nid: 1, old: true, hist: [] };
-  S.v = Math.max(S.v || 1, 14);
+  // v15 (2026-10-15): ホームタウン. Supporters from the club's fan level (and what its 格 gained or lost since the data), the
+  // old スタジアム設備 level becomes the stadium buildings (Lv3 屋根と大型ビジョン, Lv4 + スタジアムグルメ, Lv5 + グッズショップ).
+  if ((S.v || 1) < 15) {
+    const p0 = {}; for (const d of ((DATA && DATA.clubs) || []).concat(J2)) if (d.pres != null && p0[d.id] == null) p0[d.id] = d.pres;
+    for (const c of Object.values(S.clubs)) {
+      const lv = c.fac && c.fac.stadium;
+      if (c.fac) delete c.fac.stadium;
+      if (lv >= 3) { const T = townOf(c); T.b.roof = S.date; if (lv >= 4) T.b.food = S.date; if (lv >= 5) T.b.shop = S.date; }
+      if (!c.ab) fansInit(c, p0[c.id]);
+      if (c.fin && c.fin.up == null) c.fin.up = 0;
+    }
+  }
+  S.v = Math.max(S.v || 1, 15);
   return S;
 }
 // old saves: the season's unplayed league rounds go to the real 2026/27 dates (a round whose date has passed goes to the
@@ -658,6 +669,7 @@ function devWeek(S, p, dry) {
     // a big gap (a 16-year-old prodigy) closes over a few seasons rather than in one: the base rate is capped,
     // and playing time, the team menu and the intensity still multiply on top
     g = Math.min(gap * k / 4.33 * (1 + (fac - 2) * 0.12), rb ? rb.gMax : GROW.gMax) * playing * trg * it.g;
+    if (a <= TOWN.b.dorm.age && !p.loan && built(c, 'dorm')) g *= TOWN.b.dorm.young;   // 選手寮
     if (p.learn) g *= 0.75;
   }
   // 開花: playing young players raise their own ceiling (how much depends on minutes and how well they play)
@@ -785,7 +797,7 @@ function newGame(DATA, clubId, managerName, todayISO) {
     initAttrs(S.players[p.id]);
   }
   addAbroad(S, DATA);
-  S.v = 14; S.presV = 4; S.presets = []; S.nt = { done: {}, res: [], log: [] };
+  S.v = 15; S.presV = 4; S.presets = []; S.nt = { done: {}, res: [], log: [] };
   secOf(S).f0 = S.clubs[clubId].funds;
   for (const p of squad(S, clubId)) track(S, p);
   for (const id of S.order) autoLineup(S, id);
@@ -808,10 +820,11 @@ function addClub(S, c, guest) {
     id: c.id, name: c.name, short: c.short, abbr: c.abbr, c1: c.c1, c2: c.c2, stadium: c.stadium, cap: c.cap,
     coach: c.coach || '', tier: c.tier, fan: c.fan, area: c.area, base: c.base || (63 + (c.tier || 2)),
     pres: c.pres || 2, titles: Object.assign({ j1: 0, lc: 0, ec: 0, acl: 0 }, c.titles || {}), o10: !!c.o10,
-    funds: startFunds, fac: { train: 2, youth: 2, stadium: 2, medical: 2, scout: 1 },
+    funds: startFunds, fac: { train: 2, youth: 2, medical: 2, scout: 1 },
     tac: { form: FORMATIONS[c.form] ? c.form : '4-4-2', ment: 'bal', press: 'mid', ...TAC_DEF, xi: [], bench: [] },
-    fin: { gate: 0, spon: 0, wages: 0, trans: 0, prize: 0, fac: 0 },
+    fin: { gate: 0, spon: 0, wages: 0, trans: 0, prize: 0, fac: 0, up: 0 },
   };
+  fansInit(S.clubs[c.id]);
   if (!guest && !S.order.includes(c.id)) S.order.push(c.id);
 }
 function squad(S, cid) { return Object.values(S.players).filter(p => p.club === cid); }
@@ -1839,7 +1852,7 @@ function stepMatch(S, M) {
     }
     // injury
     const med = S.clubs[sd.cid].fac.medical;
-    if (R() < 0.0021 * (1.15 - med * 0.06)) {
+    if (R() < 0.0021 * (1.15 - med * 0.06) * townInj(S.clubs[sd.cid])) {
       const pl = pick(onPitch(sd));
       if (pl && !M.pm[pl.pid].inj) {
         const days = wpick([[3, 6], [7, 14], [15, 30], [31, 75]], r => [55, 28, 12, 5][[3, 7, 15, 31].indexOf(r[0])]);
@@ -2074,12 +2087,14 @@ function finishMatch(S, M) {
   }
   // a single cup yellow is wiped after the quarter-final (a second one there still means missing the semi-final)
   if (cup && cupDepth(fx) === 2 && fx.leg !== 1) for (const cid of [fx.h, fx.a]) for (const p of squad(S, cid)) if (p.cyc && p.cyc[comp] === 1) { delete p.cyc[comp]; if (!Object.keys(p.cyc).length) delete p.cyc; }
+  // supporters: a win brings some, a losing run costs some
+  fansMatch(S, fx.h, res.h); fansMatch(S, fx.a, res.a);
   // finances: gate for home club (a final at 国立 is shared)
   const hc = S.clubs[fx.h];
   let att = attendance(S, fx.h, fx.a);
   if (cup) att = fx.neutral ? Math.round(NATIONAL.cap * (0.75 + R() * 0.2)) : Math.round(att * (cupDepth(fx) <= 1 ? 0.9 : cupDepth(fx) === 2 ? 0.75 : 0.55));
   fx.att = att;
-  const gate = Math.round(att * (0.2 + hc.fac.stadium * 0.01));
+  const gate = Math.round(att * (fx.neutral ? TOWN.per : gatePer(hc)));
   if (fx.neutral) { for (const id of [fx.h, fx.a]) { S.clubs[id].funds += Math.round(gate / 2); S.clubs[id].fin.gate += Math.round(gate / 2); } }
   else { hc.funds += gate; hc.fin.gate += gate; }
   // board
@@ -2135,11 +2150,12 @@ function checkTitle(S) {
 function attendance(S, hid, aid) {
   const c = S.clubs[hid], o = S.clubs[aid];
   const t = table(S); const row = t.find(r => r.id === hid); const pos = t.indexOf(row) + 1;
-  let f = 1 + (o.fan >= 4 ? 0.08 : 0) + (c.fac.stadium - 2) * 0.05 + (row && row.p > 3 ? (10 - pos) * 0.012 : 0) + (c.hype || 0);
+  let f = 1 + (fansOf(o) >= FANBASE[4] ? 0.08 : 0) + townAtt(c) + (row && row.p > 3 ? (10 - pos) * 0.012 : 0) + (c.hype || 0);
   if (hid === S.my && Object.values(S.players).some(p => p.reborn && p.club === hid)) f += 0.05;  // a reborn legend draws the fans
   f += Math.min(NT.gateMax, NT.gate * squad(S, hid).filter(p => recentNt(p, S.date)).length);   // internationals draw a few more
   f += R() * 0.12 - 0.06;
-  return Math.round(clamp(FANBASE[c.fan] * f, 3000, c.cap * 0.97));
+  const att = clamp(fansOf(c) * f, 3000, c.cap * 0.97);
+  return Math.round(townWorks(c) ? Math.max(3000, att * TOWN.works) : att);   // a stand being built: fewer seats
 }
 
 /* ---------- news & inbox ---------- */
@@ -2207,14 +2223,15 @@ function nextDay(S) {
     const mine = p.club === S.my;
     const it = INTENS[mine ? (p.ti || 'norm') : 'norm'];
     if (p.hot && p.hot.d !== S.date) delete p.hot;
-    let rec = 6 + med * 0.6 + (mine ? TRAINING[S.training].rec + it.rec : 0);
+    let rec = 6 + med * 0.6 + (built(c, 'house') ? TOWN.b.house.rec : 0) + (mine ? TRAINING[S.training].rec + it.rec : 0);
     if (age(p, S.date) >= 31) rec -= 1;
     p.cond = Math.min(100, p.cond + rec);
-    if (mine && it.inj && p.inj <= 0 && R() < it.inj * (1.15 - med * 0.06)) { p.inj = ri(3, 14); news(S, `${p.name}がハードトレーニング中に負傷。全治およそ${p.inj}日。`, 'warn'); }
+    if (mine && it.inj && p.inj <= 0 && R() < it.inj * (1.15 - med * 0.06) * townInj(c)) { p.inj = ri(3, 14); news(S, `${p.name}がハードトレーニング中に負傷。全治およそ${p.inj}日。`, 'warn'); }
     if (p.inj > 0) { p.inj--; if (p.inj === 0 && p.club === S.my) news(S, `${p.name}が負傷から復帰。`, 'info'); }
   }
   for (const it of S.inbox) if (!it.done && it.exp && S.date > it.exp) { it.done = true; it.result = 'expired'; scoutExpire(S, it); }
   scoutReturns(S);
+  townDay(S);
   if (D.dow(S.date) === 1) weekly(S);
   if (D.d(S.date) === 1) monthly(S);
   if (isIn) transferDay(S);
@@ -2250,7 +2267,10 @@ function monthly(S) {
     const sp = cid === S.my ? sponMonthly(S, c) : c.spon || 5000;   // my club: the fixed sponsors + the contracts' guarantees
     c.funds += sp - w; c.fin.wages += w; c.fin.spon += sp;
     if (cid === S.my) c._sp = sp;
+    const up = townUpkeep(c);   // ホームタウン: the buildings' and the facilities' upkeep
+    if (up) { c.funds -= up; c.fin.up = (c.fin.up || 0) + up; }
   }
+  fansMonth(S);
   // development report for my club (change since last month)
   const mine = squad(S, S.my).filter(p => p.at);
   const shown = p => ({ p, a: Math.round(p.ovrM != null ? p.ovrM : p.ovr), b: Math.round(p.ovr) });
@@ -2273,7 +2293,8 @@ function monthly(S) {
   }
   secMonth(S, rows);
   const my = S.clubs[S.my];
-  news(S, `${D.m(S.date)}月の収支：スポンサー収入 ${money(my._sp != null ? my._sp : my.spon || 0)}／人件費 ${money(Math.round(squad(S, S.my).reduce((a, p) => a + wage(p), 0) / 12))}`, 'money');
+  const myUp = townUpkeep(my);
+  news(S, `${D.m(S.date)}月の収支：スポンサー収入 ${money(my._sp != null ? my._sp : my.spon || 0)}／人件費 ${money(Math.round(squad(S, S.my).reduce((a, p) => a + wage(p), 0) / 12))}${myUp ? `／維持費 ${money(myUp)}` : ''}`, 'money');
   if (my.funds < 0) { S.board = clamp(S.board - 6, 0, 100); news(S, '資金がマイナスになっている。フロントは財政を懸念している。', 'warn'); }
 }
 
@@ -2471,7 +2492,8 @@ function negoInfo(S, p) {
 // how likely he is to say no once the clubs agree (the same rule as before), and the label shown up front
 function negoWill(S, p) {
   const my = S.clubs[S.my], ab = abroadOf(S, p);
-  const r = ab ? abroadReluct(S, p) : clamp((strength(S, p.club) - strength(S, S.my)) * 0.06 + (p.ovr - strength(S, S.my) - 4) * 0.04 + ((S.clubs[p.club].pres || 2) - (my.pres || 2)) * 0.1, 0, 0.75);
+  let r = ab ? abroadReluct(S, p) : clamp((strength(S, p.club) - strength(S, S.my)) * 0.06 + (p.ovr - strength(S, S.my) - 4) * 0.04 + ((S.clubs[p.club].pres || 2) - (my.pres || 2)) * 0.1, 0, 0.75);
+  if (built(my, 'house')) r = Math.max(0, r - TOWN.b.house.will);   // クラブハウス: a better place to come to
   return { r, jp: r < 0.15 ? '前向き' : r < 0.4 ? '迷っている' : '消極的', lv: r < 0.15 ? 2 : r < 0.4 ? 1 : 0 };
 }
 function negoFloor(S, p, n) { return price(S, p) * negoInfo(S, p).k * n.nz; }
@@ -2680,6 +2702,7 @@ function makeReborn(S, L) {
   S.reborn.used.push(L.id);
   if (L.num && !squad(S, S.my).some(q => q.id !== p.id && q.num === L.num)) p.num = L.num;
   S.reborn.show = p.id;  // the pop-up is still to be seen
+  fansAdd(S.clubs[S.my], TOWN.fan.reborn);   // the whole town talks about him
   track(S, p);
   news(S, `転生――「${L.epi}」の魂を継ぐ${L.name}（16歳・${L.pp}）がユースからトップ昇格。${L.num ? `伝説の背番号${L.num}を知る人は、その姿に息をのんだ。` : ''}`, 'big');
   return p;
@@ -2742,7 +2765,7 @@ function clubBase(S, cid) { const c = S.clubs[cid]; const b = c.base || (63 + (c
 function rareRoll(p) { if (R() >= p) return null; const cap = ri(RARE.cap[0], RARE.cap[1]); return { cap, pot: ri(Math.max(86, cap - 5), cap) }; }
 function intakePot(S, cid, lv) {
   const r = rareRoll(RARE.youth); if (r) return r;
-  return { pot: Math.min(GROW.potMax, Math.round(clubBase(S, cid) + INTAKE.pot + lv * INTAKE.lvP + R() * INTAKE.spread + (R() < INTAKE.tail ? R() * INTAKE.tailAdd : 0))) };
+  return { pot: Math.min(GROW.potMax, Math.round(clubBase(S, cid) + INTAKE.pot + lv * INTAKE.lvP + (built(S.clubs[cid], 'dorm') ? TOWN.b.dorm.pot : 0) + R() * INTAKE.spread + (R() < INTAKE.tail ? R() * INTAKE.tailAdd : 0))) };
 }
 function gemPot(lv) {
   const r = rareRoll(RARE.gem); if (r) return r;
@@ -2846,6 +2869,7 @@ function ensureFreeAgents(S) {
 /* ---------- facilities ---------- */
 function facCost(lvl) { return Math.round(4000 * Math.pow(lvl, 1.6) / 100) * 100; }
 function upgrade(S, key) {
+  if (!FACILITY[key]) return { ok: false, msg: 'この施設はありません' };
   const c = S.clubs[S.my]; const lv = c.fac[key];
   if (lv >= 5) return { ok: false, msg: 'すでに最大レベルです' };
   const cost = facCost(lv);
@@ -2853,6 +2877,163 @@ function upgrade(S, key) {
   c.funds -= cost; c.fin.fac += cost; c.fac[key] = lv + 1;
   news(S, `${FACILITY[key].jp}をLv${lv + 1}に強化（${money(cost)}）。`, 'money');
   return { ok: true, msg: `${FACILITY[key].jp}がLv${lv + 1}になりました` };
+}
+
+/* ---------- ホームタウン (2026-10-15, 作業4): the supporters, the stadium and the club's buildings ----------
+   Supporters c.fans: the people who come to an ordinary home game (before, the fixed FANBASE[c.fan]; it starts there).
+   attendance = c.fans × the match's pull, at most the stadium (c.cap). They move with the results (fansMatch: a win
+   +0.3%, a loss −0.3%, from the 3rd loss in a row −0.5% more), the season (fansSeason: the table, cups), a reborn
+   legend and internationals — each in proportion to the club's level fansTarget = c.fan0 × (1 + (pres − c.fanP) × 0.2)
+   × (1 + the buildings' tgt + c.fanT) — and each month drift back towards it (TOWN.fan.back). A run of success settles
+   about half above the level; titles raise the 格 and so the level itself, which is how a small club grows.
+   Buildings (TOWN.b, c.town = { b: {key: date built}, exp: stands added, job: {k, from, to, cost, step} | null }):
+   one job at a time, paid up front, ready after the works (TOWN.b[k].mo months, townDay), then an upkeep every month
+   (townUpkeep, with the facility levels above the start). The effects are small (a full set barely moves the team).
+   The four facilities (練習場・ユース・メディカル・スカウト網) stay as they were; the old スタジアム設備 level became the
+   stands and the stadium buildings (S.v 15: Lv3 屋根と大型ビジョン, Lv4 + スタジアムグルメ, Lv5 + グッズショップ).
+   AI clubs (townSeason, at the season end) put the money they don't need (above TOWN.ai.keep) into a new stand when
+   their ground was full, and a share (TOWN.ai.share) of the rest into the supporters (c.fanT, up to TOWN.ai.fanMax),
+   so their funds stop piling up. Money is in 万円, upkeep a month. */
+const TOWN = {
+  b: {
+    exp: { jp: 'スタジアム増築', cost: [150000, 220000, 300000, 400000], mo: [6, 8, 10, 12], up: 250, seats: 5000, capMax: 75000, tgt: 0.02, fan: 0.03 },
+    roof: { jp: '屋根と大型ビジョン', cost: 120000, mo: 8, up: 350, att: 0.06, per: 0.01, tgt: 0.03, fan: 0.02 },
+    food: { jp: 'スタジアムグルメ', cost: 20000, mo: 2, up: 60, att: 0.02, per: 0.02, tgt: 0.01, fan: 0.01 },
+    shop: { jp: 'グッズショップ', cost: 30000, mo: 3, up: 80, per: 0.025, tgt: 0.01, fan: 0.01 },
+    sclub: { jp: 'サポーターズクラブ', cost: 15000, mo: 2, up: 100, gain: 1.3, loss: 0.7, tgt: 0.05, fan: 0.02 },
+    house: { jp: 'クラブハウス', cost: 60000, mo: 5, up: 150, rec: 0.6, will: 0.05 },
+    dorm: { jp: '選手寮', cost: 50000, mo: 4, up: 120, age: 21, young: 1.06, pot: 1 },
+    indoor: { jp: '室内練習場', cost: 80000, mo: 6, up: 200, inj: 0.85 },
+  },
+  per: 0.22,     // a spectator's ticket (万円; was 0.2 + スタジアム設備 Lv2 × 0.01)
+  works: 0.9,    // the home crowd while a stand is being built
+  facUp: { train: 80, youth: 80, medical: 80, scout: 40 },   // upkeep a month for each facility level above the start
+  facStart: { train: 2, youth: 2, medical: 2, scout: 1 },
+  // the supporters' moves, in proportion to the club's level (fansTarget): a win, a draw, a loss, each loss from the
+  // runFrom-th in a row, the month's drift back, the 格 (pres) above or below the start, the table (top: 1st, 2nd...),
+  // 14th or lower, relegation, a cup won, a final lost, a reborn legend, one of ours called up by a national team
+  fan: { w: 0.003, d: 0.0005, l: -0.003, run: -0.005, runFrom: 3, back: 0.03, pres: 0.2, min: 2000,
+    top: [0.06, 0.03, 0.03, 0.015, 0.015, 0.015, 0.015], low: -0.01, lowFrom: 14, rel: -0.06, cup: 0.03, final: 0.01, reborn: 0.03, nt: 0.001 },
+  ai: { keep: 150000, share: 0.6, fanPer: 0.005, fanMax: 0.3, full: 0.9 },
+};
+const TOWN_KEYS = Object.keys(TOWN.b);
+function townOf(c) { if (!c.town) c.town = { b: {}, exp: 0, job: null }; if (!c.town.b) c.town.b = {}; return c.town; }
+function built(c, k) { return !!(c && c.town && c.town.b && c.town.b[k]); }
+function townWorks(c) { return !!(c && c.town && c.town.job && c.town.job.k === 'exp'); }
+function townAtt(c) { let a = 0; for (const k of TOWN_KEYS) if (TOWN.b[k].att && built(c, k)) a += TOWN.b[k].att; return a; }
+// what a spectator brings in (tickets + food + goods)
+function gatePer(c) { let x = TOWN.per; for (const k of TOWN_KEYS) if (TOWN.b[k].per && built(c, k)) x += TOWN.b[k].per; return x; }
+function townInj(c) { return built(c, 'indoor') ? TOWN.b.indoor.inj : 1; }
+function townUpkeep(c) {
+  let m = 0; const T = c && c.town;
+  if (T) { for (const k of Object.keys(T.b || {})) if (TOWN.b[k] && T.b[k]) m += TOWN.b[k].up; m += (T.exp || 0) * TOWN.b.exp.up; }
+  for (const [k, u] of Object.entries(TOWN.facUp)) m += Math.max(0, ((c && c.fac && c.fac[k]) || 0) - TOWN.facStart[k]) * u;
+  return m;
+}
+// the next k this club can build: {cost, mo, up, step?} or null (built already / no more stands)
+function townNext(c, k) {
+  const b = TOWN.b[k]; if (!b || !c) return null;
+  if (k === 'exp') { const n = (c.town && c.town.exp) || 0; if (n >= b.cost.length || (c.cap || 0) + b.seats > b.capMax) return null; return { cost: b.cost[n], mo: b.mo[n], up: b.up, step: n + 1 }; }
+  if (built(c, k)) return null;
+  return { cost: b.cost, mo: b.mo, up: b.up };
+}
+function addMonths(s, n) { const m = D.m(s) - 1 + n; return `${D.y(s) + Math.floor(m / 12)}-${String(m % 12 + 1).padStart(2, '0')}-${String(Math.min(D.d(s), 28)).padStart(2, '0')}`; }
+function townCan(S, k, cid) {
+  const c = S.clubs[cid || S.my]; if (!c || !TOWN.b[k]) return { ok: false, msg: '建てられません' };
+  const nx = townNext(c, k), T = townOf(c);
+  if (!nx) return { ok: false, msg: k === 'exp' ? 'これ以上は増築できません' : 'すでに建っています' };
+  if (T.job) return { ok: false, msg: `${TOWN.b[T.job.k].jp}の工事中です（${jdate(T.job.to)}完成予定）`, busy: true, ...nx };
+  if (c.funds < nx.cost) return { ok: false, msg: `資金が足りません（${money(nx.cost)}）`, short: true, ...nx };
+  return { ok: true, ...nx };
+}
+function townBuild(S, k) {
+  const r = townCan(S, k); if (!r.ok) return r;
+  const c = S.clubs[S.my], T = townOf(c), b = TOWN.b[k];
+  townStart(S, c, k, r);
+  const what = k === 'exp' ? `${b.jp}（${r.step}期・${b.seats.toLocaleString('ja-JP')}席）` : b.jp;
+  news(S, `${what}の工事を始めた（${money(r.cost)}・${jdate(T.job.to)}完成予定）。`, 'money');
+  return { ok: true, msg: `${what}の工事が始まりました（${jdate(T.job.to)}完成予定）`, job: T.job };
+}
+function townStart(S, c, k, r) {
+  const T = townOf(c);
+  c.funds -= r.cost; c.fin.fac = (c.fin.fac || 0) + r.cost;
+  T.job = { k, from: S.date, to: addMonths(S.date, r.mo), cost: r.cost };
+  if (r.step) T.job.step = r.step;
+}
+// every day: a job whose works are over is finished (my club: news + the secretary, who stops the day)
+function townDay(S) {
+  for (const c of Object.values(S.clubs)) if (c.town && c.town.job && S.date >= c.town.job.to) townDone(S, c);
+}
+function townDone(S, c) {
+  const T = c.town, j = T.job, b = TOWN.b[j.k]; T.job = null;
+  if (j.k === 'exp') { T.exp = (T.exp || 0) + 1; c.cap += b.seats; } else T.b[j.k] = S.date;
+  if (b.fan) fansAdd(c, b.fan);
+  if (c.id === S.my) {
+    const text = j.k === 'exp' ? `スタジアムの増築が完成しました。収容は${c.cap.toLocaleString('ja-JP')}人になりました。` : `${b.jp}が完成しました。`;
+    news(S, `【完成】${text}`, 'big');
+    secPost(S, 'built', { k: j.k, step: j.step || 0, cap: c.cap, text }, { stop: true });
+  } else if (j.k === 'exp' && S.order.includes(c.id)) news(S, `${c.short}のスタジアムが${b.seats.toLocaleString('ja-JP')}席増えて、${c.cap.toLocaleString('ja-JP')}人収容に。`, 'info');
+}
+// --- supporters ---
+function fansOf(c) { return c ? (c.fans != null ? c.fans : FANBASE[c.fan || 2]) : FANBASE[2]; }
+function fansInit(c, pres0) {
+  if (!c || c.fans != null) return;
+  c.fan0 = FANBASE[c.fan || 2] || FANBASE[2];
+  c.fanP = pres0 != null ? pres0 : (c.pres || 2);
+  c.fans = Math.round(fansTarget(c));
+}
+function fansTarget(c) {
+  const F = TOWN.fan;
+  let add = Math.min(TOWN.ai.fanMax, c.fanT || 0);
+  for (const k of TOWN_KEYS) { const t = TOWN.b[k].tgt; if (t) add += k === 'exp' ? t * ((c.town && c.town.exp) || 0) : built(c, k) ? t : 0; }
+  const base = (c.fan0 || FANBASE[c.fan || 2]) * (1 + ((c.pres || 2) - (c.fanP != null ? c.fanP : (c.pres || 2))) * F.pres);
+  return Math.max(F.min, base * (1 + add));
+}
+// x: a change in proportion to the club's level (+0.003 = +0.3% of fansTarget, not of the fans now: a run of success
+// settles at a level instead of compounding); the サポーターズクラブ makes gains bigger and losses smaller
+function fansAdd(c, x) {
+  if (!c || c.fans == null || !x) return;
+  const k = built(c, 'sclub') ? (x > 0 ? TOWN.b.sclub.gain : TOWN.b.sclub.loss) : 1;
+  c.fans = Math.max(TOWN.fan.min, Math.round(c.fans + fansTarget(c) * x * k));
+}
+function fansMatch(S, cid, r) {
+  const c = S.clubs[cid]; if (!c || c.fans == null) return;
+  const F = TOWN.fan; c.lrun = r === 'L' ? (c.lrun || 0) + 1 : 0;
+  fansAdd(c, r === 'W' ? F.w : r === 'D' ? F.d : F.l + (c.lrun >= F.runFrom ? F.run : 0));
+}
+function fansSeason(S, t, rel) {
+  const F = TOWN.fan;
+  t.forEach((r, i) => { const c = S.clubs[r.id]; fansAdd(c, rel.includes(r.id) ? F.rel : i < F.top.length ? F.top[i] : i + 1 >= F.lowFrom ? F.low : 0); });
+}
+function fansMonth(S) {
+  for (const c of Object.values(S.clubs)) if (c.fans != null && !c.ab) c.fans = Math.max(TOWN.fan.min, Math.round(c.fans + (fansTarget(c) - c.fans) * TOWN.fan.back));
+}
+// at the season end, before the fixtures go: each AI club of the league that has money to spare builds a stand if its
+// ground was full this season (the job runs like mine), and puts a share of the rest into the supporters
+function townSeason(S) {
+  const A = TOWN.ai;
+  for (const cid of S.order) {
+    if (cid === S.my) continue;
+    const c = S.clubs[cid]; let spare = c.funds - A.keep; if (spare <= 0) continue;
+    const T = townOf(c), nx = townNext(c, 'exp');
+    if (!T.job && nx && spare >= nx.cost) {
+      const hm = S.fixtures.filter(f => f.played && !f.cup && f.h === cid);
+      const full = hm.length ? hm.reduce((a, f) => a + (f.att || 0), 0) / hm.length / Math.max(1, c.cap) : 0;
+      if (full >= A.full) { townStart(S, c, 'exp', nx); spare -= nx.cost; }
+    }
+    const inv = Math.round(spare * A.share);
+    if (inv > 0) { c.funds -= inv; c.inv = (c.inv || 0) + inv; c.fanT = Math.min(A.fanMax, (c.fanT || 0) + inv / 10000 * A.fanPer); }
+  }
+}
+// what the town looks like (for the screens and the tests)
+function townInfo(S, cid) {
+  const c = S.clubs[cid || S.my]; if (!c) return null;
+  const T = c.town || { b: {}, exp: 0, job: null };
+  const hm = (S.fixtures || []).filter(f => f.played && !f.cup && f.h === c.id);
+  const att = hm.length ? Math.round(hm.reduce((a, f) => a + (f.att || 0), 0) / hm.length) : null;
+  return { fans: fansOf(c), target: Math.round(fansTarget(c)), cap: c.cap, att, full: att != null ? att / Math.max(1, c.cap) : null, per: gatePer(c), upkeep: townUpkeep(c),
+    job: T.job ? { ...T.job, jp: TOWN.b[T.job.k].jp, left: Math.max(0, D.diff(T.job.to, S.date)), days: Math.max(1, D.diff(T.job.to, T.job.from)) } : null,
+    b: TOWN_KEYS.map(k => ({ k, jp: TOWN.b[k].jp, built: k === 'exp' ? (T.exp || 0) : !!(T.b && T.b[k]), next: townNext(c, k) })) };
 }
 
 /* ---------- firing & offers ---------- */
@@ -3193,6 +3374,7 @@ function crownCup(S, key, f, champ) {
   c.funds += CUP_PRIZE.win; c.fin.prize += CUP_PRIZE.win;
   c.titles = Object.assign({ j1: 0, lc: 0, ec: 0, acl: 0 }, c.titles || {}); c.titles[key]++;
   c.pres = clamp(Math.round(((c.pres || 2) + 0.12) * 100) / 100, 1, 5);
+  fansAdd(c, TOWN.fan.cup); if (S.clubs[cu.runner]) fansAdd(S.clubs[cu.runner], TOWN.fan.final);
   if (champ === S.my) {
     S.board = clamp(S.board + 12, 0, 100); news(S, `${name}優勝！ ${S.clubs[cu.runner].short}を破ってタイトルを獲得。賞金 ${money(CUP_PRIZE.win)}。`, 'big');
     const mine = f.h === S.my ? 'h' : 'a';
@@ -3360,6 +3542,7 @@ function endSeason(S) {
     if (i === 0) { c.titles = c.titles || { j1: 0, lc: 0, ec: 0, acl: 0 }; c.titles.j1++; c.spon = Math.round((c.spon || 5000) * 1.08 / 10) * 10; }
     else if (i <= 2) c.spon = Math.round((c.spon || 5000) * 1.03 / 10) * 10;
   });
+  fansSeason(S, t, rel);
   const presAfter = S.clubs[S.my].pres;
   if (presStars(presAfter) > presStars(presBefore)) news(S, `クラブの格が上がった（${'★'.repeat(presStars(presAfter))}）。選手が集まりやすくなる。`, 'big');
   else if (presStars(presAfter) < presStars(presBefore)) news(S, `クラブの格が下がった（${'★'.repeat(presStars(presAfter))}）。`, 'warn');
@@ -3418,6 +3601,7 @@ function rollover(S) {
   const fireMe = myRelegated || (S.board < B.fireEnd && tenure(S) > B.grace);
   const newDate = (S.season + 1) + '-06-08';
   if (S.sec) S.sec.back = [];   // last season's stand-ins: the new season starts as the manager puts the team
+  townSeason(S);   // the AI clubs put spare money into the stadium and the supporters
   // retirements (decided at the end of the season)
   decideRetirements(S);
   for (const p of Object.values(S.players)) if (p.retire) { if (p.club === S.my) news(S, `${p.name}が現役引退。お疲れさまでした。`, 'info'); p.club = 'RET'; }
@@ -3498,7 +3682,7 @@ function rollover(S) {
   // new season
   S.season += 1;
   S.date = newDate;
-  for (const cid of S.order) { const c = S.clubs[cid]; c.fin = { gate: 0, spon: 0, wages: 0, trans: 0, prize: 0, fac: 0 }; }
+  for (const cid of S.order) { const c = S.clubs[cid]; c.fin = { gate: 0, spon: 0, wages: 0, trans: 0, prize: 0, fac: 0, up: 0 }; }
   for (const p of Object.values(S.players)) p.cond = 100;
   S.fixtures = genFixtures(S.order, null, S.season);
   S.inbox = S.inbox.filter(x => !x.done).slice(0, 20);
@@ -3721,6 +3905,7 @@ function ntCall(S, ev) {
     const p = S.players[id]; const n = p.nt || (p.nt = { cc, caps: 0, g: 0, calls: 0 });
     n.cc = cc; n.calls++; const first = !n.first; if (first) n.first = ev.from;
     n.last = S.date; n.lk = ev.k; n.ks = (n.ks || []).concat(S.date).slice(-6);
+    if (S.order.includes(p.club)) fansAdd(S.clubs[p.club], TOWN.fan.nt);   // an international from our club
     if (p.club === S.my) {
       rows.push({ pid: id, cc, first, kat: jp.kat.includes(id) });
       (N.log || (N.log = [])).unshift({ k: ev.k, d: S.date, pid: id, name: p.name, cc, club: p.club, first });
@@ -3904,7 +4089,7 @@ const API = {
   NATIONS, NT, natJp, ntName, ntEvents, ntWindows, inNtWindow, ntNow, inNtBreak, recentNt, ntScore, ntForm, ntDay, ntCall, ntPower, abShare, EURO, euroWanted, euroOffer, euroDay, seasonDates, cupSchedule, J1_2026, AC_2027,
   LC_OLD, LC_STAGE, cupNames, roundName, fxEn, cupDepth, cupFinal, tieLegs, tieAgg, lcNew, lc1Alive,
   ABROAD, abroadOf, isAbroadClub, price, addAbroad, abroadReluct, nameKey, realNames, reservedNames, freshName, renamePlayer, genPlayer,
-  CARDS, BOARD, BOARD_LV, boardLv, tenure, CUPS, CUP_PRIZE, NATIONAL, fxLabel, cupResult, cupWinner, hypeMatch, HYPE, SUB_RATE, subRate, STYLE, GROW, RARE, INTAKE, potCap, clubBase, devWeek, shareFor, LOAN, GEM, REBORN, LEGENDS, legendOf, rebornCheck, makeReborn, rebornNum, myLoans, loanCan, loanOptions, loanOut, growthOutlook, weeksLeft, yearsTo, bigGame, rivalry, SCOUT, sendScout, playShare, marketList, ensureFreeAgents, upgrade, facCost, takeJob, rollover, endSeason, news, fire,
+  CARDS, BOARD, BOARD_LV, boardLv, tenure, CUPS, CUP_PRIZE, NATIONAL, fxLabel, cupResult, cupWinner, hypeMatch, HYPE, SUB_RATE, subRate, STYLE, GROW, RARE, INTAKE, potCap, clubBase, devWeek, shareFor, LOAN, GEM, REBORN, LEGENDS, legendOf, rebornCheck, makeReborn, rebornNum, myLoans, loanCan, loanOptions, loanOut, growthOutlook, weeksLeft, yearsTo, bigGame, rivalry, SCOUT, sendScout, playShare, marketList, ensureFreeAgents, upgrade, facCost, TOWN, townOf, built, townNext, townCan, townBuild, townDay, townUpkeep, townInfo, townSeason, townInj, townAtt, gatePer, fansOf, fansTarget, fansAdd, fansMatch, fansSeason, fansMonth, intakePot, takeJob, rollover, endSeason, news, fire,
 };
 if (typeof module !== 'undefined' && module.exports) module.exports = API; else root.Engine = API;
 })(typeof window !== 'undefined' ? window : globalThis);

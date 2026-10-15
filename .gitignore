@@ -5,3 +5,7 @@ dev/icons/*.png
 dev/icons/*.html
 dev/test/blank.html
 __pycache__/
+dev/test/mock_hometown/out/
+dev/test/mock_hometown/save.json
+dev/test/mock_hometown/page.html
+dev/test/mock_hometown/mock_*.html
