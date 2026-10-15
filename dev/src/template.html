@@ -828,7 +828,19 @@ html.ios-app { min-height: calc(var(--apph) + 1px); }
 .sp-slot.sleeve { left: 80%; top: 15%; width: 15%; height: 13%; font-family: var(--f-display); font-weight: 400; }
 .sp-slot.back { left: 23%; top: 24%; width: 54%; height: 16%; }
 .sp-kit .cap { display: block; margin-top: 4px; font-family: var(--f-chalk); font-size: 13px; color: var(--muted); }
-@media (max-height: 700px) { .sp-kit:not(.mini) { width: 88px; } .sp-kit:not(.mini) .sp-slot { font-size: 7.5px; } .sp-kits { gap: 14px; padding-top: 0; } }   /* iPhone SE: the first contract shows on opening */
+.sp-top { display: grid; gap: 14px; }
+.sp-slot .sp-mk { display: none; }
+/* iPhone SE and other short screens: the two kits go small beside the text (the slots show the logo letters), so the
+   first contract shows whole when the sheet opens */
+@media (max-height: 700px) {
+  .sp-top { display: flex; align-items: center; gap: 10px; } .sp-top > p { flex: 1; min-width: 0; }
+  .sp-kits { gap: 6px; padding: 0; }
+  .sp-kit:not(.mini) { width: 58px; }
+  .sp-kit:not(.mini) .sp-slot { font-family: var(--f-display); font-weight: 400; font-size: 9px; padding: 0; }
+  .sp-kit:not(.mini) .sp-slot .sp-lg { display: none; } .sp-kit:not(.mini) .sp-slot .sp-mk { display: inline; }
+  .sp-kit:not(.mini) .sp-slot.empty { font-family: var(--f-body); font-weight: 700; font-size: 8px; }
+  .sp-kit:not(.mini) .cap { font-size: 11px; margin-top: 2px; }
+}
 .sp-kit.mini { width: 78px; } .sp-kit.mini .sp-slot { font-size: 6.5px; border-radius: 2px; } .sp-kit.mini .sp-slot.sleeve { font-size: 7px; }
 .sp-home { display: grid; gap: 10px; }
 .sp-head { display: flex; align-items: center; gap: 10px; }

@@ -958,7 +958,7 @@ const spCond = d => esc(E.sponText(d)).replace(/(で|を)/g, '$1<wbr>').replace(
 // the kit: the front carries the chest and the sleeve, the back the back; by = [chest, back, sleeve] (a contract or null)
 function spKit(back, by, mini) {
   const v = kitVars(S.my, S.clubs[S.my]);
-  const slot = (k, s) => { const d = by[s]; if (!d && mini) return ''; return `<span class="sp-slot ${k}${d ? '' : ' empty'}">${d ? esc(k === 'sleeve' ? d.mk : d.br || d.co) : spSlotJp(s)}</span>`; };
+  const slot = (k, s) => { const d = by[s]; if (!d && mini) return ''; return `<span class="sp-slot ${k}${d ? '' : ' empty'}">${d ? (k === 'sleeve' ? esc(d.mk) : `<span class="sp-lg">${esc(d.br || d.co)}</span><span class="sp-mk">${esc(d.mk)}</span>`) : spSlotJp(s)}</span>`; };
   return `<span class="sp-kit${mini ? ' mini' : ''}" aria-hidden="true"><span class="sp-body"><span class="sp-shirt${v.cls}" style="${v.st}"></span>${back ? slot('back', 1) : slot('chest', 0) + slot('sleeve', 2)}</span>${mini ? '' : `<span class="cap">${back ? '背中' : '胸・袖'}</span>`}</span>`;
 }
 const spTag = s => { const c = S.clubs[S.my]; return `<span class="sp-tag" style="--k1:${c.c1};--kt:${lum(c.c1) > 0.6 ? '#141414' : '#ffffff'}">${spSlotJp(s)}</span>`; };
@@ -989,8 +989,8 @@ function sheetSpon(back, fid) {
     </div>`;
   }).join('');
   openSheet(`<div class="sec-head">${akiMag('md')}<div style="min-width:0;flex:1"><div class="eyebrow">${E.SEC.role}からの連絡</div><b class="sec-name">${esc(secWho())}</b></div></div>
-    <p class="small" style="margin:0">${E.seasonLabel(S.season)}のスポンサー候補が${sp.offer.length}社。ユニフォームの<b>胸・背中・袖</b>に1社ずつ、3社まで選べます（胸は1.2倍、袖は0.8倍）。保証は毎月、ボーナスは条件を達成した日に入ります。</p>
-    <div class="sp-kits">${spKit(false, by)}${spKit(true, by)}</div>
+    <div class="sp-top"><p class="small" style="margin:0">${E.seasonLabel(S.season)}のスポンサー候補が${sp.offer.length}社。ユニフォームの<b>胸・背中・袖</b>に1社ずつ、3社まで選べます（胸は1.2倍、袖は0.8倍）。保証は毎月、ボーナスは条件を達成した日に入ります。</p>
+    <div class="sp-kits">${spKit(false, by)}${spKit(true, by)}</div></div>
     <div class="row"><span class="eyebrow">${E.seasonLabel(S.season)} スポンサー候補</span><span class="spacer"></span><span class="sp-cnt">契約 ${n} / ${E.SPON.max}社</span></div>
     ${cards}
     <p class="fine" style="margin:4px 0 0">${secNm()}のおすすめ（達成しやすい3社）を入れてあります。もう一度タップすると外れます。●の数は難しさで、難しい約束ほどボーナスが大きくなります。選ばないまま開幕戦を迎えると、おすすめの3社と契約します。</p>`,

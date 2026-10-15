@@ -2,7 +2,7 @@
 # filled in, tap to take one out / put one in, 「場所」 to move it, 3 at most, signing; the pre-match line and kick-off with her
 # pick; the progress on the home screen and クラブ → 経営 (a bonus met, a condition at risk); the season review; the next
 # season's offers (she stops the days); an old save (the old fixed sponsors this season). iPhone 16 chalkboard, iPhone SE
-# whiteboard. Screenshots: dev/test/shots/spon-*.png. usage: python3 dev/test/sponsor.py   (KTK_FONTS=<node_modules/@fontsource>)
+# whiteboard (the first contract whole on opening; on the SE the kits go small beside the text). Screenshots: dev/test/shots/spon-*.png. usage: python3 dev/test/sponsor.py   (KTK_FONTS=<node_modules/@fontsource>)
 import asyncio, pathlib, os, re, json, subprocess, sys
 from playwright.async_api import async_playwright
 ROOT = pathlib.Path(__file__).resolve().parent.parent; OUT = ROOT/'test'/'shots'; OUT.mkdir(exist_ok=True)
@@ -98,6 +98,8 @@ async def main(vw, vh, board):
         await page.evaluate("scrollTo(0,0)")
         await page.click('.sp-home [data-act="sponOpen"]'); await page.wait_for_timeout(450)
         ok(await page.locator('#sheet .sp-paper').count() == 5 and await page.locator('#sheet .sp-seal').count() == 3, 'the sheet: five contracts, her three sealed')
+        vis = await page.evaluate('''() => { const b = document.querySelector('#sheet .sheet-body').getBoundingClientRect(), r = document.querySelector('#sheet .sp-paper').getBoundingClientRect(); return [Math.round(r.top), Math.round(r.bottom), Math.round(b.top), Math.round(b.bottom)]; }''')
+        ok(vis[0] >= vis[2] and vis[1] <= vis[3], f'the first contract shows whole on opening (top {vis[0]}, bottom {vis[1]}, visible {vis[2]}-{vis[3]})')
         st0 = await state(); off = st0['spon']['offer']
         sl = await seals()
         ok([off[i]['id'] for i in range(5) if sl[i] == '胸'] == [INFO['rec'][0]] and [off[i]['id'] for i in range(5) if sl[i] == '袖'] == [INFO['rec'][2]], 'her likeliest on the chest, the third on the sleeve')
@@ -144,7 +146,8 @@ async def main(vw, vh, board):
         st = await state()
         ok(sorted(st['spon']['deals'], key=lambda d: d['slot']) and [d['id'] for d in sorted(st['spon']['deals'], key=lambda d: d['slot'])] == INFO['rec'], 'kicked off without a choice: her three are signed')
         bub = await page.locator('#sec-float .sec-bub').inner_text() if await page.locator('#sec-float .sec-bub').count() else ''
-        ok('おすすめの3社と契約しました' in bub, f'she says so ({bub.splitlines()[0] if bub else "-"})')
+        note = next((n for n in st['sec']['notes'] if n['k'] == 'spon'), None)
+        ok(note and note['data'].get('auto') and not note['seen'] and ('おすすめの3社と契約しました' in bub or '出られない選手' in bub), f'she says so (a note; the bubble: {bub.splitlines()[0] if bub else "-"})')
 
         # ---- the season: a bonus met, a condition at risk; クラブ → 経営
         await load(SAVES['mid'])
@@ -169,8 +172,13 @@ async def main(vw, vh, board):
 
         # ---- next season: she stops the days to bring the offers
         await load(SAVES['next'])
-        await page.click('[data-act="go"]'); await page.wait_for_timeout(600)
-        ok(await page.locator('#sheet .sp-paper').count() == 5, 'next season: the first 次へ進む brings her offers')
+        presses = 0
+        for _ in range(4):   # an offer from Europe or the window opening may stop the day first
+            if await page.locator('#sheet .sp-paper').count(): break
+            if await page.locator('#sheet.on').count(): await page.click('#sheet [data-act="closeSheet"]'); await page.wait_for_timeout(300)
+            while await page.locator('[data-act="offerNo"]').count(): await page.locator('[data-act="offerNo"]').first.click(); await page.wait_for_timeout(200)
+            await page.click('[data-act="go"]'); await page.wait_for_timeout(600); presses += 1
+        ok(await page.locator('#sheet .sp-paper').count() == 5 and presses <= 3, f'next season: 次へ進む brings her offers ({presses} presses: the next day)')
         await shot('next')
         await page.click('#sheet [data-act="closeSheet"]'); await page.wait_for_timeout(300)
         ok(await page.locator('.sp-home [data-act="sponOpen"]').count() == 1, 'あとで決める: the home card waits')
