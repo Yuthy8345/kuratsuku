@@ -13,3 +13,7 @@ dev/test/mock_link/out/
 dev/test/mock_link/save.json
 dev/test/mock_link/data.json
 dev/test/mock_link/page.html
+dev/test/mock_camp/out/
+dev/test/mock_camp/save.json
+dev/test/mock_camp/mock.json
+dev/test/mock_camp/page.html
