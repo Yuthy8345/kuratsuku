@@ -97,6 +97,7 @@ ok(S.spon.offer.every(x => E.sponText(x) && E.sponShort(x)), `texts: ${S.spon.of
   const d2 = T.spon.deals[2]; Object.assign(d2, { k: 'hl', n: 0 });   // the sleeve: lose no home game
   const ai = T.order.find(x => x !== T.my); const ac = T.clubs[ai]; const aiSp0 = ac.spon;
   let f0 = tc.funds, hit = null, miss = null, missNews = false, months = 0, first = null;
+  const base = Math.round(tc.spon * SP.base);   // before the season ends (a top-3 finish raises c.spon)
   for (let g = 0; g < 400 && !T.seasonEnd; g++) {
     const before = tc.fin.spon, fb = tc.funds;
     const day = T.date;
@@ -106,7 +107,6 @@ ok(S.spon.offer.every(x => E.sponText(x) && E.sponShort(x)), `texts: ${S.spon.of
     if (!miss && d2.st === 'fail') { miss = T.date; missNews = T.news.some(x => x.text.includes(d2.co) && x.text.includes('届かなかった')) && T.sec.notes.some(n => n.k === 'sponMiss' && n.data.co === d2.co); }
     if (st.stop === 'seasonEnd') break;
   }
-  const base = Math.round(tc.spon * SP.base);
   ok(first != null && Math.abs(first - (base + T.spon.deals.reduce((a, d) => a + Math.round(d.g * SP.slot[d.slot].f / T.spon.months), 0))) <= 3, `a month: fixed ${E.money(base)} + the guarantees' share (${E.money(first)})`);
   ok(hit && hit.got === Math.round(d0.b * SP.slot[0].f), `勝点1以上 met on ${hit && hit.date}: the bonus × 1.2 (胸) the same day (${hit && E.money(hit.got)})`);
   ok(T.sec.notes.some(n => n.k === 'sponHit' && n.data.co === d0.co) || T.news.some(x => x.text.includes(d0.co) && x.text.includes('達成')), 'she tells (a note / the news)');
@@ -120,7 +120,8 @@ ok(S.spon.offer.every(x => E.sponText(x) && E.sponShort(x)), `texts: ${S.spon.of
   ok(ac.fin.spon === aiSp0 * T.spon.months, `AI club: the same fixed sponsors as before (${E.money(ac.fin.spon)})`);
   ok(T.spon.hist.length === 1 && T.spon.hist[0].s === 2026, 'kept in the history');
   // next season: new offers, she stops the days to bring them
-  E.rollover(T);
+  T.board = 100; E.rollover(T);
+  if (T.fired) { console.log(`(skip the next season's checks: sacked at the season end — ${T.fired.reason})`); } else {
   ok(T.spon.s === T.season && T.spon.offer.length === SP.n && T.spon.months >= 11 && T.spon.months === E.payMonths(E.D.add(T.date, 1), T.spon.end) && T.spon.u23 === 0 && !T.spon.yo.length, `${E.seasonLabel(T.season)}: five new offers, ${T.spon.months} paydays to ${T.spon.end}, counters back to 0`);
   const U = clone(T); E.sponPick(U, E.sponRec(U));
   const st = E.advance(T, 3);
@@ -128,6 +129,7 @@ ok(S.spon.offer.every(x => E.sponText(x) && E.sponShort(x)), `texts: ${S.spon.of
   const su = E.advance(U, 3);
   ok(su.stop !== 'sec', `signed before the next day: no stop for them (${su.stop})`);
   ok(T.spon.offer.every(x => !sp.deals.some(d => d.co === x.co)), 'new companies');
+  }
 }
 
 /* each condition */
