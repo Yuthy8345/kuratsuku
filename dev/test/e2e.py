@@ -30,7 +30,7 @@ async def main():
         async def has(sel): return await page.locator(sel).count() > 0
         async def click(sel, w=120):
             await page.locator(sel).first.click(); await page.wait_for_timeout(w)
-        stats = {'matches': 0, 'offers': 0, 'ret': 0, 'cele': 0, 'reborn': 0, 'jobs': 0, 'closed': 0, 'xi': 0, 'taps': 0, 'xi_left': 0, 'tours': 0, 'stuck': 0, 'nt': 0, 'sec': 0, 'spon': 0, 'built': 0, 'done': 0}
+        stats = {'matches': 0, 'offers': 0, 'ret': 0, 'cele': 0, 'reborn': 0, 'jobs': 0, 'closed': 0, 'xi': 0, 'taps': 0, 'xi_left': 0, 'tours': 0, 'stuck': 0, 'nt': 0, 'sec': 0, 'spon': 0, 'built': 0, 'done': 0, 'camp': 0, 'campRep': 0}
         LOAD = "() => JSON.parse(LZString.decompressFromBase64(localStorage.getItem('touchline.j1.save').slice(3)))"
         unknown = {}
         seasons = 0; t0 = time.time(); it = 0
@@ -57,6 +57,12 @@ async def main():
                 elif await has('#sheet .ht-done'):   # ホームタウン (2026-10-15): a building done → her note → the board
                     if stats['done'] == 0: await page.screenshot(path=str(OUT / 'built.png'))
                     stats['done'] += 1; await click('#sheet [data-act="htGo"]', 250)
+                elif await has('#sheet [data-act="campPick"]:not([disabled])'):   # キャンプ (2026-10-16): her pick
+                    if stats['camp'] == 0: await page.screenshot(path=str(OUT / 'camp.png'))
+                    await click('#sheet [data-act="campPick"]', 250); stats['camp'] += 1
+                elif await has('#sheet [data-act="campRepDone"]'):   # the camp report
+                    if stats['campRep'] == 0: await page.screenshot(path=str(OUT / 'camp-report.png'))
+                    await click('#sheet [data-act="campRepDone"]', 250); stats['campRep'] += 1
                 elif await has('#sheet .sec-head'):
                     stats['sec'] += 1
                     if await has('#sheet [data-act="secAll"]'): await click('#sheet [data-act="secAll"]', 200)

@@ -211,7 +211,7 @@ ok(near(v(xi[far[0]], xi[far[1]])[0], r1, 0.06), `sent off at 30: ${v(xi[far[0]]
   const nbs = A2.map(([i, j]) => (est[key(xi[i], xi[j])] || [0])[0]);
   const real = T.clubs[T.my].lk, rv = A2.map(([i, j]) => (real[key(xi[i], xi[j])] || [0])[0]);
   const ma = a => a.reduce((s, y) => s + y, 0) / a.length;
-  ok(old.v === 16 && Object.keys(est).length > 40 && near(ma(nbs), ma(rv), 15), `v15 → 16 (${old.date}): ${Object.keys(est).length} pairs from the minutes, neighbours ${ma(nbs).toFixed(0)} (played: ${ma(rv).toFixed(0)})`);
+  ok(old.v >= 16 && Object.keys(est).length > 40 && near(ma(nbs), ma(rv), 15), `v15 → 16 (${old.date}): ${Object.keys(est).length} pairs from the minutes, neighbours ${ma(nbs).toFixed(0)} (played: ${ma(rv).toFixed(0)})`);
   const dbp = Object.fromEntries(DATA.players.filter(d => d.bp).map(d => [d.id, d.bp]));
   const rl = Object.values(old.players).filter(p => !p.gen && dbp[p.id]);
   ok(rl.length > 500 && rl.every(p => p.bp === dbp[p.id]), `v15 → 16: real players get their birthplace from the data (${rl.length}; born abroad, none)`);
@@ -226,7 +226,7 @@ ok(near(v(xi[far[0]], xi[far[1]])[0], r1, 0.06), `sent off at 30: ${v(xi[far[0]]
   fs.unlinkSync(tmp);
   E.migrate(B, DATA);
   const bc = B.clubs[B.my], bl = E.linkEval(B, B.my, bc.tac.form, bc.tac.xi);
-  ok(B.v === 16 && bl.avg > 30 && bl.avg < 95, `be3e2da (${B.date}): 連携 estimated, the XI's average ${bl.avg.toFixed(0)}`);
+  ok(B.v >= 16 && bl.avg > 30 && bl.avg < 95, `be3e2da (${B.date}): 連携 estimated, the XI's average ${bl.avg.toFixed(0)}`);
   for (let g = 0; g < 60; g++) playDay(B);
   ok(Object.values(bc.lk).some(e => e[1] > 0), `be3e2da: the season goes on (${B.date})`);
 }

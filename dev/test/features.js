@@ -104,7 +104,7 @@ const D0 = '2027-05-20', D1 = '2027-05-21';
     for (const f of lg) { if (f === mine || f === theirs) continue; f.played = true; const me = f.h === T.my ? 'h' : f.a === T.my ? 'a' : null; f.hg = me === 'h' ? 3 : me === 'a' ? 0 : 1; f.ag = me === 'a' ? 3 : me === 'h' ? 0 : 1; }
     T.fixtures = T.fixtures.filter(f => !f.cup); T.cups = null;
     theirs.date = D1; mine.date = '2027-05-30'; T.date = D0;
-    let st = null; for (let i = 0; i < 5; i++) { st = E.advance(T); if (st.stop !== 'note' && st.stop !== 'inbox') break; }
+    let st = null; for (let i = 0; i < 8; i++) { st = E.advance(T); if (st.stop === 'camp') E.campSeen(T); else if (st.stop === 'sec') E.secSeen(T); else if (st.stop !== 'note' && st.stop !== 'inbox') break; }   // the camp (2026-10-16) on the way
     ok(st.stop === 'cele' && T.cele.length === 1 && T.cele[0].k === 'j1' && T.cele[0].left === 1, `title settled while I rest: advance stops (${st.stop}, ${T.cele && T.cele[0] && T.cele[0].left} left)`);
   }
   ok(!!stops.match, 'advance stops: ' + JSON.stringify(stops));

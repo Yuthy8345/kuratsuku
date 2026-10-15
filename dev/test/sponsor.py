@@ -175,6 +175,7 @@ async def main(vw, vh, board):
         presses = 0
         for _ in range(4):   # an offer from Europe or the window opening may stop the day first
             if await page.locator('#sheet .sp-paper').count(): break
+            if await page.locator('#sheet [data-act="rebornDone"]').count(): await page.click('#sheet [data-act="rebornDone"]'); await page.wait_for_timeout(300); continue   # a 転生 player may come with the new season
             if await page.locator('#sheet.on').count(): await page.click('#sheet [data-act="closeSheet"]'); await page.wait_for_timeout(300)
             while await page.locator('[data-act="offerNo"]').count(): await page.locator('[data-act="offerNo"]').first.click(); await page.wait_for_timeout(200)
             await page.click('[data-act="go"]'); await page.wait_for_timeout(600); presses += 1
