@@ -824,6 +824,8 @@ const SEC_VIEW = {
         <dt>次の大一番</dt><dd>${f && S.clubs[opp] ? `${jdw(f.date)} ${esc(S.clubs[opp].short)}戦・${esc(d.big.tag)}${f.played ? '（終了）' : ''}` : 'この1か月はありません'}</dd>
         <dt>資金</dt><dd>${E.money(d.funds)}${d.delta == null ? '' : `（先月から ${d.delta >= 0 ? '+' : ''}${E.money(d.delta)}）`}</dd>
         <dt>若手</dt><dd>${top.length ? `${top.join('、')}${d.youth > top.length ? ` ほか${d.youth - top.length}人` : ''}が成長` : '先月から目立った変化はありません'}</dd>
+        ${d.fans != null ? `<dt>サポーター</dt><dd>${ppl(d.fans)}人${d.fd ? `（先月から ${sgn(d.fd)}）` : ''}</dd>` : ''}
+        ${d.job ? `<dt>工事</dt><dd>${htJobName(d.job)} ${d.job.to <= S.date ? `完成（${jd(d.job.to)}）` : `${d.job.pct}%（${jd(d.job.to)} 完成予定）`}</dd>` : ''}
         ${d.sp ? `<dt>スポンサー</dt><dd>${[d.sp.done ? `達成${d.sp.done}` : '', d.sp.n - d.sp.done - d.sp.fail ? `進行中${d.sp.n - d.sp.done - d.sp.fail}` : '', d.sp.fail ? `届かず${d.sp.fail}` : ''].filter(Boolean).join('・')}${d.sp.got ? `（ボーナス ${E.money(d.sp.got)}）` : ''}</dd>` : ''}</dl>
         ${y ? '<button class="btn ghost block" data-act="youthOpen" style="min-height:40px">若手の成長レポート</button>' : ''}`;
     },
@@ -852,6 +854,28 @@ Object.assign(SEC_VIEW, {
     bubble: n => `${n.data.co}との約束「${E.sponShort(spDeal(n.data))}」には届きませんでした ›`,
     title: () => 'スポンサーとの約束',
     body: n => `<p class="small" style="margin:0">${esc(n.data.co)}との約束「${esc(E.sponShort(spDeal(n.data)))}」は、今季はもう届きません。保証の額はそのまま入ります。</p>`,
+    done: 'わかりました',
+  },
+});
+// ホームタウン (2026-10-15): a building done (she stops the days), and once for an old save the new screen
+Object.assign(SEC_VIEW, {
+  built: {
+    bubble: n => n.data.k === 'exp' ? `スタジアムの増築が完成。${(n.data.cap || 0).toLocaleString('ja-JP')}席になりました ›` : `${E.TOWN.b[n.data.k].jp}が完成しました ›`,
+    title: n => n.data.k === 'exp' ? `スタジアム増築 ${n.data.step}期が完成` : `${E.TOWN.b[n.data.k].jp}が完成`,
+    body: n => { const k = n.data.k, B = E.TOWN.b[k];
+      return `<div class="ht-done"><span class="ht-mag built lg">${htIc(k)}</span><div class="t"><b>${k === 'exp' ? `収容 ${(n.data.cap || 0).toLocaleString('ja-JP')}席` : esc(B.jp)}</b><small>維持費 月${E.money(B.up)}（来月から）</small></div></div>
+        ${htChips(k)}<p class="small" style="margin:0">${k === 'exp' ? '席が増えたので、満員で入れなかったサポーターも入れます。' : ''}${B.fan ? `完成を聞いて、サポーターが${Math.round(B.fan * 100)}%増えました。` : ''}</p>
+        <button class="btn primary block" data-act="htGo" style="min-height:44px">ホームタウンを見る</button>`; },
+    done: 'わかりました',
+  },
+  town: {
+    bubble: () => 'クラブに「ホームタウン」ができました ›',
+    title: () => 'ホームタウン',
+    body: n => { const d = n.data, mv = (d.moved || []).map(k => E.TOWN.b[k].jp);
+      return `<p class="small" style="margin:0">クラブ → ホームタウンで、スタジアムの増築やクラブハウス・選手寮などを建てられるようになりました。いまのサポーターは${ppl(d.fans)}人です。</p>
+        ${d.lv >= 3 && mv.length ? `<p class="small" style="margin:0">これまでのスタジアム設備（Lv${d.lv}）は、${mv.map(esc).join('・')}になりました。</p>` : ''}
+        <p class="small" style="margin:0">建物と施設（始めのLvより上の分）には維持費がかかります。${d.up ? `来月から月${E.money(d.up)}です。` : 'いまはかかっていません。'}</p>
+        <button class="btn primary block" data-act="htGo" style="min-height:44px">ホームタウンを見る</button>`; },
     done: 'わかりました',
   },
 });
@@ -914,9 +938,12 @@ function sheetSec(back, fid) {
   const nf = E.nextMyFixture(S); const f = (fid && S.fixtures.find(x => x.id === fid)) || nf;
   const opp = f ? S.clubs[f.h === S.my ? f.a : f.h] : null;
   const out = [];
+  const noteSec = n => { const v = secView(n); return `<section class="sec-sec"><h4>${esc(v.title(n))}<small>${jd(n.d)}</small></h4>${v.body(n)}${v.done ? `<button class="btn ghost block" data-act="secDone" data-id="${n.id}" style="min-height:40px">${v.done}</button>` : ''}</section>`; };
+  const top = si.notes.filter(n => !n.seen && n.k === 'built');   // a building done stops the day: it comes first
+  for (const n of top) out.push(noteSec(n));
   if (si.fix) out.push(`<section class="sec-sec"><h4>${f && opp ? `${jdw(f.date)} ${esc(opp.short)}戦（${E.fxLabel(f)}）` : '次の試合'}に出られない選手</h4>${secFixRows(si.fix)}<p class="fine" style="margin:0">押すまでメンバーは変わりません。候補は同じ役割でいちばん力を出せる選手です。</p></section>`);
   for (const m of si.back) out.push(`<section class="sec-sec"><h4>戻ってきた選手</h4><p class="small" style="margin:0"><b>${backLine(m)}</b><br><span class="muted">${backSub(m)}。</span></p><div class="grid2"><button class="btn ghost" data-act="secKeep" data-id="${m.out}">このまま</button><button class="btn primary" data-act="secBack" data-id="${m.out}">戻す</button></div></section>`);
-  for (const n of si.notes) { const v = secView(n); out.push(`<section class="sec-sec"><h4>${esc(v.title(n))}<small>${jd(n.d)}</small></h4>${v.body(n)}${v.done ? `<button class="btn ghost block" data-act="secDone" data-id="${n.id}" style="min-height:40px">${v.done}</button>` : ''}</section>`); }
+  for (const n of si.notes) if (!top.includes(n)) out.push(noteSec(n));
   E.secSeen(S); persist(false);
   openSheet(`<div class="sec-head">${akiMag('md')}<div style="min-width:0;flex:1"><div class="eyebrow">${E.SEC.role}からの連絡</div><b class="sec-name">${esc(secWho())}</b></div><button class="btn ghost sec-rename" data-act="secName">名前を変える</button></div>
     ${out.join('') || `<p class="empty">いまはお知らせはありません。${esc(c.short)}の様子を見ておきますね。</p>`}`,
@@ -1041,6 +1068,201 @@ function sponReview(sp) {
 // the pre-match sheet, when the season starts without a choice
 function spPreLine(fid) {
   return `<div class="sec-line" style="margin-top:0">${akiMag('sm')}<p><b>スポンサーがまだ決まっていません。</b><span class="small">このままキックオフすると、おすすめの3社と契約します。</span></p></div><button class="btn ghost block" data-act="sponOpen" data-back="pre" data-fid="${fid}">スポンサーを選ぶ</button>`;
+}
+
+/* ---------- ホームタウン (2026-10-15, 作業5, ユーザーの選んだ案A＝作戦ボードの街の地図) ----------
+   クラブ → ホームタウン: the supporters and the stadium on top, then the town drawn on the board in chalk — the club's four
+   facilities in a dashed box at the top (blue magnets with their level), the river and the railway, the stadium in the
+   middle with its capacity (a little bigger with each stand added), the buildings as magnets: built = white with a yellow
+   rim and a name tag, not yet = a dashed chalk circle with its name and cost, under construction = yellow-and-black
+   stripes with the % — then the works, the season's supporters and home crowds (chart) and the money. A magnet opens
+   sheetTown (cost, months, upkeep, effects; build / upgrade). Her note when a building is done (SEC_VIEW.built) and, once,
+   for an old save (SEC_VIEW.town). The map is drawn on a 361×432 board (HT_POS), x in % so it fits every width. */
+const HT_IC = {
+  exp: '<path d="M4 20V9l8-4 8 4v11"/><path d="M4 13h16M8 20v-4h8v4"/><path d="M17 3v3M15.5 4.5h3"/>',
+  crane: '<path d="M6 21V4h1.5L19 7"/><path d="M6 7h13M16 7v5"/><path d="M14.5 12h3v2h-3z"/><path d="M3 21h8"/>',
+  roof: '<rect x="4" y="5" width="16" height="10" rx="1.5"/><path d="M9 19h6M12 15v4"/><path d="M8 9l2.5 2.5L16 8"/>',
+  food: '<path d="M4 12h16a8 8 0 0 1-16 0z"/><path d="M9 8c0-1.5 1-1.5 1-3M13 8c0-1.5 1-1.5 1-3"/>',
+  shop: '<path d="M5 8h14l-1 12H6z"/><path d="M9 10V7a3 3 0 0 1 6 0v3"/>',
+  sclub: '<path d="M5 21V4"/><path d="M5 5h12l-2.5 3.5L17 12H5"/>',
+  house: '<path d="M4 11l8-6 8 6"/><path d="M6 10v10h12V10"/><path d="M10 20v-5h4v5"/>',
+  dorm: '<path d="M3 19V7M3 13h18v6M21 13v-2a3 3 0 0 0-3-3h-7v5"/><circle cx="7" cy="10.5" r="1.8"/>',
+  indoor: '<path d="M3 19a9 9 0 0 1 18 0z"/><path d="M8 19v-3h8v3"/><path d="M12 10v3"/>',
+  train: '<path d="M4 20h16"/><path d="M6 20V9h12v11"/><path d="M6 9l6-4 6 4"/><circle cx="12" cy="14" r="2"/>',
+  youth: '<path d="M12 21v-9"/><path d="M12 12c0-4 3-6 7-6 0 4-3 6-7 6zM12 14c0-3-2.5-5-6-5 0 3 2.5 5 6 5z"/>',
+  medical: '<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M12 8v8M8 12h8"/>',
+  scout: '<circle cx="7" cy="15" r="3.5"/><circle cx="17" cy="15" r="3.5"/><path d="M10.5 15h3M7 11.5l2-6h1.5M17 11.5l-2-6h-1.5"/>',
+  crowd: '<circle cx="9" cy="8" r="3"/><path d="M3.5 19.5a5.5 5.5 0 0 1 11 0"/><circle cx="17" cy="9" r="2.4"/><path d="M15.2 14.6A4.4 4.4 0 0 1 21 18.8"/>',
+};
+const htIc = (k, cls) => `<svg class="${cls || 'ht-ic'}" viewBox="0 0 24 24" aria-hidden="true">${HT_IC[k] || ''}</svg>`;
+// people: 15098 → 1万5,098, 20000 → 2万
+const ppl = n => { n = Math.round(n || 0); const r = n % 10000; return n >= 10000 ? `${Math.floor(n / 10000)}万${r ? r.toLocaleString('ja-JP') : ''}` : n.toLocaleString('ja-JP'); };
+const yen = man => `${Math.round(man * 10000).toLocaleString('ja-JP')}円`;
+const sgn = n => `${n > 0 ? '+' : n < 0 ? '−' : '±'}${Math.abs(n).toLocaleString('ja-JP')}`;
+const HT_FAC = ['train', 'youth', 'medical', 'scout'];
+const HT_SHORT = { exp: '増築', roof: '屋根・ビジョン', food: 'グルメ', shop: 'ショップ', sclub: 'サポーターズ', house: 'クラブハウス', dorm: '選手寮', indoor: '室内練習場' };
+const HT_POS = { stad: [158, 202], exp: [262, 146], train: [52, 60], youth: [134, 60], medical: [216, 60], scout: [298, 60], shop: [40, 170], food: [40, 258], roof: [312, 196], house: [52, 330], dorm: [134, 330], indoor: [216, 330], sclub: [298, 330] };
+const HT_DESC = {
+  exp: 'スタンドを5,000席増やします。満員で入れなかったサポーターが入れるようになり、入場料が増えます。工事中のホーム戦は、席が減るので観客が1割少なくなります。',
+  roof: 'スタンドを覆う屋根と大型ビジョン。雨の日も観やすく、試合の熱気が伝わるスタジアムに。観客が増え、1人あたりの売上も上がります。',
+  food: 'スタジアムの名物グルメ。試合の日の楽しみが増えて観客が少し増え、1人あたりの売上が上がります。',
+  shop: 'ユニフォームやグッズの売店。1人あたりの売上が上がります。',
+  sclub: 'サポーターの集まり。勝ったときに増えやすく、負けても離れにくくなります。',
+  house: '練習の合間に体を休める場所。選手のコンディションが毎日少し早く戻り、移籍の交渉で「行ってもいい」と思われやすくなります。',
+  dorm: '若手が暮らす寮。21歳以下の選手が少し早く伸び、ユースから上がってくる選手の伸びしろが少し大きくなります。',
+  indoor: '天気に左右されない練習場。試合と練習でのケガが減ります。',
+};
+// what a building does, as chips
+function htFx(k) {
+  const b = E.TOWN.b[k], pc = x => `${Math.round(x * 100)}%`, out = [];
+  if (k === 'exp') out.push(`+${b.seats.toLocaleString('ja-JP')}席`);
+  if (b.att) out.push(`観客 +${pc(b.att)}`);
+  if (b.per) out.push(`1人あたり +${Math.round(b.per * 10000)}円`);
+  if (b.tgt) out.push(`サポーター +${pc(b.tgt)}`);
+  if (b.gain) out.push(`増え方 ×${b.gain}`, `減り方 ×${b.loss}`);
+  if (b.rec) out.push(`コンディションの戻り +${b.rec}/日`);
+  if (b.will) out.push(`移籍の意思 +${pc(b.will)}`);
+  if (b.young) out.push(`${b.age}歳以下の成長 ×${b.young}`, `ユース昇格 伸びしろ +${b.pot}`);
+  if (b.inj) out.push(`ケガ −${pc(1 - b.inj)}`);
+  return out;
+}
+const htChips = k => `<div class="ht-fx">${htFx(k).map(x => `<span class="chip acc">${x}</span>`).join('')}</div>`;
+const htJobName = j => j.k === 'exp' ? `スタジアム増築 ${j.step || ''}期` : E.TOWN.b[j.k].jp;
+const htPct = j => Math.round(100 * Math.min(1, Math.max(0, E.D.diff(S.date, j.from) / Math.max(1, E.D.diff(j.to, j.from)))));
+// the supporters (line) and the home crowds (bars, a full house in yellow) of this season, with the capacity (dashed)
+function htChart(I) {
+  const c = S.clubs[S.my];
+  const a = `${S.season}-07-15`, z = `${S.season + 1}-05-31`, span = E.D.diff(z, a);
+  const W = 320, H = 112, L = 30, B = 16, X = d => L + (W - L - 4) * Math.min(1, Math.max(0, E.D.diff(d, a) / span));
+  const pts = I.hist.filter(r => r[0] >= `${S.season}-06-01`).map(r => ({ d: r[0] < a ? a : r[0], f: r[1], cap: r[2] || c.cap }));
+  if (!pts.length || pts[pts.length - 1].d < S.date) pts.push({ d: S.date < a ? a : S.date, f: I.fans, cap: I.cap });
+  const vals = pts.map(p => p.f).concat(pts.map(p => p.cap), I.games.map(g => g.att));
+  const lo = Math.max(0, Math.floor(Math.min(...vals) * 0.8 / 1000) * 1000), hi = Math.ceil(Math.max(...vals) * 1.06 / 1000) * 1000;
+  const Y = v => (H - B) - (H - B - 6) * (v - lo) / Math.max(1, hi - lo);
+  const bars = I.games.map(g => { const x = X(g.d); return `<rect class="g${g.att >= c.cap * 0.95 ? ' full' : g.cup ? ' cup' : ''}" x="${(x - 3).toFixed(1)}" y="${Y(g.att).toFixed(1)}" width="6" height="${Math.max(1, Y(lo) - Y(g.att)).toFixed(1)}" rx="1"/>`; }).join('');
+  let cap = `M${X(pts[0].d).toFixed(1)} ${Y(pts[0].cap).toFixed(1)}`;
+  for (let i = 1; i < pts.length; i++) cap += ` H${X(pts[i].d).toFixed(1)} V${Y(pts[i].cap).toFixed(1)}`;
+  cap += ` H${X(z).toFixed(1)}`;
+  const line = pts.map(p => `${X(p.d).toFixed(1)},${Y(p.f).toFixed(1)}`).join(' '), last = pts[pts.length - 1];
+  const md = (m, d) => `${m >= 7 ? S.season : S.season + 1}-${String(m).padStart(2, '0')}-${d}`;
+  const months = [8, 9, 10, 11, 12, 1, 2, 3, 4, 5].map(m => { const x = X(md(m, '01')).toFixed(1); return `<line class="tk" x1="${x}" x2="${x}" y1="${H - B}" y2="${H - B + 3}"/><text x="${X(md(m, '16')).toFixed(1)}" y="${H - 3}" text-anchor="middle">${m}月</text>`; }).join('');
+  const k = v => `${(v / 10000).toFixed(v % 10000 ? 1 : 0)}万`;
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="今季のサポーターとホームの観客">
+    <line class="ax" x1="${L}" x2="${W - 4}" y1="${H - B}" y2="${H - B}"/>${months}
+    <text x="${L - 4}" y="${Y(hi) + 4}" text-anchor="end">${k(hi)}</text><text x="${L - 4}" y="${Y(lo)}" text-anchor="end">${k(lo)}</text>
+    ${bars}<path class="cp" d="${cap}"/><polyline class="fl" points="${line}"/><circle class="fd" cx="${X(last.d).toFixed(1)}" cy="${Y(last.f).toFixed(1)}" r="3.2"/></svg>`;
+}
+function viewTown() {
+  const c = S.clubs[S.my], I = E.townInfo(S), T = c.town || { b: {}, exp: 0, job: null }, job = I.job;
+  const pct = job ? htPct(job) : 0;
+  const d0 = I.fans0 != null ? I.fans - I.fans0 : null;
+  const over = Math.round((I.fans - I.cap) / 100) * 100;
+  const note = over >= 500 ? `満員の試合は、席が取れないサポーターがおよそ${ppl(over)}人。`
+    : I.full != null && I.full >= 0.9 ? 'ほぼ満員。サポーターが増えたら増築の出番です。'
+    : I.att != null ? `まだ席に余裕があります（平均で約${ppl(Math.round((I.cap - I.att) / 100) * 100)}席の空き）。` : '今季のホーム戦はまだありません。';
+  const x = px => `${(px / 361 * 100).toFixed(2)}%`;
+  const tok = (k, st, label, sub, aria) => { const [px_, py] = HT_POS[k]; return `<button class="ht-tok ${st}" style="left:${x(px_)};top:${py}px" data-act="htOpen" data-k="${k}" aria-label="${esc(aria)}"><span class="ht-mag ${st}">${htIc(st === 'job' ? 'crane' : k)}${st === 'fac' ? `<em>Lv${sub}</em>` : ''}</span><span class="lbl">${label}</span>${st === 'empty' && sub ? `<span class="pr">${sub}</span>` : ''}</button>`; };
+  const oku = v => E.money(v).replace('円', '');
+  const facs = HT_FAC.map(k => tok(k, 'fac', E.FACILITY[k].jp, c.fac[k], `${E.FACILITY[k].jp} Lv${c.fac[k]}`)).join('');
+  const blds = ['shop', 'food', 'roof', 'house', 'dorm', 'indoor', 'sclub'].map(k => {
+    const B = E.TOWN.b[k];
+    if (job && job.k === k) return tok(k, 'job', `工事中 ${pct}%`, null, `${B.jp}（工事中 ${pct}%）`);
+    if (E.built(c, k)) return tok(k, 'built', HT_SHORT[k], null, `${B.jp}（完成）`);
+    return tok(k, 'empty', HT_SHORT[k], oku(B.cost), `${B.jp}（${E.money(B.cost)}）`);
+  }).join('');
+  const nx = E.townNext(c, 'exp');
+  const expTok = job && job.k === 'exp' ? tok('exp', 'job', `増築 ${job.step}期 ${pct}%`, null, `スタジアム増築 ${job.step}期（工事中 ${pct}%）`)
+    : nx ? tok('exp', 'empty', `増築 ${nx.step}期`, oku(nx.cost), `スタジアム増築 ${nx.step}期（${E.money(nx.cost)}）`) : '';
+  const n = T.exp || 0;
+  const stad = `<button class="ht-stad${job && job.k === 'exp' ? ' works' : ''}" style="left:${x(HT_POS.stad[0])};top:${HT_POS.stad[1]}px;--n:${n}" data-act="htOpen" data-k="exp" aria-label="${esc(c.stadium || 'スタジアム')}（収容 ${I.cap.toLocaleString('ja-JP')}席）">
+    <span class="c">${Array.from({ length: n }, (_, i) => `<span class="st" style="--i:${n - i}"></span>`).join('')}<span class="ring"></span><span class="bowl"></span><span class="cap">${I.cap.toLocaleString('ja-JP')}席</span></span></button>`;
+  const rails = Array.from({ length: 26 }, (_, i) => { const xx = i * 15; const y = 286 - xx * 0.021; return `<path class="rail" d="M${xx} ${y - 5} L ${xx + 1} ${y + 5}"/>`; }).join('');
+  const board = `<div class="ht-board">
+    <svg class="map" viewBox="0 0 361 432" preserveAspectRatio="none" aria-hidden="true">
+      <defs><filter id="ht-chalk"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" seed="4"/><feDisplacementMap in="SourceGraphic" scale="1.6"/></filter></defs>
+      <g filter="url(#ht-chalk)">
+        <rect class="zone" x="8" y="12" width="345" height="94" rx="10"/>
+        <path class="ch" d="M-5 122 C 40 106, 80 134, 130 118 S 210 102, 250 116 S 320 130, 370 110"/>
+        <path class="ch" d="M-5 133 C 40 117, 80 145, 130 129 S 210 113, 250 127 S 320 141, 370 121"/>
+        <path class="rail" d="M-5 283 L 370 275"/><path class="rail" d="M-5 289 L 370 281"/>${rails}
+        <path class="ch thin" d="M95 400 L 102 300 L 92 140"/><path class="ch thin" d="M361 240 L 270 240 L 250 300"/><path class="ch thin" d="M258 400 L 262 300"/>
+      </g>
+    </svg>
+    <span class="ht-lab" style="left:${x(18)};top:18px">クラブの施設</span><span class="ht-lab" style="right:${x(22)};top:140px">川</span><span class="ht-lab" style="right:${x(14)};top:292px">駅 →</span>
+    ${stad}${expTok}${facs}${blds}
+  </div>`;
+  const jobCard = job ? `<section class="card ht-job">
+      <div class="row"><div class="eyebrow">工事中</div><span class="spacer"></span><span class="chip acc">あと${job.left}日</span></div>
+      <div class="ht-job-t"><b>${htJobName(job)}</b>${job.k === 'exp' ? `<span class="small muted">+${E.TOWN.b.exp.seats.toLocaleString('ja-JP')}席 → ${(I.cap + E.TOWN.b.exp.seats).toLocaleString('ja-JP')}席</span>` : ''}</div>
+      <div class="ht-prog" role="img" aria-label="進み具合 ${pct}%"><i style="width:${pct}%"></i></div>
+      <div class="small muted">${jd(job.to)} 完成予定${job.k === 'exp' ? '・工事中のホーム戦は観客 −10%' : ''}</div></section>` : '';
+  const hg = I.games.filter(g => !g.cup), fullN = hg.filter(g => g.att >= I.cap * 0.95).length;
+  const chart = `<section class="card ht-chart"><div class="row"><div class="eyebrow">サポーターと観客</div><span class="spacer"></span><span class="small muted">${E.seasonLabel(S.season)}</span></div>
+      ${htChart(I)}
+      <div class="ht-leg"><span><i></i>サポーター</span><span><i class="g"></i>ホームの観客</span><span><i class="f"></i>満員</span><span><i class="c"></i>収容</span></div>
+      <p class="fine" style="margin:0">${hg.length ? `リーグのホーム戦 ${hg.length}試合・平均 ${ppl(I.att)}人${fullN ? `・満員 ${fullN}試合` : ''}。` : 'ホーム戦が始まると、試合ごとの観客がここに並びます。'}サポーターは勝つと増え、負けが続くと減ります。毎月、クラブの格や建物で決まる人数（いまは約${ppl(Math.round(I.target / 100) * 100)}人）へ少しずつ戻ります。</p></section>`;
+  const upB = I.upkeep - I.upF;
+  const money = `<section class="card" style="display:grid;gap:6px"><dl class="kv"><dt>観客1人あたり</dt><dd>${yen(I.per)}</dd>${I.att != null ? `<dt>1試合の入場料</dt><dd>平均 ${E.money(Math.round(I.att * I.per))}</dd>` : ''}<dt>維持費</dt><dd>月${E.money(I.upkeep)}</dd></dl>
+      <p class="fine" style="margin:0">維持費は 建物 月${E.money(upB)}・施設 月${E.money(I.upF)}（施設は始めのLvより上の分）。建物は完成の翌月からかかります。マグネットをタップすると、費用・工期・効果を見て建てられます。工事は1つずつです。</p></section>`;
+  return `<section class="card ht-top">
+      <div class="ht-stats">
+        <div><small>サポーター</small><b>${ppl(I.fans)}<span>人</span></b>${d0 ? `<i class="${d0 > 0 ? 'up' : 'dn'}">今季 ${sgn(d0)}</i>` : '<i>&nbsp;</i>'}</div>
+        <div><small>スタジアム</small><b>${ppl(I.cap)}<span>席</span></b><i>${I.att != null ? `平均 ${ppl(I.att)}人・${Math.round(I.full * 100)}%` : esc(c.stadium || '')}</i></div>
+      </div>
+      <p class="ht-note">${note}</p></section>
+    ${board}${jobCard}${chart}${money}`;
+}
+// クラブ → 経営: the facilities and the buildings, in one line, and the way to ホームタウン
+function townLink() {
+  const c = S.clubs[S.my], I = E.townInfo(S), j = I.job;
+  const nb = I.b.filter(b => b.k !== 'exp' && b.built).length;
+  return `<section class="card ht-link"><div class="row" style="gap:12px"><span class="ht-mag built sm">${htIc('exp')}</span><div style="flex:1;min-width:0"><b>ホームタウン</b>
+    <div class="small muted">${HT_FAC.map(k => `${E.FACILITY[k].jp} Lv${c.fac[k]}`).join('・')}</div>
+    <div class="small muted">収容 ${c.cap.toLocaleString('ja-JP')}席・建物 ${nb}/7${j ? `・工事中 ${htJobName(j)} ${htPct(j)}%` : ''}</div></div></div>
+    <button class="btn block" data-act="clView" data-k="town">施設の強化・建物はホームタウンへ</button></section>`;
+}
+// a magnet: build it (cost, months, upkeep, effects), or a facility to upgrade
+function sheetTown(k) {
+  sheetState = { type: 'town', k };
+  const c = S.clubs[S.my], close = '<button class="btn ghost block" data-act="closeSheet">閉じる</button>';
+  if (HT_FAC.includes(k)) {
+    const F = E.FACILITY[k], lv = c.fac[k], cost = E.facCost(lv), u = E.TOWN.facUp[k], st = E.TOWN.facStart[k];
+    const btn = lv >= 5 ? '' : c.funds < cost ? `<button class="btn primary block" disabled>資金が足りません（${E.money(cost)}）</button>` : `<button class="btn primary block" data-act="htUp" data-k="${k}" style="min-height:52px">Lv${lv + 1}に強化する（${E.money(cost)}）</button>`;
+    openSheet(`<div class="ht-sh-head"><span class="ht-mag fac lg">${htIc(k)}<em>Lv${lv}</em></span><div class="t"><div class="eyebrow">クラブの施設</div><b class="t2">${esc(F.jp)}</b><span class="stars">${'■'.repeat(lv)}${'□'.repeat(5 - lv)}</span></div></div>
+      ${lv < 5 ? `<div class="ht-kv"><div><small>Lv${lv + 1}への費用</small><b>${E.money(cost).replace('円', '')}</b></div><div><small>工期</small><b>すぐ</b></div><div><small>維持費</small><b>月+${u}万</b></div></div>` : '<div class="row"><span class="chip ok">最大レベル</span></div>'}
+      <p class="small" style="margin:0">${esc(F.desc)}。</p>
+      <p class="fine" style="margin:0">維持費は Lv${st}より上のLv1つにつき月${u}万円（いまは月${Math.max(0, lv - st) * u}万円）。${k === 'train' ? '練習方針と選手ごとのトレーニングは「選手 → 育成」で設定します。' : k === 'scout' ? 'スカウトの派遣は「クラブ → 経営」から。' : ''}</p>`,
+      btn + close);
+    return;
+  }
+  const B = E.TOWN.b[k], T = c.town || { b: {}, exp: 0, job: null }, job = T.job, mine = job && job.k === k;
+  const nx = E.townNext(c, k), done = k !== 'exp' && E.built(c, k), I = E.townInfo(S);
+  const step = mine ? job.step : nx ? nx.step : T.exp;
+  const title = k === 'exp' ? `スタジアム増築${step ? ` ${step}期` : ''}` : B.jp;
+  const st = mine ? 'job' : done ? 'built' : 'empty';
+  const eb = mine ? '工事中' : done ? `完成（${jd(T.b[k])}）` : k === 'exp' && !nx ? 'スタジアム' : '建てる';
+  let kv;
+  if (mine) kv = `<div><small>完成予定</small><b>${jd(job.to)}</b></div><div><small>進み具合</small><b>${htPct(job)}%</b></div><div><small>維持費</small><b>月${B.up}万</b></div>`;
+  else if (done) kv = `<div><small>完成</small><b>${jd(T.b[k])}</b></div><div><small>維持費</small><b>月${B.up}万</b></div><div><small>効果</small><b>発揮中</b></div>`;
+  else if (nx) kv = `<div><small>費用</small><b>${E.money(nx.cost).replace('円', '')}</b></div><div><small>工期</small><b>${nx.mo}か月</b></div><div><small>維持費</small><b>月${nx.up}万</b></div>`;
+  else kv = `<div><small>収容</small><b>${ppl(c.cap)}</b></div><div><small>増築</small><b>${T.exp || 0}期</b></div><div><small>維持費</small><b>月${(T.exp || 0) * B.up}万</b></div>`;
+  const stadLine = k === 'exp' ? `<p class="small" style="margin:0">${esc(c.stadium || 'スタジアム')}：いま${c.cap.toLocaleString('ja-JP')}席${I.att != null ? `・今季の平均 ${I.att.toLocaleString('ja-JP')}人（${Math.round(I.full * 100)}%）` : ''}。${I.fans - c.cap >= 500 ? `満員の試合は約${ppl(Math.round((I.fans - c.cap) / 100) * 100)}人が入れません。` : ''}${(r => r > 0 ? `増築はこのあと${r}期まで（最大${B.capMax.toLocaleString('ja-JP')}席）。` : mine ? 'これが最後の増築です。' : 'これ以上は増築できません。')(nx ? B.cost.length - (T.exp || 0) - (mine ? 1 : 0) : 0)}</p>` : '';
+  let foot = '';
+  if (!mine && !done && nx) {
+    const can = E.townCan(S, k);
+    const fin = E.addMonths(S.date, nx.mo);
+    foot = can.ok ? `<button class="btn primary block" data-act="htBuild" data-k="${k}" style="min-height:54px;font-size:16px">建てる（${E.money(nx.cost)}・${jd(fin)}完成）</button>`
+      : can.busy ? `<button class="btn primary block" disabled>${jd(job.to)} の完成後に建てられます</button>`
+      : `<button class="btn primary block" disabled>資金が足りません（あと${E.money(nx.cost - c.funds)}）</button>`;
+  }
+  const busy = job && !mine && !done && nx ? `<div class="card ht-busy"><span class="small">工事は1つずつ。いまは<b>${htJobName(job)}</b>の工事中（${jd(job.to)} 完成予定）</span></div>` : '';
+  openSheet(`<div class="ht-sh-head"><span class="ht-mag ${st} lg">${htIc(mine ? 'crane' : k)}</span><div class="t"><div class="eyebrow">${eb}</div><b class="t2">${title}</b></div></div>
+    <div class="ht-kv">${kv}</div>
+    ${htChips(k)}
+    <p class="small" style="margin:0">${HT_DESC[k]}${B.fan ? `完成したときにサポーターが${Math.round(B.fan * 100)}%増えます。` : ''}</p>
+    ${stadLine}${busy}
+    ${!mine && !done && nx ? '<p class="fine" style="margin:0">費用は着工のときに全額。維持費は完成の翌月から毎月かかります。</p>' : ''}`,
+    foot + close);
 }
 
 function sheetTrain(id) {
@@ -1378,7 +1600,7 @@ function viewClub() {
   const v = UI.cl.view; let body = '';
   const c = S.clubs[S.my];
   if (v === 'main') {
-    const fin = c.fin; const inc = fin.gate + fin.spon + fin.prize + Math.max(0, fin.trans); const exp = fin.wages + fin.fac + Math.max(0, -fin.trans);
+    const fin = c.fin; const inc = fin.gate + fin.spon + fin.prize + Math.max(0, fin.trans); const exp = fin.wages + fin.fac + (fin.up || 0) + Math.max(0, -fin.trans);
     const wages = E.squad(S, S.my).reduce((a, p) => a + E.wage(p), 0);
     body = `<section class="card" style="display:grid;gap:10px">
         <div class="row"><div class="eyebrow">フロントの信頼</div><span class="spacer"></span><b class="tnum">${S.board} / 100</b></div>
@@ -1396,12 +1618,11 @@ function viewClub() {
       ${sponCard('club')}
       <section class="card" style="display:grid;gap:10px">
         <div class="row"><div class="eyebrow">資金</div><span class="spacer"></span><b style="font-family:var(--f-display);font-weight:400;font-size:22px" class="${c.funds < 0 ? 'o-low' : ''}">${E.money(c.funds)}</b></div>
-        <dl class="kv"><dt>入場料収入</dt><dd>${E.money(fin.gate)}</dd><dt>スポンサー収入</dt><dd>${E.money(fin.spon)}</dd><dt>賞金</dt><dd>${E.money(fin.prize)}</dd><dt>移籍収支</dt><dd>${fin.trans >= 0 ? '+' : ''}${E.money(fin.trans)}</dd><dt>人件費</dt><dd>-${E.money(fin.wages)}</dd><dt>施設投資</dt><dd>-${E.money(fin.fac)}</dd></dl>
-        <div class="small muted">今季の収支 ${inc - exp >= 0 ? '+' : ''}${E.money(inc - exp)}　／　年俸総額 ${E.money(wages)}・月のスポンサー収入 ${(m => E.money(m.base + m.guar))(E.sponMonth(S))}</div>
+        <dl class="kv"><dt>入場料収入</dt><dd>${E.money(fin.gate)}</dd><dt>スポンサー収入</dt><dd>${E.money(fin.spon)}</dd><dt>賞金</dt><dd>${E.money(fin.prize)}</dd><dt>移籍収支</dt><dd>${fin.trans >= 0 ? '+' : ''}${E.money(fin.trans)}</dd><dt>人件費</dt><dd>-${E.money(fin.wages)}</dd><dt>施設・建設</dt><dd>-${E.money(fin.fac)}</dd><dt>維持費</dt><dd>-${E.money(fin.up || 0)}</dd></dl>
+        <div class="small muted">今季の収支 ${inc - exp >= 0 ? '+' : ''}${E.money(inc - exp)}　／　年俸総額 ${E.money(wages)}・月のスポンサー収入 ${(m => E.money(m.base + m.guar))(E.sponMonth(S))}・月の維持費 ${E.money(E.townUpkeep(c))}</div>
       </section>
-      <h3 class="sec-h">クラブ施設<small>レベル1〜5</small></h3>
-      <ul class="list">${Object.entries(E.FACILITY).map(([k, f]) => { const lv = c.fac[k]; const cost = E.facCost(lv); return `<li><div class="row" style="padding:12px;gap:12px"><div style="flex:1;min-width:0"><b>${f.jp}</b>　<span class="stars">${'■'.repeat(lv)}${'□'.repeat(5 - lv)}</span><div class="small muted">${f.desc}</div></div>${lv < 5 ? `<button class="btn" data-act="upgrade" data-k="${k}" ${c.funds < cost ? 'disabled' : ''}>強化<br><span class="small">${E.money(cost)}</span></button>` : '<span class="chip ok">最大</span>'}</div></li>`; }).join('')}</ul>
-      <p class="fine">練習方針と選手ごとのトレーニングは「選手 → 育成」で設定します。</p>
+      <h3 class="sec-h">施設とスタジアム</h3>
+      ${townLink()}
       <h3 class="sec-h">スカウト<small>若手の発掘</small></h3>
       ${S.scout ? `<section class="card"><div class="row"><span class="chip acc">派遣中</span><b>${esc(E.SCOUT[S.scout.key].jp)}</b><span class="spacer"></span><span class="small muted">${jd(S.scout.back)}ごろ戻る</span></div></section>`
         : `<ul class="list">${Object.entries(E.SCOUT).map(([k, x]) => `<li><div class="row" style="padding:12px;gap:12px"><div style="flex:1;min-width:0"><b>${esc(x.jp)}</b><div class="small muted">${esc(x.sub)}・${x.days}日</div></div><button class="btn" data-act="scout" data-k="${k}" ${c.funds < x.cost ? 'disabled' : ''}>派遣<br><span class="small">${E.money(x.cost)}</span></button></div></li>`).join('')}</ul>`}
@@ -1413,6 +1634,8 @@ function viewClub() {
       <div class="grid2"><button class="btn" data-act="exportOpen">引き継ぎコードを作る</button><button class="btn" data-act="importOpen">コードで復元</button></div>
       <p class="fine" style="margin:0">別の端末やホーム画面版のアプリにセーブを移すときに使います。</p>
       <button class="btn danger block" data-act="askReset">はじめからやり直す</button></section>`;
+  } else if (v === 'town') {
+    body = viewTown();
   } else if (v === 'market') {
     const open = E.inWindow(S.date);
     const sl = E.shortlist(S);
@@ -1434,7 +1657,7 @@ function viewClub() {
       ${h.some(r => r.ec || r.lc) ? `<h3 class="sec-h">カップ戦</h3><div class="tbl-wrap"><table class="tbl"><thead><tr><th>季</th><th style="text-align:left">天皇杯</th><th style="text-align:left">Lカップ</th></tr></thead><tbody>${h.filter(r => r.ec || r.lc).map(r => `<tr><td>${r.season.slice(2)}</td><td style="text-align:left">${esc(r.ec || '—')}</td><td style="text-align:left">${esc(r.lc || '—')}</td></tr>`).join('')}</tbody></table></div>` : ''}
       <h3 class="sec-h">今季のクラブ記録</h3>${clubRecords()}${ntRecords()}`;
   }
-  return `${body}<div class="subnav"><div class="seg">${[['main', '経営'], ['market', '移籍市場'], ['records', '記録']].map(([k, l]) => `<button data-act="clView" data-k="${k}" aria-pressed="${v === k}">${l}</button>`).join('')}</div></div>`;
+  return `${body}<div class="subnav"><div class="seg fit">${[['main', '経営'], ['town', 'ホームタウン'], ['market', '移籍市場'], ['records', '記録']].map(([k, l]) => `<button data-act="clView" data-k="${k}" aria-pressed="${v === k}">${l}</button>`).join('')}</div></div>`;
 }
 /* 移籍交渉 (2026-10-14): the club's asking price (要求額), their situation, their patience (3 magnets), what was said,
    my offer (− / ＋ and three quick amounts), then 提示 or agree at the asking price. */
@@ -1559,6 +1782,7 @@ function sheetPrematch(fid) {
     ${story ? `<div class="row wrap">${story}</div>` : ''}
     ${E.sponPending(S) ? spPreLine(fid) : ''}
     <div class="plans small"><div><b>${esc(c.short)}</b> ${c.tac.form}・${esc(E.mentLabel(c.tac))}${E.tacLabel(c.tac) ? '・' + esc(E.tacLabel(c.tac)) : ''}</div><div><b>${esc(o.short)}</b> ${o.tac.form}${o.tac.ment !== 'bal' || o.tac.ctr ? '・' + esc(E.mentLabel(o.tac)) : ''}${E.tacLabel(o.tac) ? '・' + esc(E.tacLabel(o.tac)) : ''}</div></div>
+    ${preAtt(f)}
     <div style="display:grid;gap:8px">${row('攻撃', me.att, op.att)}${row('中盤', me.mid, op.mid)}${row('守備', me.def, op.def)}</div>
     <button class="btn ghost block" data-act="team" data-id="${opp}" data-back="pre" data-fid="${fid}">${esc(o.short)}を詳しく見る</button>
     ${gap >= 3 && c.tac.ment !== 'def' && !c.tac.ctr ? '<p class="fine" style="margin:0">格上が相手です。「守備的」や「カウンターを狙う」で戦うと勝機が増えます（戦術画面）。</p>' : ''}
@@ -1568,6 +1792,12 @@ function sheetPrematch(fid) {
     ${warn.length ? `<div class="card" style="padding:10px 12px"><div class="eyebrow" style="color:var(--loss)">メンバーの注意点</div><ul style="margin:6px 0 0;padding-left:18px;font-size:13px">${warn.slice(0, 5).map(w => `<li>${esc(w)}</li>`).join('')}</ul></div>` : iss.block ? '' : '<p class="fine">メンバーに問題はありません。</p>'}`,
     iss.block ? `<button class="btn primary block" data-act="secAll" style="min-height:54px;font-size:16px">おすすめどおりに入れ替える</button><div class="grid3"><button class="btn ghost" data-act="secOpen" data-back="pre" data-fid="${fid}">1人ずつ選ぶ</button><button class="btn ghost" data-act="toTactics">戦術画面へ</button><button class="btn ghost" data-act="closeSheet">閉じる</button></div>`
       : `<button class="btn primary block" data-act="kickoff" data-id="${fid}" style="min-height:54px;font-size:16px">キックオフ</button><div class="grid2"><button class="btn ghost" data-act="toTactics">戦術を調整</button><button class="btn ghost" data-act="quick" data-id="${fid}">結果だけ見る</button></div>`);
+}
+// the crowd to expect (pre-match): at home with the ground's seats, away at theirs, the final at 国立
+function preAtt(f) {
+  const a = E.attEst(S, f); if (!a) return '';
+  const where = f.neutral ? '国立競技場' : f.h === S.my ? 'ホーム' : `${esc(S.clubs[f.h].short)}のスタジアム`;
+  return `<div class="pre-att">${htIc('crowd')}<span>観客の見込み <b>約${ppl(a.n)}人</b><small>${a.full ? '満員' : `${where} ${a.cap.toLocaleString('ja-JP')}席`}${a.works && f.h === S.my ? '・増築の工事中' : ''}</small></span></div>`;
 }
 const VERDICT = { champion: 'リーグ優勝！', met: '目標達成', near: 'あと一歩', missed: '目標未達', relegated: 'J2降格' };
 function sheetSeasonEnd() {
@@ -1850,6 +2080,7 @@ function refreshSheet() {
   if (s.type === 'sec') return sheetSec(s.back, s.fid);
   if (s.type === 'spon') return sheetSpon(s.back, s.fid);
   if (s.type === 'youth') return sheetYouth(s.back);
+  if (s.type === 'town') return sheetTown(s.k);
   if (s.type === 'team') return sheetTeam(s.id, s.tab, s.back);
   if (s.type === 'cele') return sheetCele();
   if (s.type === 'player') sheetPlayer(s.id, s.back); else if (s.type === 'train') sheetTrain(s.id); else if (s.type === 'bench') sheetBench(s.id); else if (s.type === 'slot') sheetSlot(s.i); else if (s.type === 'pre') sheetPrematch(s.id); else if (s.type === 'msub') sheetMatchTactics();
@@ -2031,12 +2262,18 @@ function showResult() {
   const body = document.getElementById('mbody');
   body.innerHTML = `<div class="result">
     <div class="row"><span class="res res-${res}">${{ W: '勝', D: '分', L: '敗' }[res]}</span><b>${ko ? { W: '勝ち抜け！', L: '敗退' }[res] : { W: '勝利！', D: '引き分け', L: '敗戦' }[res]}${M.pk ? `<small class="muted">（PK ${M.pk[0]}-${M.pk[1]}）</small>` : ''}${aggT}</b><span class="spacer"></span><span class="small muted">${E.fxLabel(fx)}・観客 ${(fx.att || 0).toLocaleString('ja-JP')}人</span></div>
+    ${M.town ? resTown(M.town) : ''}
     <div class="scorers"><div>${goals('h')}</div><div>${goals('a')}</div></div>
     <div>${stl('支配率', Math.round(M.st.h.pos / tot * 100) + '%', Math.round(M.st.a.pos / tot * 100) + '%')}${stl('シュート', M.st.h.sh, M.st.a.sh)}${stl('枠内', M.st.h.ot, M.st.a.ot)}${stl('ファウル', M.st.h.fo, M.st.a.fo)}</div>
     <div><div class="eyebrow" style="margin-bottom:6px">${esc(S.clubs[S.my].short)}の採点</div><ul class="list">${mine.map(([id, pm]) => { const p = S.players[id]; return `<li><div class="row" style="padding:8px 12px">${posTag(p)}<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.name)} ${pm.g ? `<b class="evb">G${pm.g > 1 ? '×' + pm.g : ''}</b>` : ''}${pm.a ? `<b class="evb a">A${pm.a > 1 ? '×' + pm.a : ''}</b>` : ''}${pm.rc ? '<i class="cardi r"></i>' : pm.yc ? '<i class="cardi y"></i>' : ''}${pm.inj ? '<span class="chip warn">負傷</span>' : ''}</span><span class="small muted">${pm.on ? pm.on + "'〜" : ''}</span><span class="rating ${ratingCls(pm.final)}">${(pm.final || 6).toFixed(1)}</span></div></li>`; }).join('')}</ul></div>
     ${others.length ? `<div><div class="eyebrow" style="margin-bottom:6px">他会場</div><ul class="list">${others.map(f => `<li><div class="fx"><span class="h">${esc(S.clubs[f.h].short)}${kit(f.h, 'sm')}</span><span class="sc">${f.hg}-${f.ag}${f.pk ? `<small>PK${f.pk[0]}-${f.pk[1]}</small>` : ''}</span><span class="a">${kit(f.a, 'sm')}${esc(S.clubs[f.a].short)}</span></div></li>`).join('')}</ul></div>` : ''}
   </div>`;
   renderMatchCtl();
+}
+// under the result: a full house, my gate, my supporters (before → after)
+function resTown(t) {
+  const d = (t.f1 || 0) - (t.f0 || 0);
+  return `<div class="res-town">${t.home && t.att >= t.cap * 0.95 ? '<span class="chip acc">満員</span>' : ''}${t.gate ? `<span>入場料 +${E.money(t.gate)}</span>` : ''}<span>サポーター ${ppl(t.f1)}人<b class="${d > 0 ? 'up' : d < 0 ? 'dn' : ''}">（${sgn(d)}）</b></span></div>`;
 }
 function closeMatch() {
   if (MATCH) { clearTimeout(MATCH.timer); cancelAnimationFrame(MATCH.raf); }
@@ -2255,6 +2492,11 @@ const ACT = {
   youthDone(d) { const it = S.inbox.find(x => x.id === Number(d.id)); if (it) it.done = true; persist(false); render(); },
   unshort(d) { const p = S.players[d.id]; E.unshort(S, Number(d.id)); persist(false); toast(`${p ? p.name : '選手'}をショートリストから外しました`); refreshSheet(); render(); },
   upgrade(d) { const r = E.upgrade(S, d.k); toast(r.msg); if (r.ok) { persist(true); render(); } },
+  // ホームタウン: a magnet's sheet, building (the sheet closes so the works show on the map), a facility's next level
+  htOpen(d) { sheetTown(d.k); },
+  htBuild(d) { const r = E.townBuild(S, d.k); toast(r.msg); if (r.ok) { persist(true); closeSheet(); render(); } else refreshSheet(); },
+  htUp(d) { const r = E.upgrade(S, d.k); toast(r.msg); if (r.ok) persist(true); refreshSheet(); render(); },
+  htGo() { closeSheet(); UI.tab = 'club'; UI.cl.view = 'town'; render(); window.scrollTo(0, 0); },
   training(d) { S.training = d.k; persist(false); render(); },
   toggleList(d) { const p = S.players[d.id]; const r = E.setListed(S, p.id, !p.listed); if (!r.ok) return; persist(false); toast(p.listed ? `${r.wasKeep ? '放出不可を解除し、' : ''}${E.inWindow(S.date) ? '放出リストに載せました。オファーを待ちます' : '放出リストに載せました。移籍期間に入るとオファーが届きます'}` : '放出リストから外しました'); refreshSheet(); render(); },
   toggleKeep(d) { const p = S.players[d.id]; const r = E.setKeep(S, p.id, !p.keep); if (!r.ok) return; persist(false); toast(p.keep ? `${r.wasListed ? '放出リストから外し、' : ''}放出不可にしました。他クラブのオファーは断ります${r.n ? '（届いていたオファーも断りました）' : ''}` : '放出不可を解除しました'); refreshSheet(); render(); },

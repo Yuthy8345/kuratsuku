@@ -149,8 +149,8 @@ ok(!S.sec.back.length && S.sec.f0 === S.clubs[other].funds, 'new job: memories g
 /* old saves */
 const O = clone(E.newGame(DATA, 'kashima', 'テスト', '2026-10-14')); delete O.sec; O.v = 12;
 const M = E.migrate(O, DATA);
-ok(M.v >= 13 && E.secName(M) === 'あき' && M.sec.notes.length === 1 && M.sec.notes[0].data.old && M.sec.f0 === M.clubs[M.my].funds, 'v12 → v13: she introduces herself');
-E.migrate(M, DATA); ok(M.sec.notes.length === 1, 'migrating twice: one hello');
+ok(M.v >= 13 && E.secName(M) === 'あき' && M.sec.notes.filter(n => n.k !== 'town').length === 1 && M.sec.notes[0].k === 'hello' && M.sec.notes[0].data.old && M.sec.f0 === M.clubs[M.my].funds, 'v12 → v13: she introduces herself (first; the hometown note of v15 under it)');
+E.migrate(M, DATA); ok(M.sec.notes.filter(n => n.k === 'hello').length === 1 && M.sec.notes.length === 2, 'migrating twice: one hello');
 {
   const tmp = path.join(require('os').tmpdir(), 'engine_be3e2da_' + process.pid + '.js');
   let old = null;

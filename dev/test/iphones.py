@@ -148,6 +148,18 @@ async def main():
                     await bottom_of('.dock', 'shortlist')
                     await subnav('shortlist')
                     if w == 393: await page.screenshot(path=str(OUT/f"ip-short-{mode}-{w}x{h}.png"))
+                    # ホームタウン (2026-10-15): the board, the switch bar of four (every label whole, her magnet inside), a building's sheet
+                    await page.locator('[data-act="clView"][data-k="town"]').dispatch_event('click'); await page.wait_for_timeout(150)
+                    await again('hometown')
+                    await subnav('hometown')
+                    cut = await page.evaluate('''() => { const s = document.querySelector('#view > .subnav'); const sr = s.getBoundingClientRect();
+                      return [...s.querySelectorAll('.seg button')].filter(b => b.scrollWidth > b.clientWidth + 1 || b.getBoundingClientRect().right > sr.right + 0.5).map(b => b.textContent.trim())
+                        .concat(document.scrollingElement.scrollWidth > innerWidth + 1 ? ['horizontal scroll'] : []); }''')
+                    if cut: print(f"   {name} hometown: {cut}"); bad.append(f'{tag} hometown bar')
+                    await page.locator('[data-act="htOpen"][data-k="house"]').dispatch_event('click'); await page.wait_for_timeout(350)
+                    await bottom_of('#sheet', 'hometown sheet')
+                    if w == 393: await page.screenshot(path=str(OUT/f"ip-town-{mode}-{w}x{h}.png"))
+                    await page.locator('#sheet [data-act="closeSheet"]').last.dispatch_event('click'); await page.wait_for_timeout(300)
                     await page.locator('[data-act="clView"][data-k="main"]').dispatch_event('click'); await page.wait_for_timeout(100)
                     # an open sheet (the page is pinned while it is open)
                     await page.locator('[data-tab="squad"]').dispatch_event('click'); await page.wait_for_timeout(150)

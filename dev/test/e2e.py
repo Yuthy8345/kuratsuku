@@ -30,7 +30,8 @@ async def main():
         async def has(sel): return await page.locator(sel).count() > 0
         async def click(sel, w=120):
             await page.locator(sel).first.click(); await page.wait_for_timeout(w)
-        stats = {'matches': 0, 'offers': 0, 'ret': 0, 'cele': 0, 'reborn': 0, 'jobs': 0, 'closed': 0, 'xi': 0, 'taps': 0, 'xi_left': 0, 'tours': 0, 'stuck': 0, 'nt': 0, 'sec': 0, 'spon': 0}
+        stats = {'matches': 0, 'offers': 0, 'ret': 0, 'cele': 0, 'reborn': 0, 'jobs': 0, 'closed': 0, 'xi': 0, 'taps': 0, 'xi_left': 0, 'tours': 0, 'stuck': 0, 'nt': 0, 'sec': 0, 'spon': 0, 'built': 0, 'done': 0}
+        LOAD = "() => JSON.parse(LZString.decompressFromBase64(localStorage.getItem('touchline.j1.save').slice(3)))"
         unknown = {}
         seasons = 0; t0 = time.time(); it = 0
         async def resolve():
@@ -53,6 +54,9 @@ async def main():
                 elif await has('#sheet [data-act="spSign"]'):   # スポンサー契約 (2026-10-15): sign her three
                     if stats['spon'] == 0: await page.screenshot(path=str(OUT / 'spon.png'))
                     await click('#sheet [data-act="spSign"]', 250); stats['spon'] += 1
+                elif await has('#sheet .ht-done'):   # ホームタウン (2026-10-15): a building done → her note → the board
+                    if stats['done'] == 0: await page.screenshot(path=str(OUT / 'built.png'))
+                    stats['done'] += 1; await click('#sheet [data-act="htGo"]', 250)
                 elif await has('#sheet .sec-head'):
                     stats['sec'] += 1
                     if await has('#sheet [data-act="secAll"]'): await click('#sheet [data-act="secAll"]', 200)
@@ -97,7 +101,19 @@ async def main():
                         if await has('#sheet [data-act="teamTab"][data-k="squad"]'): await click('#sheet [data-act="teamTab"][data-k="squad"]', 100)
                         if await has('#sheet [data-act="closeSheet"]'): await click('#sheet [data-act="closeSheet"]', 120)
                 if tab == 'club':
-                    for k in ['main', 'market', 'records']: await click(f'[data-act="clView"][data-k="{k}"]', 60)
+                    for k in ['main', 'town', 'market', 'records']: await click(f'[data-act="clView"][data-k="{k}"]', 60)
+                    # ホームタウン: build the next thing when 10億 would be left (one job at a time), else just look at a sheet
+                    await click('[data-act="clView"][data-k="town"]', 80)
+                    st = await page.evaluate(LOAD); c = st['clubs'][st['my']]
+                    nxt = None
+                    for k in ['food', 'shop', 'sclub', 'dorm', 'house', 'roof', 'indoor', 'exp']:
+                        if await has(f'.ht-tok.empty[data-k="{k}"]'): nxt = k; break
+                    if nxt:
+                        await click(f'[data-act="htOpen"][data-k="{nxt}"]', 150)
+                        cost = {'food': 20000, 'shop': 30000, 'sclub': 15000, 'dorm': 50000, 'house': 60000, 'roof': 120000, 'indoor': 80000}.get(nxt) or [150000, 220000, 300000, 400000][min(3, (c.get('town') or {}).get('exp', 0))]
+                        if await has('#sheet [data-act="htBuild"]') and c['funds'] - cost >= 100000:
+                            await click('#sheet [data-act="htBuild"]', 150); stats['built'] += 1
+                        elif await has('#sheet [data-act="closeSheet"]'): await click('#sheet [data-act="closeSheet"]', 120)
                     await click('[data-act="clView"][data-k="main"]', 60)
             await click('[data-act="tab"][data-tab="home"]', 60)
         while seasons < SEASONS and it < 1200:
