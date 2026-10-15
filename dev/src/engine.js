@@ -613,7 +613,14 @@ function migrate(S, DATA) {
       if (h > 0) S.sec.notes.unshift(S.sec.notes.splice(h, 1)[0]);
     }
   }
-  S.v = Math.max(S.v || 1, 15);
+  // v16 (2026-10-15): 連携とコンボ. Birthplaces (地元の星): real players from the data, made-up ones from their id (academy
+  // players often local); each club's 連携 estimated from this season's minutes
+  if ((S.v || 1) < 16) {
+    const dp = {}; for (const d of (DATA && DATA.players) || []) if (d.bp) dp[d.id] = d.bp;
+    for (const p of Object.values(S.players)) if (!p.bp && p.nat === 'JPN') { if (!p.gen) { if (dp[p.id]) p.bp = dp[p.id]; } else p.bp = bpFor(p.id, p.yo && S.clubs[p.yo] ? S.clubs[p.yo].area : null); }
+    linkEstimate(S);
+  }
+  S.v = Math.max(S.v || 1, 16);
   return S;
 }
 // old saves: the season's unplayed league rounds go to the real 2026/27 dates (a round whose date has passed goes to the
@@ -806,7 +813,7 @@ function newGame(DATA, clubId, managerName, todayISO) {
     initAttrs(S.players[p.id]);
   }
   addAbroad(S, DATA);
-  S.v = 15; S.presV = 4; S.presets = []; S.nt = { done: {}, res: [], log: [] };
+  S.v = 16; S.presV = 4; S.presets = []; S.nt = { done: {}, res: [], log: [] };
   secOf(S).f0 = S.clubs[clubId].funds;
   for (const p of squad(S, clubId)) track(S, p);
   for (const id of S.order) autoLineup(S, id);
@@ -1155,6 +1162,7 @@ function clubRating(S, cid, comp) {
   const cond = {}; for (const s0 of slots) if (s0.pid) cond[s0.pid] = S.players[s0.pid].cond;
   const r = teamRating(S, { slots, cond, press: PRESS[c.tac.press] ? c.tac.press : 'mid', tactBonus: cid === S.my && S.training === 'tact' ? 1 : 0, pres: c.pres || 2 });
   const x = tacX(c.tac); r.mid += LINE[x.line].mid + BUILD[x.build].mid + (x.mark ? MARK.mid : 0);
+  const L = linkEval(S, cid, c.tac.form, slots.map(s0 => s0.pid)); r.att += L.att; r.mid += L.mid; r.def += L.def; r.link = L;
   return r;
 }
 // what the manager has to sort out before kickoff: empty slots and players who can't play (injured / suspended in the
@@ -1744,6 +1752,237 @@ function teamRating(S, side) {
   return { att: a / aw + pb, attV: aw, mid: m / mw + P.mid + (side.tactBonus || 0) + pb, def: (d / dw) * 0.75 + gk * 0.25 + pb, defV: dw, gk };
 }
 
+/* ---------- 連携とコンボ (2026-10-15〜) ---------- */
+// 連携: two players of a club get used to each other by being on the pitch together. c.lk = { 'a-b': [value 0..100,
+// minutes together] } (player ids, a < b). Next to each other on the board (neighbouring slots of the formation) it grows
+// faster; it grows more slowly the higher it is. A match of the club they weren't in together takes a little off, and
+// leaving the club wipes it (moveP, rollover). Every club (the AI's too) builds it the same way.
+// adj/far: per 90 minutes together, top: the curve (v += rate × (1 − v/top), at least floor), decay: per club match apart,
+// dist: neighbours on the design board (y × 1.326 = the board's 4:5.1), max: what an average of 100 adds to attack,
+// midfield and defence, combos: how many count at once, est: old saves (minutes together ≈ the smaller share × est)
+const LINK = { adj: 5, far: 2, top: 110, floor: 0.12, decay: 0.8, dist: 43, max: 1, combos: 3, est: 0.85 };
+const _lkAdj = {};
+function linkAdj(form) {
+  if (_lkAdj[form]) return _lkAdj[form];
+  const F = FORMATIONS[form] || FORMATIONS['4-4-2'], out = [];
+  const d = (a, b) => Math.hypot(a[1] - b[1], (a[2] - b[2]) * 1.326);
+  for (let i = 0; i < F.length; i++) for (let j = i + 1; j < F.length; j++) if (d(F[i], F[j]) <= LINK.dist) out.push([i, j]);
+  // the flank: a full-back and the nearest wide player in front of him on his side (4-2-3-1's LSB and LSH), if not too far
+  const wide = s => s[1] <= 30 || s[1] >= 70, same = (a, b) => (a[1] < 50) === (b[1] < 50);
+  F.forEach((s, i) => {
+    if (!BACKS.has(s[0])) return;
+    const j = F.map((t, k) => k).filter(k => k !== i && wide(F[k]) && same(s, F[k]) && F[k][2] > s[2] && F[k][0] !== 'CB').sort((a, b) => d(s, F[a]) - d(s, F[b]))[0];
+    if (j != null && d(s, F[j]) <= 60 && !out.some(e => (e[0] === i && e[1] === j) || (e[0] === j && e[1] === i))) out.push(i < j ? [i, j] : [j, i]);
+  });
+  // nobody is alone: a slot with fewer than two neighbours gets its nearest ones (5-4-1's lone striker, a wide wing-back)
+  const deg = i => out.filter(e => e[0] === i || e[1] === i).length;
+  for (let i = 0; i < F.length; i++) {
+    const near = F.map((s, j) => j).filter(j => j !== i && !out.some(e => (e[0] === i && e[1] === j) || (e[0] === j && e[1] === i))).sort((a, b) => d(F[i], F[a]) - d(F[i], F[b]));
+    while (deg(i) < 2 && near.length) { const j = near.shift(); out.push(i < j ? [i, j] : [j, i]); }
+  }
+  return (_lkAdj[form] = out);
+}
+const lkKey = (a, b) => (a = +a, b = +b, a < b ? a + '-' + b : b + '-' + a);
+function linkOf(S, cid, a, b) { const c = S.clubs[cid]; const x = c && c.lk && c.lk[lkKey(a, b)]; return x ? x[0] : 0; }
+// after a match: minutes together for every pair of each side (a sent-off player leaves at his red card), a little off for
+// every other pair of the club
+function linkMatch(S, M) {
+  for (const k of ['h', 'a']) {
+    const sd = M[k], c = S.clubs[sd.cid]; if (!c) continue;
+    const lk = c.lk || (c.lk = {}), end = Math.min(90, M.min), on = [];
+    for (const [id, pm] of Object.entries(M.pm)) if (pm.side === k && pm.si != null) on.push({ id: +id, a: pm.on, b: pm.so != null ? pm.so : pm.off != null ? pm.off : end, si: pm.si });
+    const adj = new Set(linkAdj(sd.form).map(([i, j]) => i * 32 + j)), met = new Set();
+    for (let x = 0; x < on.length; x++) for (let y = x + 1; y < on.length; y++) {
+      const P = on[x], Q = on[y], m = Math.min(P.b, Q.b) - Math.max(P.a, Q.a);
+      if (m <= 0) continue;
+      const key = lkKey(P.id, Q.id), e = lk[key] || [0, 0];
+      const rate = adj.has(Math.min(P.si, Q.si) * 32 + Math.max(P.si, Q.si)) ? LINK.adj : LINK.far;
+      lk[key] = [Math.round(Math.min(100, e[0] + m / 90 * rate * Math.max(LINK.floor, 1 - e[0] / LINK.top)) * 10) / 10, e[1] + m];
+      met.add(key);
+    }
+    for (const key of Object.keys(lk)) if (!met.has(key)) { const e = lk[key]; e[0] = Math.round((e[0] - LINK.decay) * 10) / 10; if (e[0] < 0.5) delete lk[key]; }
+  }
+}
+// a player left the club: his pairs there go
+function linkDrop(S, cid, pid) {
+  const c = S.clubs[cid]; if (!c || !c.lk) return;
+  const a = pid + '-', b = '-' + pid;
+  for (const key of Object.keys(c.lk)) if (key.startsWith(a) || key.endsWith(b)) delete c.lk[key];
+}
+// pairs whose players are no longer both at the club (retired, transferred, a loan player gone back) go; a player of the
+// club who is out on loan keeps his
+function linkSweep(S) {
+  for (const [cid, c] of Object.entries(S.clubs)) {
+    if (!c.lk) continue;
+    const here = id => { const p = S.players[id]; return p && (p.club === cid || (p.loan && p.loan.from === cid)); };
+    for (const key of Object.keys(c.lk)) { const [a, b] = key.split('-'); if (!here(a) || !here(b)) delete c.lk[key]; }
+  }
+}
+// the partners of a player at his club, best first: [{ pid, v, m }]
+function linkPartners(S, p) {
+  const c = S.clubs[p.club]; if (!c || !c.lk) return [];
+  const out = [];
+  for (const [key, e] of Object.entries(c.lk)) {
+    const [a, b] = key.split('-').map(Number); if (a !== p.id && b !== p.id) continue;
+    const q = S.players[a === p.id ? b : a]; if (!q || q.club !== p.club) continue;
+    out.push({ pid: q.id, v: e[0], m: e[1] });
+  }
+  return out.sort((x, y) => y.v - x.v || y.m - x.m);
+}
+// コンボ: named pairs and groups in the XI. att/mid/def/all: what each adds (all = to each of the three); need: the bar.
+// Up to LINK.combos count at once (the strongest). The same for every club.
+const COMBO = {
+  legend: { jp: '伝説の再来', all: 0.4, cond: '転生選手がレジェンドの背番号で先発' },
+  yo: { jp: '生え抜きの誇り', all: 0.3, need: 3, cond: 'ユース出身を3人先発' },
+  local: { jp: '地元の星', all: 0.3, need: 3, cond: 'の生まれを3人先発' },
+  hot: { jp: 'ホットライン', att: 0.5, need: 80, cond: '出し手と点取り屋の連携 80以上' },
+  wall: { jp: '鉄壁', def: 0.5, need: 75, cond: 'GKとCB2人の連携 平均75以上' },
+  heart: { jp: '中盤の心臓', mid: 0.4, need: 80, cond: '中央のMF2人の連携 80以上' },
+  wings: { jp: '両翼', att: 0.4, need: 75, cond: '左右とも サイドバックと前のサイドの選手の連携 75以上' },
+  mentor: { jp: '師弟', mid: 0.3, need: 70, cond: '32歳以上と21歳以下が隣どうしで 連携70以上' },
+  nat: { jp: 'コネクション', att: 0.3, need: 2, cond: '同じ国の外国籍を2人先発' },
+};
+const comboPow = C => (C.att || 0) + (C.mid || 0) + (C.def || 0) + (C.all || 0) * 3;
+const BACKS = new Set(['LB', 'RB', 'WB', 'DWB']), CENTRE = new Set(['DM', 'CM']);
+// one combo for the XI pids[i] (slot i of the formation; null = empty / sent off). Returns null when the XI can't make it
+// at all (no such slots or players); else { ok, val, need, who: [pids], lines: [[i, j]], jp? }
+function comboTest(S, k, x) {
+  const { F, pids, P, v, adj, c, cid } = x;
+  const best = (list, f) => { let b = null; for (const it of list) { const val = f(it); if (b == null || val > b.val) b = { it, val }; } return b; };
+  const role = i => F[i][0], cat = i => ROLE[role(i)].cat;
+  const filled = adj.filter(([i, j]) => P(i) && P(j));
+  switch (k) {
+    case 'hot': {
+      const pass = i => cat(i) !== 'FW' && role(i) !== 'GK' && role(i) !== 'CB';
+      const b = best(filled.filter(([i, j]) => (cat(i) === 'FW' && pass(j)) || (cat(j) === 'FW' && pass(i))), ([i, j]) => v(i, j));
+      if (!b) return null; const [i, j] = b.it, s = cat(i) === 'FW' ? [j, i] : [i, j];
+      return { val: b.val, need: COMBO.hot.need, who: s.map(n => pids[n]), lines: [[i, j]] };
+    }
+    case 'wall': {
+      const g = F.findIndex(s => s[0] === 'GK'), cbs = F.map((s, i) => i).filter(i => role(i) === 'CB' && P(i));
+      if (g < 0 || !P(g) || cbs.length < 2) return null;
+      const ps = []; for (let a = 0; a < cbs.length; a++) for (let b2 = a + 1; b2 < cbs.length; b2++) ps.push([cbs[a], cbs[b2]]);
+      const b = best(ps, ([a, b2]) => (v(g, a) + v(g, b2) + v(a, b2)) / 3);
+      const [a, b2] = b.it;
+      return { val: b.val, need: COMBO.wall.need, who: [pids[g], pids[a], pids[b2]], lines: [[g, a], [g, b2], [a, b2]] };
+    }
+    case 'heart': {
+      const b = best(filled.filter(([i, j]) => CENTRE.has(role(i)) && CENTRE.has(role(j))), ([i, j]) => v(i, j));
+      return b && { val: b.val, need: COMBO.heart.need, who: b.it.map(n => pids[n]), lines: [b.it] };
+    }
+    case 'wings': {
+      const side = (i, L) => L ? F[i][1] < 50 : F[i][1] > 50;
+      const wide = i => F[i][1] <= 30 || F[i][1] >= 70;
+      const one = L => best(filled.filter(([i, j]) => [[i, j], [j, i]].some(([bk, fw]) => BACKS.has(role(bk)) && side(bk, L) && side(fw, L) && wide(fw) && role(fw) !== 'CB' && role(fw) !== 'GK' && F[fw][2] > F[bk][2])), ([i, j]) => v(i, j));
+      const l = one(true), r = one(false);
+      if (!l || !r) return null;
+      return { val: Math.min(l.val, r.val), need: COMBO.wings.need, who: [...l.it, ...r.it].map(n => pids[n]), lines: [l.it, r.it] };
+    }
+    case 'mentor': {
+      const AG = {}, ag = i => AG[i] != null ? AG[i] : (AG[i] = age(P(i), S.date));
+      const b = best(filled.filter(([i, j]) => (ag(i) >= 32 && ag(j) <= 21) || (ag(j) >= 32 && ag(i) <= 21)), ([i, j]) => v(i, j));
+      if (!b) return null; const [i, j] = b.it, s = ag(i) >= 32 ? [i, j] : [j, i];
+      return { val: b.val, need: COMBO.mentor.need, who: s.map(n => pids[n]), lines: [[i, j]] };
+    }
+    // the XI alone decides these; the squad (only for the screen's 「あと少し」, x.sq) says whether they're possible at all
+    case 'yo': case 'local': {
+      const mine = p => k === 'yo' ? p.yo === cid : !!(c.area && p.bp === c.area);
+      const xi = F.map((s, i) => i).filter(i => P(i) && mine(P(i))), need = COMBO[k].need;
+      if (x.sq ? x.sq.filter(p => mine(p) && !p.loan).length < need : xi.length < need) return null;
+      return { val: xi.length, need, who: xi.map(i => pids[i]), lines: [] };
+    }
+    case 'nat': {
+      const by = {}; for (const p of x.sq || F.map((s, i) => P(i)).filter(Boolean)) if (p.nat && p.nat !== 'JPN' && !p.loan) (by[p.nat] = by[p.nat] || []).push(p.id);
+      const ok = Object.keys(by).filter(n => by[n].length >= 2); if (!ok.length) return null;
+      const b = best(ok, n => F.reduce((a, s, i) => a + (P(i) && P(i).nat === n ? 1 : 0), 0) + by[n].length / 100);
+      const n = b.it, who = F.map((s, i) => i).filter(i => P(i) && P(i).nat === n).map(i => pids[i]);
+      return { val: who.length, need: 2, who, lines: [], jp: `${natJp(n)}・コネクション`, nat: n };
+    }
+    case 'legend': {
+      const sym = p => p && p.reborn && legendOf(p.reborn) && legendOf(p.reborn).num != null ? legendOf(p.reborn).num : null;
+      const on = F.map((s, i) => i).filter(i => P(i) && sym(P(i)) === P(i).num);
+      const rb = x.sq ? x.sq.filter(p => sym(p) != null && !p.loan) : on.map(i => P(i));
+      if (!rb.length) return null;
+      return { val: on.length ? 1 : 0, need: 1, who: on.map(i => pids[i]), lines: [], num: sym(rb[0]), pid: rb[0].id };
+    }
+  }
+  return null;
+}
+// the XI's 連携 and コンボ: pids[i] = the player in slot i of the formation (null = empty or sent off).
+// avg: the average over the neighbouring pairs (both filled), bonus = what it adds to attack, midfield and defence,
+// combos: the ones that count (strongest first, up to LINK.combos), over: more that hold but don't count, near (opts.near):
+// the rest that this XI could make, closest first. att/mid/def: everything added.
+function linkEval(S, cid, form, pids, opts) {
+  const c = S.clubs[cid], F = FORMATIONS[form] || FORMATIONS['4-4-2'], lk = (c && c.lk) || {};
+  const P = i => (pids[i] && S.players[pids[i]]) || null;
+  const v = (i, j) => { const e = lk[lkKey(pids[i], pids[j])]; return e ? e[0] : 0; };
+  const adj = linkAdj(form);
+  let sum = 0, n = 0; const pairs = [];
+  for (const [i, j] of adj) { if (!P(i) || !P(j)) continue; const x = v(i, j); pairs.push([i, j, x]); sum += x; n++; }
+  const avg = n ? sum / n : 0;
+  const R = { avg, n, pairs, bonus: LINK.max * avg / 100, combos: [], over: [], near: [], att: 0, mid: 0, def: 0 };
+  if (!c) return R;
+  const x = { F, pids, P, v, adj, c, cid, sq: opts && opts.near ? squad(S, cid) : null };
+  const hold = [];
+  for (const k of Object.keys(COMBO)) {
+    const t = comboTest(S, k, x); if (!t) continue;
+    const C = COMBO[k], ok = t.val >= t.need;
+    const it = { k, jp: t.jp || C.jp, cond: k === 'local' ? `${c.area}${C.cond}` : C.cond, att: C.att || 0, mid: C.mid || 0, def: C.def || 0, all: C.all || 0, pow: comboPow(C), ...t, ok };
+    if (k === 'legend' && !ok) it.cond = `転生選手が背番号${t.num}で先発`;
+    (ok ? hold : R.near).push(it);
+  }
+  hold.sort((a, b) => b.pow - a.pow);
+  R.combos = hold.slice(0, LINK.combos); R.over = hold.slice(LINK.combos);
+  R.near.sort((a, b) => b.val / b.need - a.val / a.need);
+  R.att = R.mid = R.def = R.bonus;
+  for (const it of R.combos) { R.att += it.att + it.all; R.mid += it.mid + it.all; R.def += it.def + it.all; }
+  return R;
+}
+// during a match: the side on the pitch now (cached until a change or a red card)
+function linkLive(S, side) {
+  const pids = side.slots.map(s => s.pid && !side.sent.includes(s.pid) ? s.pid : null), key = pids.join(',');
+  if (!side._lk || side._lk.key !== key) side._lk = { key, r: linkEval(S, side.cid, side.form, pids) };
+  return side._lk.r;
+}
+// old saves: this season's minutes → 連携 (two players' matches together ≈ the smaller share × est; neighbours in the
+// current XI at the faster rate)
+function linkEstimate(S) {
+  for (const [cid, c] of Object.entries(S.clubs)) {
+    if (c.ab || !c.tac) continue;
+    const g = clubGames(S, cid); if (g < 1) continue;
+    const ps = squad(S, cid).filter(p => p.st && p.st.mins > 0);
+    const xi = c.tac.xi || [], adj = new Set(linkAdj(c.tac.form).map(([i, j]) => i * 32 + j));
+    const lk = c.lk || (c.lk = {});
+    for (let a = 0; a < ps.length; a++) for (let b = a + 1; b < ps.length; b++) {
+      const P = ps[a], Q = ps[b];
+      const n = Math.min(1, P.st.mins / (90 * g), Q.st.mins / (90 * g)) * g * LINK.est;
+      const i = xi.indexOf(P.id), j = xi.indexOf(Q.id);
+      const rate = i >= 0 && j >= 0 && adj.has(Math.min(i, j) * 32 + Math.max(i, j)) ? LINK.adj : LINK.far;
+      const v = Math.min(100, LINK.top * (1 - Math.exp(-rate * n / LINK.top)));
+      if (v >= 1) lk[lkKey(P.id, Q.id)] = [Math.round(v * 10) / 10, Math.round(n * 90)];
+    }
+  }
+}
+// a combo's line for the kick-off and the news: 「ホットライン（クルークス→遠野）」
+function comboText(S, it) {
+  const nm = id => (S.players[id] ? S.players[id].short : '?');
+  const who = it.who || [];
+  const w = ['hot', 'mentor'].includes(it.k) && who.length === 2 ? `${nm(who[0])}→${nm(who[1])}` : ['yo', 'local', 'nat'].includes(it.k) ? `${who.length}人` : who.length && who.length <= 3 ? who.map(nm).join('・') : '';
+  return `${it.jp}${w ? `（${w}）` : ''}`;
+}
+// birthplace of a made-up player (none for foreigners): an academy player is from the club's own prefecture about half the
+// time; otherwise from where J1 players come from (the 2026/27 squads). From his id, so the game's dice aren't used.
+const BP_POOL = '東京90 大阪57 神奈川54 埼玉50 千葉40 愛知28 兵庫26 福岡22 茨城20 静岡17 広島16 群馬14 京都12 熊本12 新潟11 三重11 滋賀10 栃木9 北海道8 大分8 山口7 宮城6 長崎6 宮崎5 沖縄5 徳島5 岡山5 奈良4 佐賀4 鹿児島4 青森4 和歌山4 山梨4 愛媛3 富山3 岩手3 岐阜3 島根2 香川2 山形2 福島2 長野1 石川1 秋田1 福井1 鳥取1 高知1'
+  .split(' ').map(s => [s.replace(/\d+$/, ''), +s.match(/\d+$/)[0]]);
+const BP_SUM = BP_POOL.reduce((a, b) => a + b[1], 0);
+function bpFor(id, area) {
+  const h = hash('bp' + id);
+  if (area && h % 100 < 55) return area;
+  let r = (h >>> 8) % BP_SUM;
+  for (const [k, w] of BP_POOL) { if (r < w) return k; r -= w; }
+  return '東京';
+}
+
 /* ---------- match engine ---------- */
 let _lgKey = null, _lg = null;
 function leagueAvg(S) {
@@ -1781,11 +2020,17 @@ function createMatch(S, fx) {
   };
   // the second leg of a two-legged tie: the first leg's goals count (agg0 = [this home side, this away side])
   if (fx.leg === 2) { const g = tieAgg(S, fx); M.agg0 = [g[fx.h] || 0, g[fx.a] || 0]; }
-  for (const k of ['h', 'a']) for (const s of M[k].slots) if (s.pid) M.pm[s.pid] = { side: k, role: s.role, rt: 6.0, g: 0, a: 0, yc: 0, rc: 0, on: 0, off: null, inj: 0 };
+  for (const k of ['h', 'a']) M[k].slots.forEach((s, si) => { if (s.pid) M.pm[s.pid] = { side: k, role: s.role, rt: 6.0, g: 0, a: 0, yc: 0, rc: 0, on: 0, off: null, inj: 0, si }; });
   M.ev.push({ m: 0, t: 'ko', text: `キックオフ　${S.clubs[fx.h].short} vs ${S.clubs[fx.a].short}` + (fx.cup ? `（${fxLabel(fx)}）` : '') });
   // players on fire for this match
   const hy = hypeMatch(S, fx); M.hot = {};
   for (const h of hy.hot) { const p = S.players[h.pid]; if (!p || !p.hot) continue; M.hot[h.pid] = h.why; if (M.pm[h.pid] || M[h.side].bench.includes(h.pid)) M.ev.push({ m: 0, t: 'hot', side: h.side, pid: h.pid, text: `【覚醒】${p.name}が燃えている！（${h.why}）` }); }
+  // コンボ at kick-off; the first time one of the manager's holds: the news
+  for (const k of ['h', 'a']) {
+    const L = linkLive(S, M[k]);
+    if (L.combos.length) M.ev.push({ m: 0, t: 'combo', side: k, text: `【コンボ】${S.clubs[M[k].cid].short}　${L.combos.map(it => comboText(S, it)).join('・')}` });
+    if (M[k].cid === S.my) { const seen = S.cmb || (S.cmb = {}); for (const it of L.combos) { const key = it.k === 'nat' ? 'nat:' + it.nat : it.k; if (!seen[key]) { seen[key] = S.date; news(S, `【コンボ】「${comboText(S, it)}」が初めて発動。`, 'big'); } } }
+  }
   return M;
 }
 function onPitch(side) { return side.slots.filter(s => s.pid && !side.sent.includes(s.pid)); }
@@ -1802,6 +2047,8 @@ function stepMatch(S, M) {
   const live = side => {
     const sd = { ...side, slots: side.slots.map(s => ({ ...s, pid: side.sent.includes(s.pid) ? null : s.pid })) };
     const r = teamRating(S, sd);
+    // 連携 and コンボ of the players on the pitch
+    const L = linkLive(S, side); r.att += L.att; r.mid += L.mid; r.def += L.def;
     // a player on fire lifts the whole side
     if (sd.slots.some(s => s.pid && S.players[s.pid] && S.players[s.pid].hot)) { r.att += HYPE.team; r.mid += HYPE.team * 0.6; }
     return r;
@@ -1855,13 +2102,13 @@ function stepMatch(S, M) {
       const pl = wpick(onPitch(sd).filter(s => s.role !== 'GK'), s => (ROLE[s.role].d + 0.3) * (M.pm[s.pid].yc ? CARDS.again : 1));
       if (pl) {
         const pm = M.pm[pl.pid];
-        if (pm.yc >= 1) { pm.yc++; pm.rc = 1; sd.sent.push(pl.pid); pm.rt -= 1.5; push({ t: 'red', side: k, pid: pl.pid, text: `${pname(S, pl.pid)}に2枚目のイエロー、退場` }); }
+        if (pm.yc >= 1) { pm.yc++; pm.rc = 1; pm.so = M.min; sd.sent.push(pl.pid); pm.rt -= 1.5; push({ t: 'red', side: k, pid: pl.pid, text: `${pname(S, pl.pid)}に2枚目のイエロー、退場` }); }
         else { pm.yc = 1; pm.rt -= 0.3; push({ t: 'yc', side: k, pid: pl.pid, text: `${pname(S, pl.pid)}にイエローカード` }); }
       }
     } else if (R() < CARDS.red) {
       const pl = pick(onPitch(sd).filter(s => s.role !== 'GK'));
       const rr = wpick(Object.keys(RED), r => RED[r].w);
-      if (pl) { M.pm[pl.pid].rc = 1; M.pm[pl.pid].rr = rr; M.pm[pl.pid].rt -= 2; sd.sent.push(pl.pid); push({ t: 'red', side: k, pid: pl.pid, text: `${pname(S, pl.pid)}に一発レッド！退場（${RED[rr].feed}）` }); }
+      if (pl) { M.pm[pl.pid].rc = 1; M.pm[pl.pid].rr = rr; M.pm[pl.pid].rt -= 2; M.pm[pl.pid].so = M.min; sd.sent.push(pl.pid); push({ t: 'red', side: k, pid: pl.pid, text: `${pname(S, pl.pid)}に一発レッド！退場（${RED[rr].feed}）` }); }
     }
     // injury
     const med = S.clubs[sd.cid].fac.medical;
@@ -1955,7 +2202,7 @@ function doSub(S, M, k, outPid, inPid, push) {
   slot.pid = inPid; sd.subs++;
   sd.cond[inPid] = S.players[inPid].cond;
   M.pm[outPid].off = M.min;
-  M.pm[inPid] = { side: k, role: slot.role, rt: 6.0, g: 0, a: 0, yc: 0, rc: 0, on: M.min, off: null, inj: 0 };
+  M.pm[inPid] = { side: k, role: slot.role, rt: 6.0, g: 0, a: 0, yc: 0, rc: 0, on: M.min, off: null, inj: 0, si: sd.slots.indexOf(slot) };
   sd.bench = sd.bench.filter(b => b !== inPid);
   sd.subLog.push([outPid, inPid]);
   const ev = { t: 'sub', side: k, text: `交代　${S.players[outPid].short} → ${S.players[inPid].short}`, m: M.min };
@@ -1972,7 +2219,7 @@ function forceSub(S, M, k, pid, push) {
   if (!slot) return;
   const inn = bestSubFor(S, M, k, slot);
   if (inn && sd.subs < 5) doSub(S, M, k, pid, inn, push);
-  else { sd.sent.push(pid); }
+  else { if (M.pm[pid]) M.pm[pid].so = M.min; sd.sent.push(pid); }
 }
 // how readily the bench is used. mins: when to look; two: from which minute two changes at a time; cond: before 'late', change a
 // player only when his condition is at or under this (in-match condition only falls to ~85 by full time, so 'late' is what
@@ -2057,6 +2304,7 @@ function finishMatch(S, M) {
   const ko = cup && fx.leg !== 1, hw = ko ? cupWinner(fx) === fx.h : null;
   const res = { h: ko ? (hw ? 'W' : 'L') : M.hg > M.ag ? 'W' : M.hg < M.ag ? 'L' : 'D' };
   res.a = res.h === 'W' ? 'L' : res.h === 'L' ? 'W' : 'D';
+  linkMatch(S, M);   // 連携: minutes together
   // serve existing suspensions: only a match of the same competition counts (suspended players were not in it)
   for (const cid of [fx.h, fx.a]) for (const p of squad(S, cid)) if (!M.pm[p.id] && susIn(p, comp) > 0) serveBan(p, comp);
   // player updates
@@ -2408,6 +2656,7 @@ function moveP(S, p, toCid, fee) {
   if (from) { from.funds += fee; from.fin.trans += fee; from.tac.xi = from.tac.xi.map(x => x === p.id ? null : x); from.tac.bench = from.tac.bench.filter(x => x !== p.id); }
   if (to) { to.funds -= fee; to.fin.trans -= fee; }
   const oldClub = p.club;
+  linkDrop(S, oldClub, p.id);   // 連携 with his team-mates goes
   if (S.clubs[oldClub]) p.prev = oldClub; // for 古巣対決
   p.club = toCid; p.listed = false; delete p.keep; p.joined = S.date; p.cond = Math.min(p.cond, 90);
   if (toCid === S.my) { unshort(S, p.id); delete p.trk; track(S, p); }  // signed: off the shortlist, growth chart starts
@@ -2885,6 +3134,7 @@ function genPlayer(S, cid, opts) {
   const p = { id: S.nextPid++, club: cid, pos, pp: o.pp || (pos === 'GK' ? 'GK' : genPP(pos)), num, name, short: foreign ? parts[1] : parts[0], birth, nat: foreign ? 'BRA' : 'JPN', ovr: ov, pot, cond: 100, form: 6.5, inj: 0, sus: 0, ycAcc: 0, listed: false, st: blankStats(), hist: [], joined: S.date, gen: true };
   if (o.sty && STYLE[o.sty]) p.sty = o.sty;
   if (o.cap && o.cap > GROW.potMax) p.cap = o.cap;
+  if (!foreign) p.bp = bpFor(p.id, o.local && S.clubs[cid] ? S.clubs[cid].area : null);   // 地元の星
   initAttrs(p);
   S.players[p.id] = p;
   return p;
@@ -3673,6 +3923,7 @@ function rollover(S) {
     }
   }
   for (const p of back) if (S.players[p.id] && p.loan) loanReturn(S, p);
+  linkSweep(S);   // 連携 of players who retired or went back from a loan
   // relegation / promotion
   const promoted = [];
   // everyone below J1 can go up: the J2 clubs and the clubs relegated in earlier seasons (this season's go down for at
@@ -3701,7 +3952,7 @@ function rollover(S) {
     const base = clubBase(S, cid), lv = cid === S.my ? c.fac.youth : 2;
     for (let i = 0; i < k; i++) {
       const pt = intakePot(S, cid, lv);
-      const pr = genPlayer(S, cid, { age: 18, foreign: false, ovr: Math.round(base + INTAKE.ovr + lv * INTAKE.lvO) + ri(-2, 2), pot: pt.pot, cap: pt.cap });
+      const pr = genPlayer(S, cid, { age: 18, foreign: false, local: true, ovr: Math.round(base + INTAKE.ovr + lv * INTAKE.lvO) + ri(-2, 2), pot: pt.pot, cap: pt.cap });
       pr.yo = cid;   // ユース出身 (2026-10-15: earlier academy players aren't marked)
       if (cid === S.my) { news(S, `ユースから${pr.name}（${pr.pos}）がトップ昇格。`, 'grow'); track(S, pr); }
     }
@@ -3709,7 +3960,7 @@ function rollover(S) {
     const gemP = cid === S.my ? GEM.base + GEM.lv * c.fac.youth : GEM.ai;
     if (R() < gemP) {
       const pt = gemPot(lv);
-      const pr = genPlayer(S, cid, { age: 16, foreign: false, pos: wpick(['DF', 'MF', 'FW'], x => ({ DF: 2.6, MF: 3.4, FW: 2.6 })[x]), ovr: base - 10 + Math.round(lv / 2) + ri(-2, 2), pot: pt.pot, cap: pt.cap, sty: pick(['tech', 'tech', 'speed', 'phys', '']) });
+      const pr = genPlayer(S, cid, { age: 16, foreign: false, local: true, pos: wpick(['DF', 'MF', 'FW'], x => ({ DF: 2.6, MF: 3.4, FW: 2.6 })[x]), ovr: base - 10 + Math.round(lv / 2) + ri(-2, 2), pot: pt.pot, cap: pt.cap, sty: pick(['tech', 'tech', 'speed', 'phys', '']) });
       pr.gem = true; pr.yo = cid;
       if (cid === S.my) { news(S, `ユースの逸材、${pr.name}（${age(pr, S.date)}歳・${pr.pos}）がトップ昇格。早くから注目されてきた才能だ。`, 'big'); track(S, pr); }
     }
@@ -4127,6 +4378,7 @@ const API = {
   SPON, sponOf, sponOn, sponDeals, sponEst, sponP, sponTarget, sponOffer, sponPending, sponRec, sponPick, sponAuto, sponLook, sponStat, sponNow, sponCheck, sponMonthly, sponMonth, sponSettle, sponJob, sponText, sponShort, payMonths, attendance,
   SEC, secOf, secName, setSecName, secPost, secNotes, secSeen, secDone, secFix, secSwap, secSwapAll, secTook, secReturns, secRestore, secKeep, secMonth, bigMatch, matchStory,
   autoLineup, autoBench, benchSwap, benchRemove, lineupIssues, BENCH_SIZE, PRESET_MAX, savePreset, loadPreset, presetStatus, renamePreset, deletePreset, presetsOf, fillEmpty, clubRating, validateLineup, effective, posPenalty, available, nextComp, compOf, susIn, setSus, susList, bansOf, banHits, addBan, serveBan, banSweep, banPending, COMP_JP, CARD, RED, teamRating,
+  LINK, COMBO, linkAdj, linkOf, linkEval, linkLive, linkMatch, linkPartners, linkEstimate, linkSweep, linkDrop, comboText, bpFor, moveP,
   createMatch, stepMatch, simulateFull, finishMatch, doSub, benchOptions, onPitch, setMentality, bestSubFor, setCounter, mentLabel,
   advance, nextDay, simAIToday, myFixtureToday, nextMyFixture, todaysFixtures, inWindow, windowEnd, nextWindowStart,
   acceptOffer, rejectOffer, raiseOffer, OFFER_UP, setListed, setKeep, transferDay, bid, NEGO, negoInfo, negoWill, negoOf, negoStart, negoOffer, negoAgree, decideRetirements, shortlist, shortEntry, unshort, bidBlock,

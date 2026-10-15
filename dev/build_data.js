@@ -188,7 +188,9 @@ for (const file of fs.readdirSync(RAW).filter(f => f.endsWith('.txt')).sort()) {
     if (nat === 'KOR' || nat === 'CHN') short = nameParts.join('');
     else if (nat === 'JPN') short = nameParts[0];
     else short = nameParts[nameParts.length - 1];
-    players.push({ id: pid++, club: id, pos, num, name: full, short, birth: birth.split('/').map((v, i) => i ? String(v).padStart(2, '0') : v).join('-'), nat, ovr, pot });
+    // birthplace prefecture (2026-10-15, 地元の星 combo): 「神奈川県」→「神奈川」, as the clubs' area; players born abroad have none
+    const bp = /^(北海道|.+[都府県])$/.test(origin) ? origin.replace(/[都府県]$/, '') : null;
+    players.push({ id: pid++, club: id, pos, num, name: full, short, birth: birth.split('/').map((v, i) => i ? String(v).padStart(2, '0') : v).join('-'), nat, ovr, pot, ...(bp ? { bp } : {}) });
   }
   const missing = Object.keys(ov).filter(k => !used.has(k));
   if (missing.length) console.warn('[' + id + '] override not matched:', missing.join(','));

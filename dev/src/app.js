@@ -594,6 +594,7 @@ function sheetPlayer(id, back) {
     ${leg ? `<div class="rb-line"><span class="chip rbchip">転生</span><span>「${esc(leg.epi)}」の魂を継ぐ。${leg.num ? `かつての背番号${leg.num}` : 'クラブのレジェンド'}（${esc(leg.era)}）。${esc(leg.line)}</span></div>` : ''}
     ${attrRows(p, mine || lent)}
     ${mine || lent ? growthBlock(p, lent) : ''}
+    ${linkBlock(p)}
     <div><div class="eyebrow" style="margin-bottom:6px">ポジション</div><div class="small" style="margin-bottom:8px">本職 <b>${dpOf(p)}</b>（${E.DP_JP[dpOf(p)]}）${p.learn ? `・<span class="muted">${p.learn.pos}を習得中</span>` : ''}</div>${p.pos === 'GK' ? '' : aptGrid(p, false)}
       <div class="row wrap" style="margin-top:8px"><span class="small muted">実力の目安</span>${rolesLine(p)}</div></div>
     <div><div class="eyebrow" style="margin-bottom:6px">今季の成績</div><div class="statgrid"><div><small>出場</small><b>${p.st.apps}</b></div><div><small>得点</small><b>${p.st.g}</b></div><div><small>アシスト</small><b>${p.st.a}</b></div><div><small>平均評価</small><b>${avgR}</b></div><div><small>警告</small><b>${p.st.yc}</b></div></div>${lent ? '<div class="small muted" style="margin-top:6px">J2での成績はシーズン終了時にまとめて記録されます。</div>' : ''}${p.cs && p.cs.apps ? `<div class="small muted" style="margin-top:6px">カップ戦 ${p.cs.apps}試合 ${p.cs.g}得点 ${p.cs.a}アシスト</div>` : ''}</div>
@@ -1311,14 +1312,17 @@ function viewTactics() {
   }).join('');
   const seg = (act, cur, opts) => `<div class="seg">${opts.map(([k, l]) => `<button data-act="${act}" data-k="${k}" aria-pressed="${cur === k}">${l}</button>`).join('')}</div>`;
   const iss = E.lineupIssues(S, S.my);
+  // 連携: the XI that can play (an empty slot or a player who's out breaks his lines)
+  const LK = E.linkEval(S, S.my, c.tac.form, F.map((s, i) => { const p = S.players[c.tac.xi[i]]; return p && p.club === S.my && avail(p) ? p.id : null; }), { near: true });
   const empty = iss.spare && iss.xi.some(x => x.why === 'empty');
   const sfx = iss.block ? E.secFix(S) : null;
   const banner = iss.block ? `<div class="card alert"><div class="eyebrow">試合の前に入れ替えが必要です</div><ul>${issueLines(iss).map(t => `<li>${esc(t)}</li>`).join('')}</ul>${sfx.items.length ? secMagLine(sfx) + '<button class="btn primary block" data-act="secAll" style="margin-top:8px">おすすめどおりに入れ替える</button>' : ''}<p class="fine" style="margin:6px 0 0">押すまでメンバーは変わりません。<button class="linkish" data-act="secOpen">1人ずつ選ぶ</button>か、選手やベンチの行をタップして自分で入れ替えることもできます。${empty ? '空いた枠だけなら、下のボタンでおまかせで埋められます。' : ''}</p>${empty ? '<button class="btn block" data-act="fillEmpty" style="margin-top:8px">空いた枠をおまかせで埋める</button>' : ''}</div>` : '';
   return `${banner}<div class="trate"><div><small>攻撃</small><b>${Math.round(r.att)}</b></div><div><small>中盤</small><b>${Math.round(r.mid)}</b></div><div><small>守備</small><b>${Math.round(r.def)}</b></div></div>
     ${formSelect(c)}
     <p class="fine" style="margin:-6px 0 0">${esc(E.FORM_DESC[c.tac.form] || '')}</p>
-    <div class="pitch">${PITCH_SVG}${toks}</div>
+    <div class="pitch">${PITCH_SVG}${lkLines(F, c.tac.xi, LK)}${toks}</div>
     <p class="fine" style="margin:-4px 0 0">選手をタップすると入れ替えられます。「!」は適性が低いポジションか疲れている選手、「×」はケガや出場停止で次の試合に出られない選手です（出場停止はリーグ・天皇杯・Lカップそれぞれの試合で消化）。</p>
+    ${linkCard(LK)}
     ${planCard(c)}
     <button class="btn ghost block" data-act="presets">戦術の保存・読み込み<span class="small muted">　${(S.presets || []).length}/${E.PRESET_MAX}</span></button>
     <h3 class="sec-h">ベンチ（${c.tac.bench.length}/${E.BENCH_SIZE}人）<small>自動では入れ替わりません</small></h3>
@@ -1337,6 +1341,76 @@ function formSelect(c) {
     <span class="fs-now"><b>${f}</b><small>${grp}</small></span>
     <select data-chg="form" aria-label="フォーメーション（今は${f}）">${FORM_GROUPS.map(([g, fs]) => `<optgroup label="${g}">${fs.map(k => `<option value="${k}"${k === f ? ' selected' : ''}>${k}</option>`).join('')}</optgroup>`).join('')}</select>
   </label>`;
+}
+/* ---------- 連携とコンボ (2026-10-15, the user's 案A: chalk lines on the board, the card under it) ---------- */
+// the board's lines: thickness = how well the two know each other (〜39 dotted, 40〜, 70〜, 90〜), yellow = in a combo.
+// The board is 4:5.1, so a 100 × 127.5 viewBox keeps the slots' % positions (top = 88 − (y − 7) × 1.04) undistorted.
+function lkLines(F, xi, L) {
+  const at = i => [F[i][1], (88 - (F[i][2] - 7) * 1.04) * 1.275];
+  const key = (i, j) => Math.min(i, j) * 32 + Math.max(i, j);
+  const hot = new Set(); for (const it of L.combos) for (const [i, j] of it.lines || []) hot.add(key(i, j));
+  const tier = v => v >= 90 ? 't4' : v >= 70 ? 't3' : v >= 40 ? 't2' : 't1';
+  const ln = (i, j, cls) => { const [x1, y1] = at(i), [x2, y2] = at(j); return `<line class="${cls}" x1="${x1}" y1="${y1.toFixed(2)}" x2="${x2}" y2="${y2.toFixed(2)}"/>`; };
+  let glow = '', out = '';
+  const drawn = new Set();
+  for (const [i, j, v] of L.pairs) { const h = hot.has(key(i, j)); drawn.add(key(i, j)); if (h) glow += ln(i, j, 'glow'); out += ln(i, j, tier(v) + (h ? ' cb' : '')); }
+  // a combo between players who aren't neighbours (鉄壁 with the outer centre-backs of a back three)
+  for (const it of L.combos) for (const [i, j] of it.lines || []) if (!drawn.has(key(i, j))) { drawn.add(key(i, j)); glow += ln(i, j, 'glow'); out += ln(i, j, tier(E.linkOf(S, S.my, xi[i], xi[j])) + ' cb'); }
+  if (!out) return '';
+  return `<svg class="lk-lines" viewBox="0 0 100 127.5" preserveAspectRatio="none" aria-hidden="true"><defs><filter id="lk-chalk" filterUnits="userSpaceOnUse" x="-5" y="-5" width="110" height="137.5"><feTurbulence type="fractalNoise" baseFrequency="3" numOctaves="2" seed="7"/><feDisplacementMap in="SourceGraphic" scale=".5"/></filter></defs><g filter="url(#lk-chalk)">${glow}${out}</g></svg>`;
+}
+const LK_IC = {
+  hot: '<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>',
+  wall: '<rect x="3" y="5" width="18" height="14" rx="1"/><path d="M3 12h18M9 5v7M15 12v7"/>',
+  heart: '<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>',
+  wings: '<path d="M2 12h7M15 12h7M5 9l-3 3 3 3M19 9l3 3-3 3"/><circle cx="12" cy="12" r="2.2"/>',
+  mentor: '<circle cx="8" cy="6.5" r="3"/><path d="M3 21v-4a5 5 0 0 1 10 0v4"/><circle cx="17.5" cy="11" r="2.2"/><path d="M14 21v-3a3.5 3.5 0 0 1 7 0v3"/>',
+  yo: '<path d="M12 21V11"/><path d="M12 11c0-4 3-6 7-6 0 4-3 6-7 6zM12 14c0-3-2-5-6-5 0 3 2 5 6 5z"/>',
+  local: '<path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-5h4v5"/>',
+  nat: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/>',
+  legend: '<path d="M12 3l2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.8 6.6 19.5l1.2-6L3.3 9.3l6.1-.7z"/>',
+  link: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
+};
+const lkIc = k => `<svg viewBox="0 0 24 24" aria-hidden="true">${LK_IC[k] || ''}</svg>`;
+// what a combo adds: 「攻撃 +0.5」「全体 +0.3」
+const lkFx = it => it.all ? `全体 +${it.all}` : [['att', '攻撃'], ['mid', '中盤'], ['def', '守備']].filter(([k]) => it[k]).map(([k, l]) => `${l} +${it[k]}`).join('・');
+// who makes it: 「クルークス → 遠野・91」
+function lkWho(it) {
+  const nm = id => esc(S.players[id] ? S.players[id].short : '?'), w = it.who || [];
+  if (it.k === 'hot' || it.k === 'mentor') return `${nm(w[0])} → ${nm(w[1])}・${Math.floor(it.val)}`;
+  if (it.k === 'wall' || it.k === 'heart') return `${w.map(nm).join('・')}・${Math.floor(it.val)}`;
+  if (it.k === 'wings') return `${nm(w[0])}・${nm(w[1])} ／ ${nm(w[2])}・${nm(w[3])}`;
+  if (it.k === 'legend') return `${nm(w[0])}・背番号${it.num}`;
+  // 生え抜き・地元: say what they share (「神奈川生まれ　諏訪間・喜田・山根」)
+  const pre = it.k === 'yo' ? 'ユース出身　' : it.k === 'local' ? `${esc(S.clubs[S.my].area || '')}生まれ　` : '';
+  return pre + (w.length > 4 ? `${w.slice(0, 3).map(nm).join('・')} ほか${w.length - 3}人` : w.map(nm).join('・'));
+}
+// 連携 shown as a whole number is rounded down, so 74.7 of 75 reads 74 (not a 75 that doesn't count yet)
+const lkProg = it => ['yo', 'local', 'nat'].includes(it.k) ? `${it.val}人／${it.need}人` : it.k === 'legend' ? 'まだ' : `${Math.floor(it.val)}／${it.need}`;
+function linkCard(L) {
+  const leg = (cls, t) => `<span><svg viewBox="0 0 24 8" aria-hidden="true"><line class="${cls}" x1="2" y1="4" x2="22" y2="4"/></svg>${t}</span>`;
+  const plates = L.combos.map(it => `<div class="lk-plate"><span class="ic">${lkIc(it.k)}</span><span class="nm"><b>${esc(it.jp)}</b><small>${lkWho(it)}</small></span><span class="lk-fx">${lkFx(it)}</span></div>`).join('');
+  const over = L.over.length ? `<p class="fine" style="margin:0">ほかに${L.over.map(it => `「${esc(it.jp)}」`).join('')}も条件を満たしています（同時に${E.LINK.combos}つまで、強いものから）。</p>` : '';
+  const near = L.near.slice(0, 3).map(it => `<div class="lk-wrow"><span><b>${esc(it.jp)}</b>${esc(it.cond)}</span><span class="pg"><span class="lk-bar"><i style="width:${Math.min(100, Math.floor(it.val / it.need * 100))}%"></i></span><span>${lkProg(it)}</span></span></div>`).join('');
+  return `<section class="card lk-card">
+    <div class="lk-head"><span class="eyebrow">連携（隣り合う${L.n}組）</span><span class="lk-sum">平均<b>${Math.round(L.avg)}</b><span class="lk-plus">チーム力 +${L.bonus.toFixed(1)}</span></span></div>
+    <div class="lk-leg">${leg('t1', '〜39')}${leg('t2', '40〜')}${leg('t3', '70〜')}${leg('cb', 'コンボ')}</div>
+    <div class="lk-head"><span class="eyebrow">コンボ ${L.combos.length}/${E.LINK.combos}</span><span class="small muted">先発のときに発動</span></div>
+    ${plates || '<p class="fine" style="margin:0">まだありません。一緒に出るほど連携が上がり、条件を満たすと発動します。</p>'}${over}
+    ${near ? `<div class="lk-wait">${near}</div>` : ''}
+  </section>`;
+}
+// the player sheet: his best partners at his club (bar = 連携, minutes together, the combo they make in the XI)
+function linkBlock(p) {
+  const c = S.clubs[p.club]; if (!c || !c.tac || p.loan) return '';
+  const ps = E.linkPartners(S, p).slice(0, 5);
+  if (!ps.length) return p.club === S.my ? '<div><div class="eyebrow" style="margin-bottom:6px">相性のいい選手（連携）</div><p class="fine" style="margin:0">まだ一緒にピッチに立った選手がいません。試合に出るほど連携が上がります。</p></div>' : '';
+  const L = E.linkEval(S, p.club, c.tac.form, c.tac.xi);
+  const tags = q => L.combos.filter(it => ['hot', 'heart', 'wall', 'wings', 'mentor'].includes(it.k) && (it.who || []).includes(p.id) && it.who.includes(q)).map(it => `<span class="lk-tag">${esc(it.jp)}</span>`).join('');
+  const kt = lum(c.c1) > 0.6 ? '#141414' : '#ffffff';
+  // yellow = the two make a combo in the XI now (as on the board), not just a high number
+  const rows = ps.map(x => { const q = S.players[x.pid], tg = tags(q.id); return `<button class="lk-prow" data-act="player" data-id="${q.id}"><span class="lk-mag" style="--k1:${c.c1};--k2:${c.c2};--kt:${kt}">${q.num}</span><span class="nm"><b>${esc(q.short)}${tg}</b><span>${dpOf(q)}・一緒に約${(Math.round(x.m / 10) * 10).toLocaleString('ja-JP')}分</span></span><span class="lk-cbar${tg ? ' hi' : ''}"><i style="width:${Math.floor(x.v)}%"></i></span><span class="v">${Math.floor(x.v)}</span></button>`; }).join('');
+  return `<div><div class="eyebrow" style="margin-bottom:6px">相性のいい選手（連携）</div><div class="lk-pl">${rows}</div><p class="fine" style="margin:8px 0 0">一緒にピッチに立つほど上がり、離れていると少しずつ下がります。</p></div>`;
 }
 // 戦術 (posture, counter, press, the extra instructions, substitutions): a summary plate on the tactics screen; the
 // controls live in their own sheet so the board and the bench come one after the other
@@ -1784,6 +1858,7 @@ function sheetPrematch(fid) {
     <div class="plans small"><div><b>${esc(c.short)}</b> ${c.tac.form}・${esc(E.mentLabel(c.tac))}${E.tacLabel(c.tac) ? '・' + esc(E.tacLabel(c.tac)) : ''}</div><div><b>${esc(o.short)}</b> ${o.tac.form}${o.tac.ment !== 'bal' || o.tac.ctr ? '・' + esc(E.mentLabel(o.tac)) : ''}${E.tacLabel(o.tac) ? '・' + esc(E.tacLabel(o.tac)) : ''}</div></div>
     ${preAtt(f)}
     <div style="display:grid;gap:8px">${row('攻撃', me.att, op.att)}${row('中盤', me.mid, op.mid)}${row('守備', me.def, op.def)}</div>
+    ${preLink(me.link, op.link, o)}
     <button class="btn ghost block" data-act="team" data-id="${opp}" data-back="pre" data-fid="${fid}">${esc(o.short)}を詳しく見る</button>
     ${gap >= 3 && c.tac.ment !== 'def' && !c.tac.ctr ? '<p class="fine" style="margin:0">格上が相手です。「守備的」や「カウンターを狙う」で戦うと勝機が増えます（戦術画面）。</p>' : ''}
     ${fire}
@@ -1792,6 +1867,12 @@ function sheetPrematch(fid) {
     ${warn.length ? `<div class="card" style="padding:10px 12px"><div class="eyebrow" style="color:var(--loss)">メンバーの注意点</div><ul style="margin:6px 0 0;padding-left:18px;font-size:13px">${warn.slice(0, 5).map(w => `<li>${esc(w)}</li>`).join('')}</ul></div>` : iss.block ? '' : '<p class="fine">メンバーに問題はありません。</p>'}`,
     iss.block ? `<button class="btn primary block" data-act="secAll" style="min-height:54px;font-size:16px">おすすめどおりに入れ替える</button><div class="grid3"><button class="btn ghost" data-act="secOpen" data-back="pre" data-fid="${fid}">1人ずつ選ぶ</button><button class="btn ghost" data-act="toTactics">戦術画面へ</button><button class="btn ghost" data-act="closeSheet">閉じる</button></div>`
       : `<button class="btn primary block" data-act="kickoff" data-id="${fid}" style="min-height:54px;font-size:16px">キックオフ</button><div class="grid2"><button class="btn ghost" data-act="toTactics">戦術を調整</button><button class="btn ghost" data-act="quick" data-id="${fid}">結果だけ見る</button></div>`);
+}
+// 連携 and the combos for this match (both sides; the numbers above already include them)
+function preLink(a, b, o) {
+  if (!a || !b) return '';
+  const cs = L => L.combos.length ? L.combos.map(it => esc(it.jp)).join('・') : 'なし';
+  return `<div class="pre-lk"><span class="ic">${lkIc('link')}</span><span>連携 <b>${Math.round(a.avg)}</b>・コンボ <b>${cs(a)}</b><small>${esc(o.short)}：連携 ${Math.round(b.avg)}・コンボ ${cs(b)}</small></span></div>`;
 }
 // the crowd to expect (pre-match): at home with the ground's seats, away at theirs, the final at 国立
 function preAtt(f) {
@@ -2211,7 +2292,7 @@ function feedAdd(e) {
   const { M } = MATCH;
   const li = document.createElement('li');
   const sys = ['ko', 'ht', 'ft'].includes(e.t);
-  li.className = e.t === 'goal' ? 'goal' : e.t === 'red' ? 'red' : e.t === 'hot' ? 'hot' : e.t === 'pk' ? 'goal' : e.t === 'tac' ? 'tac' : sys ? 'sys' : '';
+  li.className = e.t === 'goal' ? 'goal' : e.t === 'red' ? 'red' : e.t === 'hot' ? 'hot' : e.t === 'pk' ? 'goal' : e.t === 'tac' ? 'tac' : e.t === 'combo' ? 'combo' : sys ? 'sys' : '';
   const c = e.side ? S.clubs[M[e.side].cid] : null;
   li.innerHTML = `<time>${e.m > 90 ? '90+' + (e.m - 90) : e.m}'</time><i class="pip" style="${c ? 'background:' + c.c1 : ''}"></i><span>${e.t === 'goal' ? '<b class="evb">GOAL</b>' : e.t === 'yc' ? '<i class="cardi y"></i>' : e.t === 'red' ? '<i class="cardi r"></i>' : ''}${esc(e.text)}</span>`;
   feed.prepend(li);

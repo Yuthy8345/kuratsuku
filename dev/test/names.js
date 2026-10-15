@@ -62,7 +62,7 @@ const clubs = DATA.clubs.map(c => c.id);
   const sasaki = Object.values(O.players).find(p => p.name === '佐々木 翔' && !p.gen);
   // the clash as it happened before: a generated player took the name, so the real player abroad never joined
   delete O.players[endo.id]; delete O.players[tanaka.id];
-  const mine = E.squad(O, O.my).filter(p => p.gen && (!p.nat || p.nat === 'JPN'))[0] || (() => { const q = clone(Object.values(O.players).find(p => p.gen && p.club === 'FA')); q.club = O.my; O.players[q.id] = q; return q; })();
+  const mine = E.squad(O, O.my).filter(p => p.gen && (!p.nat || p.nat === 'JPN'))[0] || (() => { const q = clone(Object.values(O.players).find(p => p.gen && p.club === 'FA' && (!p.nat || p.nat === 'JPN'))); q.club = O.my; O.players[q.id] = q; return q; })();
   mine.name = '遠藤 航'; mine.short = '遠藤';
   const fa = Object.values(O.players).find(p => p.gen && p.club === 'FA' && p.id !== mine.id); fa.name = '佐々木 翔'; fa.short = '佐々木';
   const other = Object.values(O.players).find(p => p.gen && p.club !== O.my && p.club !== 'FA' && !O.clubs[p.club].ab); other.name = '田中 碧'; other.short = '田中';
