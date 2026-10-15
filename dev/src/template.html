@@ -608,26 +608,32 @@ button.tside:active { background: var(--surface2); }
 .btile.addrow .bt-mag { border: 2px dashed var(--muted); background: transparent; box-shadow: none; color: var(--accent); font-size: 22px; font-weight: 700; }
 .btile.addrow .bt-name { font-size: 12px; color: var(--ink); }
 
-/* 秘書 (2026-10-15): her magnet (a portrait in a navy suit, drawn in app.js akiMag) above the dock — on the home screen
-   with a speech bubble, elsewhere just the magnet and a count; her sheet; her line in the pre-match sheet and on the
-   tactics screen. The magnet's bottom is set by secPlace (above the dock, or above the switch bar). */
+/* 秘書 (2026-10-15): her magnet (a portrait in a navy suit, drawn in app.js akiMag). On the home screen her line is a band
+   on top of the dock (.sec-band, part of the dock: the page scrolls under it); on the other tabs just the magnet and a
+   count, beside the switch bar (secPlace moves it into the bar, which gets shorter) or, without one, above the dock.
+   Her sheet; her line in the pre-match sheet and on the tactics screen. */
 .aki { position: relative; display: inline-block; flex: none; width: 50px; height: 50px; border-radius: 50%; filter: drop-shadow(0 3px 0 rgba(0,0,0,.35)); }
 .aki svg { width: 100%; height: 100%; display: block; }
 .aki.sm { width: 36px; height: 36px; filter: drop-shadow(0 2px 0 rgba(0,0,0,.3)); }
 .aki.md { width: 46px; height: 46px; }
 .aki.lg { width: 76px; height: 76px; filter: drop-shadow(0 4px 0 rgba(0,0,0,.3)); }
 .aki-badge { position: absolute; top: -4px; right: -5px; min-width: 19px; height: 19px; padding: 0 5px; border-radius: 10px; background: var(--loss); color: #fff; font: 900 11px/19px var(--f-body); font-style: normal; text-align: center; box-shadow: 0 1px 0 rgba(0,0,0,.3); }
-.sec-float { position: fixed; left: 12px; right: 12px; bottom: calc(var(--dock-h) + 8px + env(safe-area-inset-bottom, 0px)); z-index: 31; max-width: 496px; margin: 0 auto; display: flex; align-items: flex-end; justify-content: flex-end; gap: 8px; pointer-events: none; }
-.sec-float > * { pointer-events: auto; }
-.sec-mag { padding: 0; border-radius: 50%; background: none; }
+.sec-float { position: fixed; right: 12px; bottom: calc(var(--dock-h) + 8px + env(safe-area-inset-bottom, 0px)); z-index: 31; }
+.sec-float.in-bar { position: static; flex: none; }
+.subnav.with-sec { display: flex; align-items: center; gap: 10px; }
+.subnav.with-sec > :first-child { flex: 1; min-width: 0; }
+.sec-mag { padding: 0; border-radius: 50%; background: none; flex: none; }
 .sec-mag:active .aki { transform: translateY(2px); }
-.sec-bub { position: relative; flex: 0 1 auto; max-width: 300px; min-width: 0; display: grid; gap: 7px; text-align: left; padding: 9px 12px 10px; border-radius: 14px 14px 4px 14px; background: var(--surface); color: var(--ink); border: 1.5px solid color-mix(in srgb, var(--accent-bg) 70%, var(--line)); box-shadow: var(--shadow); margin-bottom: 4px; }
-.sec-bub b { font-size: 13.5px; line-height: 1.45; font-weight: 700; }
-.sec-bub small { display: block; font-size: 11.5px; color: var(--muted); margin-top: 2px; }
-.sec-bub-t { display: block; text-align: left; padding: 0; background: none; color: inherit; }
-.sec-bub .grid2 .btn { min-height: 38px; font-size: 13px; }
-.app.has-sec-home .view { padding-bottom: calc(var(--dock-h) + 24px + 140px + env(safe-area-inset-bottom, 0px)); }
-.app.has-sec .view:has(> .subnav) > :nth-last-child(2) { margin-bottom: 56px; }
+.sec-band { display: flex; align-items: center; gap: 10px; }
+.sec-bub { position: relative; flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; text-align: left; padding: 7px 9px 7px 12px; border-radius: 12px; background: var(--surface); color: var(--ink); border: 1.5px solid color-mix(in srgb, var(--accent-bg) 70%, var(--line)); box-shadow: 0 2px 0 rgba(0,0,0,.18); }
+.sec-bub::before { content: ""; position: absolute; left: -7px; top: 50%; width: 11px; height: 11px; background: var(--surface); border-left: 1.5px solid color-mix(in srgb, var(--accent-bg) 70%, var(--line)); border-bottom: 1.5px solid color-mix(in srgb, var(--accent-bg) 70%, var(--line)); transform: translateY(-50%) rotate(45deg); }
+button.sec-bub { display: grid; gap: 1px; }
+.sec-bub-t { flex: 1; min-width: 0; display: grid; gap: 1px; text-align: left; padding: 0; background: none; color: inherit; }
+.sec-bub b { font-size: 13px; line-height: 1.4; font-weight: 700; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.sec-bub small { display: block; font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sec-bub-do { flex: none; min-height: 38px; padding: 0 16px; font-size: 13.5px; }
+.app.has-sec-home .view { padding-bottom: calc(var(--dock-h) + 24px + 72px + env(safe-area-inset-bottom, 0px)); }
+body:has(.sec-band) .toast { bottom: calc(var(--dock-h) + 84px + env(safe-area-inset-bottom, 0px)); }
 .sec-line { display: flex; align-items: center; gap: 10px; margin-top: 8px; padding: 9px 11px; border-radius: 12px; background: color-mix(in srgb, var(--accent-bg) 11%, var(--surface)); border: 1px solid color-mix(in srgb, var(--accent-bg) 42%, var(--line)); }
 .sec-line p { margin: 0; font-size: 13px; line-height: 1.5; min-width: 0; }
 .sec-line .small { color: var(--muted); }
@@ -644,9 +650,8 @@ button.tside:active { background: var(--surface2); }
 .sec-tx { display: grid; flex: 1; min-width: 0; line-height: 1.3; }
 .sec-tx b { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sec-tx small { font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sec-nm { display: flex; align-items: center; gap: 5px; min-width: 0; }
-.sec-nm b { min-width: 0; }
-.sec-nm .chip { flex: none; font-size: 10px; padding: 0 5px; }
+.sec-tx small.wrap { white-space: normal; }
+.sec-tx small.wrap > span { white-space: nowrap; }
 .sec-ar { width: 30px; flex: none; text-align: center; font: 400 16px var(--f-chalk); color: var(--muted); }
 .sec-pm { position: relative; width: 30px; height: 30px; flex: none; border-radius: 50%; display: grid; place-items: center; font: 900 12px var(--f-body); border: 2.5px solid var(--k2); background: radial-gradient(circle at 34% 28%, rgba(255,255,255,.4) 0%, rgba(255,255,255,0) 48%), var(--k1); color: var(--kt); box-shadow: 0 2px 0 rgba(0,0,0,.3); }
 .sec-pm.out { background: repeating-linear-gradient(135deg, #5a5f5c 0 4px, #474b49 4px 8px); border-color: var(--loss); color: #fff; }

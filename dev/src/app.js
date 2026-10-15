@@ -286,8 +286,8 @@ function render() {
   if (!S) { root.innerHTML = UI.screen === 'select' ? viewSelect() : viewTitle(); return; }
   const views = { home: viewHome, squad: viewSquad, tactics: viewTactics, league: viewLeague, club: viewClub };
   if (S.clubs[S.my] && !S.fired) E.validateLineup(S, S.my);
-  const sec = secFloat();
-  root.innerHTML = `<div class="app${sec ? ' has-sec' : ''}${sec && UI.tab === 'home' ? ' has-sec-home' : ''}">${header()}<main class="view" id="view">${views[UI.tab]()}</main></div>${dock()}${sec}`;
+  const si = secItems(); const home = UI.tab === 'home';
+  root.innerHTML = `<div class="app${si.n ? ' has-sec' : ''}${si.n && home ? ' has-sec-home' : ''}">${header()}<main class="view" id="view">${views[UI.tab]()}</main></div>${dock(home && si.n ? secBand(si) : '')}${si.n && !home ? secFloat(si) : ''}`;
   secPlace();
 }
 function header() {
@@ -303,12 +303,12 @@ function goState() {
   if (nx) { const d = E.D.diff(nx.date, S.date); return { label: '次へ進む', sub: `次の試合 ${jdw(nx.date)}<br>あと${d}日` }; }
   return { label: '次へ進む', sub: '' };
 }
-function dock() {
+function dock(band) {
   const g = goState();
   const unseen = S.inbox.some(x => x.type === 'offer' && !x.done && !x.seen);
   const fix = !S.fired && S.clubs[S.my] && E.lineupIssues(S, S.my).block;
   const tabs = [['home', 'ホーム'], ['squad', '選手'], ['tactics', '戦術'], ['league', 'リーグ'], ['club', 'クラブ']];
-  return `<nav class="dock" aria-label="メイン操作"><div class="dock-in">
+  return `<nav class="dock" aria-label="メイン操作"><div class="dock-in">${band || ''}
     <button class="go" data-act="go"><b>${g.label}</b><span class="row"><small>${g.sub}</small><span class="arrow" aria-hidden="true">▶</span></span></button>
     <div class="tabs" role="tablist">${tabs.map(([k, l]) => `<button class="tab" data-act="tab" data-tab="${k}" ${UI.tab === k ? 'aria-current="page"' : ''}>${ICON[k]}<span>${l}</span>${(k === 'home' && unseen) || (k === 'tactics' && fix) ? '<i class="dot"></i>' : ''}</button>`).join('')}</div>
   </div></nav>`;
@@ -843,25 +843,25 @@ function secFixLine(fix) {
 const pairs = fix => fix.items.slice(0, 4).map(it => `${it.out ? esc(S.players[it.out].short) : (E.ROLE[it.role] ? E.ROLE[it.role].jp : '') + 'の空き'}→${it.cand ? esc(S.players[it.cand].short) : 'なし'}`).join('、') + (fix.items.length > 4 ? ` ほか${fix.items.length - 4}人` : '');
 const backLine = m => { const p = S.players[m.out]; return `${esc(p.short)}が${outWhy[m.why] || ''}戻りました。${m.k === 'xi' ? `${E.ROLE[m.role].jp}に` : 'ベンチに'}戻しますか？`; };
 const backSub = m => { const q = S.players[m.sub]; return m.k === 'xi' ? `代わりに先発していた${esc(q.short)}は${S.clubs[S.my].tac.bench.includes(m.out) || (m.fill && S.clubs[S.my].tac.bench.includes(m.fill)) || S.clubs[S.my].tac.bench.length < E.BENCH_SIZE ? 'ベンチへ' : 'ベンチ外へ'}` : `代わりに入っていた${esc(q.short)}はベンチ外へ`; };
-// the magnet above the dock: on the home screen with what she has to say, elsewhere just the magnet and a count
-function secFloat() {
-  const si = secItems(); if (!si.n) return '';
-  const home = UI.tab === 'home';
-  let bub = '';
-  if (home) {
-    if (si.fix) bub = `<button class="sec-bub" data-act="secOpen"><b>${secFixLine(si.fix)} ›</b><small>${esc(secWho())}</small></button>`;
-    else if (si.back.length) { const m = si.back[0]; bub = `<div class="sec-bub"><button class="sec-bub-t" data-act="secOpen"><b>${backLine(m)}</b><small>${backSub(m)}</small></button><div class="grid2"><button class="btn ghost" data-act="secKeep" data-id="${m.out}">このまま</button><button class="btn primary" data-act="secBack" data-id="${m.out}">戻す</button></div></div>`; }
-    else if (si.unseen.length) bub = `<button class="sec-bub" data-act="secOpen"><b>${esc(secView(si.unseen[0]).bubble(si.unseen[0]))}</b><small>${esc(secWho())}${si.unseen.length > 1 ? `・ほか${si.unseen.length - 1}件` : ''}</small></button>`;
-  }
-  return `<div class="sec-float${home ? ' home' : ''}" id="sec-float">${bub}<button class="sec-mag" data-act="secOpen" aria-label="${esc(secWho())}の連絡（${si.n}件）">${akiMag('', si.n)}</button></div>`;
+// home: her line as a band on top of the dock (the page scrolls under it like under the dock, nothing floats over it)
+function secBand(si) {
+  let say;
+  if (si.fix) say = `<button class="sec-bub" data-act="secOpen"><b>${secFixLine(si.fix)} ›</b><small>${esc(secWho())}</small></button>`;
+  else if (si.back.length) { const m = si.back[0]; say = `<div class="sec-bub"><button class="sec-bub-t" data-act="secOpen"><b>${backLine(m)}</b><small>${backSub(m)}</small></button><button class="btn primary sec-bub-do" data-act="secBack" data-id="${m.out}">戻す</button></div>`; }
+  else { const n = si.unseen[0]; say = `<button class="sec-bub" data-act="secOpen"><b>${n ? esc(secView(n).bubble(n)) : `${esc(secWho())}からの連絡 ›`}</b><small>${esc(secWho())}${si.unseen.length > 1 ? `・ほか${si.unseen.length - 1}件` : ''}</small></button>`; }
+  return `<div class="sec-band" id="sec-float"><button class="sec-mag" data-act="secOpen" aria-label="${esc(secWho())}の連絡（${si.n}件）">${akiMag('md', si.n)}</button>${say}</div>`;
 }
-// keep the magnet just above the dock, or above the switch bar on screens that have one
+// other tabs: just the magnet and a count, put beside the switch bar by secPlace (the bar gets shorter, so the magnet
+// covers nothing); a screen without a switch bar has it just above the dock
+function secFloat(si) {
+  return `<div class="sec-float" id="sec-float"><button class="sec-mag" data-act="secOpen" aria-label="${esc(secWho())}の連絡（${si.n}件）">${akiMag('md', si.n)}</button></div>`;
+}
 function secPlace() {
-  const fl = document.getElementById('sec-float'); if (!fl) return;
-  const dock = document.querySelector('.dock'); const sn = document.querySelector('#view > .subnav');
-  let b = dock ? dock.offsetHeight : 124;
-  if (sn && dock) b += Math.max(0, dock.getBoundingClientRect().top - sn.getBoundingClientRect().top);
-  fl.style.bottom = (b + 8) + 'px';
+  const fl = document.getElementById('sec-float'); if (!fl || fl.classList.contains('sec-band')) return;
+  const sn = document.querySelector('#view > .subnav');
+  if (sn) { sn.classList.add('with-sec'); fl.classList.add('in-bar'); sn.appendChild(fl); return; }
+  const dock = document.querySelector('.dock');
+  fl.style.bottom = ((dock ? dock.offsetHeight : 124) + 8) + 'px';
 }
 function secMagLine(fix) { return `<div class="sec-line">${akiMag('sm')}<p><b>${secFixLine(fix)}。</b><span class="small">（${pairs(fix)}）</span></p></div>`; }
 const SEC_MAG = (p, out) => { const c = S.clubs[S.my]; const kt = lum(c.c1) > 0.6 ? '#141414' : '#ffffff'; return `<span class="sec-pm${out ? ' out' : ''}" style="--k1:${c.c1};--k2:${c.c2};--kt:${kt}">${p ? p.num : '+'}</span>`; };
@@ -871,8 +871,9 @@ function secFixRows(fix) {
     const o = it.out && S.players[it.out], n = it.cand && S.players[it.cand], fl = it.fill && S.players[it.fill];
     const where = it.k === 'xi' ? E.ROLE[F[it.i][0]].jp : 'ベンチ';
     const top = o ? `${SEC_MAG(o, true)}<span class="sec-tx"><b>${where}　${esc(o.name)}</b><small>${outText(o)}</small></span>` : `${SEC_MAG(null, true)}<span class="sec-tx"><b>${where}　空き</b><small>先発の枠が空いています</small></span>`;
-    const sub = n ? (it.k === 'xi' ? `適性${it.apt}・総合力${E.ovr(n)}` : `${dpOf(n)}・総合力${E.ovr(n)}`) : '';
-    const bot = n ? `<span class="sec-ar" aria-hidden="true">↳</span>${SEC_MAG(n)}<span class="sec-tx"><span class="sec-nm"><b>${esc(n.name)}</b>${it.from === 'bench' ? '<span class="chip">ベンチから</span>' : ''}</span><small>${sub}</small></span><button class="btn ghost sec-do" data-act="secOne" data-id="${it.id}">入れ替える</button>`
+    // the stand-in's line breaks only between its pieces (ベンチから・適性100・総合力73)
+    const sub = n ? [it.from === 'bench' ? 'ベンチから' : '', it.k === 'xi' ? `適性${it.apt}` : dpOf(n), `総合力${E.ovr(n)}`].filter(Boolean).map(x => `<span>${x}</span>`).join('・') : '';
+    const bot = n ? `<span class="sec-ar" aria-hidden="true">↳</span>${SEC_MAG(n)}<span class="sec-tx"><b>${esc(n.name)}</b><small class="wrap">${sub}</small></span><button class="btn ghost sec-do" data-act="secOne" data-id="${it.id}">入れ替える</button>`
       : `<span class="sec-ar" aria-hidden="true">↳</span><span class="sec-tx"><small>代わりに出られる選手がいません</small></span>${o ? `<button class="btn ghost sec-do" data-act="secOne" data-id="${it.id}">外す</button>` : ''}`;
     return `<li class="sec-row"><div class="sec-ln">${top}</div><div class="sec-ln">${bot}</div>${fl ? `<div class="sec-fill">ベンチの空きには ${esc(fl.name)}（${dpOf(fl)}・${E.ovr(fl)}）</div>` : ''}</li>`;
   }).join('')}</ul>`;

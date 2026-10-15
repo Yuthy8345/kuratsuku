@@ -88,12 +88,23 @@ async def main(vw, vh, board, full):
             """the element is inside the viewport and not under the dock"""
             r = await page.evaluate('''s => { const e = document.querySelector(s); if (!e) return null; const r = e.getBoundingClientRect(), d = document.querySelector('.dock').getBoundingClientRect(); return [r.top, r.bottom, d.top, innerHeight]; }''', sel)
             return r and r[0] >= 0 and r[1] <= min(r[2], r[3]) + 0.5
+        async def in_dock(sel):
+            """the element is on screen, inside the dock (her band on the home screen is part of the dock)"""
+            r = await page.evaluate('''s => { const e = document.querySelector(s); if (!e) return null; const r = e.getBoundingClientRect(), d = document.querySelector('.dock').getBoundingClientRect(); return [r.top, r.bottom, d.top, d.bottom, innerHeight]; }''', sel)
+            return r and r[0] >= r[2] - 0.5 and r[1] <= min(r[3], r[4]) + 0.5
+        async def page_end_clear():
+            """the end of the home page can be scrolled above the dock and her band"""
+            await page.evaluate('scrollTo(0, document.scrollingElement.scrollHeight)'); await page.wait_for_timeout(150)
+            r = await page.evaluate("() => { const v = document.querySelector('#view'), l = v.lastElementChild.getBoundingClientRect(); return [l.bottom, document.querySelector('.dock').getBoundingClientRect().top]; }")
+            await page.evaluate('scrollTo(0, 0)'); await page.wait_for_timeout(100)
+            return r[0] <= r[1] + 0.5
 
         # ---- a new game: hello
         await load(SAVES['hello'])
         txt = await page.locator('#sec-float .sec-bub').inner_text() if await page.locator('#sec-float .sec-bub').count() else ''
         ok('はじめまして' in txt and 'あき' in txt, f'new game: she says hello ({txt.splitlines()[0] if txt else "-"})')
-        ok(await fits('#sec-float .sec-bub') and await fits('#sec-float .sec-mag'), 'the bubble and the magnet are above the dock')
+        ok(await in_dock('#sec-float .sec-bub') and await in_dock('#sec-float .sec-mag'), 'her line and magnet: a band at the top of the dock')
+        ok(await page_end_clear(), 'the end of the page scrolls clear of the band')
         await shot('hello')
         await page.click('#sec-float .sec-mag'); await page.wait_for_timeout(350)
         ok('はじめまして' in await sheet.inner_text(), 'her sheet: the hello note')
@@ -107,14 +118,16 @@ async def main(vw, vh, board, full):
         bub = await page.locator('#sec-float .sec-bub').inner_text()
         ok('出られない選手が3人' in bub, f'home: {bub.splitlines()[0]}')
         ok((await page.locator('#sec-float .aki-badge').inner_text()).strip() == '3', 'the magnet shows 3')
-        ok(await fits('#sec-float .sec-bub'), 'the bubble is above the dock')
+        ok(await in_dock('#sec-float .sec-bub'), 'her line is in the band at the top of the dock')
+        ok(await page_end_clear(), 'the end of the page scrolls clear of the band')
         await shot('home-out')
         for t in ['squad', 'tactics', 'league', 'club']:
             await page.click(f'[data-tab="{t}"]'); await page.wait_for_timeout(150)
-            ok(await page.locator('#sec-float .sec-mag').count() == 1 and await page.locator('#sec-float .sec-bub').count() == 0 and await fits('#sec-float .sec-mag'), f'{t}: just the magnet, above the dock / switch bar')
-            if t != 'home':
-                sn = await page.evaluate("() => { const m = document.querySelector('#sec-float .sec-mag').getBoundingClientRect(), s = document.querySelector('#view > .subnav'); return s ? m.bottom <= s.getBoundingClientRect().top + 1 : true; }")
-                ok(sn, f'{t}: the magnet sits above the switch bar')
+            ok(await page.locator('#sec-float .sec-mag').count() == 1 and await page.locator('#sec-float .sec-bub').count() == 0 and await fits('#sec-float .sec-mag'), f'{t}: just the magnet, on screen and not under the dock')
+            sn = await page.evaluate('''() => { const m = document.querySelector('#sec-float .sec-mag'), s = document.querySelector('#view > .subnav'); if (!s) return 'no bar';
+              const r = m.getBoundingClientRect(), sr = s.getBoundingClientRect(), f = s.firstElementChild.getBoundingClientRect();
+              return s.contains(m) && r.top >= sr.top - 0.5 && r.bottom <= sr.bottom + 0.5 && f.right <= r.left + 0.5 ? 'ok' : JSON.stringify([r.left, r.top, r.bottom, sr.top, sr.bottom, f.right]); }''')
+            ok(sn == 'ok', f'{t}: the magnet sits beside the switch bar, covering nothing ({sn})')
         await page.click('[data-tab="tactics"]'); await page.wait_for_timeout(200)
         ok(await page.locator('.card.alert .sec-line').count() == 1 and await page.locator('.card.alert [data-act="secAll"]').count() == 1, 'tactics: her line and the one-tap button in the warning')
         await page.evaluate('scrollTo(0,0)'); await shot('tactics')
@@ -123,6 +136,8 @@ async def main(vw, vh, board, full):
         # her sheet: one place, then all
         await page.click('#sec-float .sec-bub'); await page.wait_for_timeout(400)
         ok(await page.locator('#sheet .sec-row').count() == 3, 'her sheet: three places with a stand-in each')
+        cut = await page.evaluate("() => [...document.querySelectorAll('#sheet .sec-tx b, #sheet .sec-tx small')].filter(b => b.scrollWidth > b.clientWidth + 1).map(b => b.textContent)")
+        ok(not cut, f'her sheet: no name cut short {cut}')
         await shot('sheet-out')
         one = INFO['fix'][0]
         await page.click(f'#sheet [data-act="secOne"][data-id="{one["id"]}"]'); await page.wait_for_timeout(350)
@@ -160,7 +175,7 @@ async def main(vw, vh, board, full):
         await load(SAVES['back'])
         bub = await page.locator('#sec-float .sec-bub').inner_text() if await page.locator('#sec-float .sec-bub').count() else ''
         ok('戻しますか' in bub and '出場停止明け' in bub, f'home: {bub.splitlines()[0] if bub else "-"}')
-        ok(await fits('#sec-float [data-act="secBack"]'), 'the 戻す button is above the dock')
+        ok(await in_dock('#sec-float [data-act="secBack"]'), 'the 戻す button is in her band')
         await shot('home-back')
         st = await state(); c = st['clubs'][st['my']]; m = next(x for x in st['sec']['back'] if x['out'] == INFO['cb'])
         i = c['tac']['xi'].index(m['sub'])
