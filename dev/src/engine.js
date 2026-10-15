@@ -620,11 +620,11 @@ function migrate(S, DATA) {
     for (const p of Object.values(S.players)) if (!p.bp && p.nat === 'JPN') { if (!p.gen) { if (dp[p.id]) p.bp = dp[p.id]; } else p.bp = bpFor(p.id, p.yo && S.clubs[p.yo] ? S.clubs[p.yo].area : null); }
     linkEstimate(S);
   }
-  // v17 (2026-10-16): キャンプ. Before this season's camp starts it goes as in a new game (asked on 1/4, or the next day if
-  // that has passed); once the camp would have started, nobody has one this season (the AI clubs neither) — next winter.
+  // v17 (2026-10-16): キャンプ. The summer camp of 2026/27 was before the game began, so a save of that season has none
+  // (campPlan); from the next season on it goes as in a new game.
   if ((S.v || 1) < 17) {
     for (const c of Object.values(S.clubs)) if (c.fin && c.fin.camp == null) c.fin.camp = 0;
-    if (S.fixtures && S.fixtures.length) { const C = campPlan(S); if (!C.skip && S.date >= C.from) C.skip = true; S.camp = C; }
+    if (S.fixtures && S.fixtures.length) S.camp = campPlan(S);
   }
   S.v = Math.max(S.v || 1, 17);
   return S;
@@ -4383,39 +4383,46 @@ function euroOffer(S, p) {
   }
 }
 
-/* ---------- キャンプ (2026-10-16, 作業7, ユーザーの選んだ案A＝九州の地図ボード) ----------
-   In the winter break (2026/27: 第20節 12/19 → 第21節 2/13) every J1 club goes to a camp of CAMP.len (10) days that ends
-   CAMP.gap (11) days before its first league match after New Year (2026/27: 1/24〜2/2; the 天皇杯 final is 1/1, the
-   アジアカップ 1/2〜2/5, the winter transfer window 12/20〜2/26). On CAMP.ask (1/4) the secretary asks where (note 'camp',
-   she stops the days); if nothing is chosen by the first day she takes 宮崎 (CAMP.std). The cost is paid on the first day.
-   Every day of the camp a player of a J1 club who is there counts a day (not injured, not away with his national team —
-   one back from the アジアカップ joins the next day —, not on loan; a winter signing from the day he arrives); a minor
-   injury now and then (inj over the whole camp, 3〜14 days). At 沖縄 the injured come along: their rehab runs twice as fast.
+/* ---------- キャンプ (2026-10-16, 作業7, ユーザーの選んだ案A＝作戦ボードの地図、行き先はマグネット) ----------
+   With the autumn-spring season (2026/27〜) the clubs' camp moved to the summer before the August opening: in July 2026
+   the J1 clubs camped about 7/5〜7/26 for one to three weeks (横浜FM 宮崎 7/12〜25), most in 北海道 (8 J1 clubs), then
+   宮崎 (5) and 沖縄; nobody had announced a camp in the winter break (checked 2026-10-16, see HANDOFF). So every J1 club
+   goes to a camp of CAMP.len (14) days that ends CAMP.gap (13) days before its first league match of the season
+   (2027/28: 7/12〜7/25 for the 8/7 opening). The game starts on 2026-08-07, after that summer's camps: the first camp is
+   in the second season. CAMP.ask (21) days before it the secretary asks where (note 'camp', she stops the days); if
+   nothing is chosen by the first day she takes 北海道 (CAMP.std). The cost is paid on the first day. Every day of the camp
+   a player of a J1 club who is there counts a day (not injured, not away with his national team — he joins the day he is
+   back —, not on loan; a summer signing from the day he arrives); a minor injury now and then (inj over the whole camp,
+   3〜14 days). At 宮崎 the injured come along: their rehab runs twice as fast.
    At the end (campEnd) the effects are scaled by his days / CAMP.len: growth (wk weeks of devWeek at once, no ageing),
    連携 (pm practice matches for the XI: neighbours LINK.adj, the other pairs LINK.far, the curve of linkMatch), 調子
    (p.form += form). My club also gets a few できごと (a youngster's 伸びしろ +1, a new position's aptitude, two players
    click, a veteran and a youngster) and practice-match results, all in the report (S.camp.rep; the days stop with
-   {stop: 'camp'}). Every AI club does the standard camp (宮崎: cost, growth, 連携, 調子, injuries; no できごと), so the
-   league stays level and only my club chooses.
-   S.camp = { s: season, ask, from, to, st: null|'run'|'done', dest, auto, club, paid, dd {pid: days}, out {pid: why},
-   first {pid: date}, ev [], rep, show, skip } */
+   {stop: 'camp'}). Every AI club does the standard camp (北海道: cost, growth, 連携, 調子, injuries; no できごと), so the
+   league stays level and only my club chooses. (The first version, the same day, put it in the winter break 1/24〜2/2;
+   the user asked to match the real calendar.)
+   S.camp = { s: season, ask, from, to, re (the opening), st: null|'run'|'done', dest, auto, club, paid, dd {pid: days},
+   out {pid: why}, ev [], rep, show, skip } */
 const CAMP = {
-  ask: '01-04', len: 10, gap: 11, std: 'miya', inj: [3, 14],
-  keys: ['miya', 'oki', 'kago', 'abr', 'none'],
+  ask: 21, len: 14, gap: 13, std: 'hok', link: 'oki', inj: [3, 14],
+  keys: ['hok', 'miya', 'oki', 'abr', 'none'],
   d: {
-    miya: { jp: '宮崎', cost: 4000, wk: 3, pm: 3, form: 0.2, inj: 0.03, ev: [1, 2] },
-    oki: { jp: '沖縄', cost: 7000, wk: 3, pm: 3, form: 0.4, inj: 0.015, ev: [1, 2], rehab: 2 },
-    kago: { jp: '鹿児島', cost: 5000, wk: 3, pm: 5, form: 0.3, inj: 0.05, ev: [2, 3], pos: 2 },
+    hok: { jp: '北海道', cost: 5000, wk: 3, pm: 4, form: 0.3, inj: 0.02, ev: [1, 2] },
+    miya: { jp: '宮崎', cost: 4000, wk: 3, pm: 3, form: 0.2, inj: 0.03, ev: [1, 2], rehab: 2 },
+    oki: { jp: '沖縄', cost: 6000, wk: 3, pm: 5, form: 0.2, inj: 0.04, ev: [2, 3], pos: 2 },
     abr: { jp: '海外', sub: 'スペイン', cost: 18000, wk: 6, pm: 4, form: -0.2, inj: 0.06, ev: [2, 3], pot: 2 },
     none: { jp: '行かない', cost: 0, wk: 0, pm: 0, form: 0, inj: 0, ev: [0, 0] },
   },
 };
-// the dates of the season's camp: from the first league match after New Year
+// the dates of the season's camp: before its first league match. A season already under way (a new game starts on
+// 2026-08-07) has none.
 function campPlan(S) {
-  const y = S.season + 1, lg = S.fixtures.filter(f => !f.cup && f.date >= y + '-01-01').map(f => f.date).sort();
+  const lg = S.fixtures.filter(f => !f.cup && f.date >= S.season + '-07-01').map(f => f.date).sort();
   if (!lg.length) return { s: S.season, skip: true };
-  const to = D.add(lg[0], -CAMP.gap);
-  return { s: S.season, ask: `${y}-${CAMP.ask}`, from: D.add(to, -(CAMP.len - 1)), to, re: lg[0], st: null, dest: null };
+  const to = D.add(lg[0], -CAMP.gap), from = D.add(to, -(CAMP.len - 1));
+  const C = { s: S.season, ask: D.add(from, -CAMP.ask), from, to, re: lg[0], st: null, dest: null };
+  if (S.date >= from) C.skip = true;
+  return C;
 }
 function campOf(S) { if (!S.camp || S.camp.s !== S.season) S.camp = campPlan(S); return S.camp; }
 // still to choose (her question is open)
@@ -4442,15 +4449,16 @@ function campAbsent(S) {
   for (const p of myLoans(S)) out.push({ pid: p.id, why: 'loan', to: p.loan.to });
   return out;
 }
-// her suggestion: 沖縄 when a regular would heal in time only there, 鹿児島 while the XI's 連携 is low, 海外 for a rich club
-// with young regulars, 宮崎 otherwise
+// her suggestion: 宮崎 when a regular would heal in time only there (the rehab), 沖縄 while the XI's 連携 is low (the most
+// practice matches), 海外 for a rich club with young regulars, 北海道 otherwise
 function campRec(S) {
   const C = campOf(S), c = S.clubs[S.my]; if (C.skip || !C.from) return { k: CAMP.std };
-  const xi = c.tac.xi.filter(Boolean), lead = Math.max(0, D.diff(C.from, S.date)), left = D.diff(C.re, S.date), extra = CAMP.len * (CAMP.d.oki.rehab - 1);
-  const hurt = xi.map(id => S.players[id]).filter(p => p && !p.away && p.inj > lead && p.inj > left && p.inj - extra <= left);   // back for the restart only with the rehab
-  if (hurt.length) return { k: 'oki', why: 'rehab', pid: hurt[0].id };
+  const rk = CAMP.keys.find(k => CAMP.d[k].rehab);
+  const xi = c.tac.xi.filter(Boolean), lead = Math.max(0, D.diff(C.from, S.date)), left = D.diff(C.re, S.date), extra = CAMP.len * (CAMP.d[rk].rehab - 1);
+  const hurt = xi.map(id => S.players[id]).filter(p => p && !p.away && p.inj > lead && p.inj > left && p.inj - extra <= left);   // back for the opening only with the rehab
+  if (hurt.length) return { k: rk, why: 'rehab', pid: hurt[0].id };
   const L = linkEval(S, S.my, c.tac.form, c.tac.xi);
-  if (L.n && L.avg < 50) return { k: 'kago', why: 'link', v: Math.floor(L.avg) };
+  if (L.n && L.avg < 50) return { k: CAMP.link, why: 'link', v: Math.floor(L.avg) };
   const young = xi.filter(id => S.players[id] && age(S.players[id], S.date) <= 21).length;
   if (young >= 2 && c.funds >= 150000) return { k: 'abr', why: 'young', n: young };
   return { k: CAMP.std, why: 'std' };
@@ -4480,8 +4488,8 @@ function campStart(S) {
   C.paid = T.cost;
   for (const p of squad(S, S.my)) if (p.away || p.inj > 0) C.out[p.id] = p.away ? 'nt' : 'inj';
   if (S.sec) S.sec.notes = S.sec.notes.filter(n => n.k !== 'camp');
-  if (C.dest === 'none') news(S, '今年は冬のキャンプに行かず、クラブハウスで調整する。', 'info');
-  else news(S, `${T.jp}${T.sub ? `（${T.sub}）` : ''}キャンプがスタート（〜${jdate(C.to)}）。${C.auto ? '行き先が決まらなかったので、標準の宮崎に。' : ''}費用 ${money(T.cost)}。`, 'big');
+  if (C.dest === 'none') news(S, '今年は夏のキャンプに行かず、クラブハウスで調整する。', 'info');
+  else news(S, `${T.jp}${T.sub ? `（${T.sub}）` : ''}キャンプがスタート（〜${jdate(C.to)}）。${C.auto ? `行き先が決まらなかったので、標準の${CAMP.d[CAMP.std].jp}に。` : ''}費用 ${money(T.cost)}。`, 'big');
 }
 // one day of the camp for every J1 club: who is there, a knock now and then, 沖縄's rehab
 function campCount(S) {
@@ -4490,7 +4498,7 @@ function campCount(S) {
     const mine = cid === S.my && C.club === S.my, T = CAMP.d[mine ? C.dest : CAMP.std];
     if (mine && C.dest === 'none') continue;
     for (const p of squad(S, cid)) {
-      if (mine && T.rehab && p.inj > 0 && !p.away) {   // 沖縄: the injured come along and heal faster
+      if (mine && T.rehab && p.inj > 0 && !p.away) {   // 宮崎: the injured come along and heal faster
         p.inj = Math.max(0, p.inj - (T.rehab - 1)); C.reh = (C.reh || 0) + 1;
         if (p.inj === 0) news(S, `${p.name}が負傷から復帰（${T.jp}でリハビリ）。`, 'info');
         if (p.inj > 0) continue;
@@ -4562,7 +4570,7 @@ function campEnd(S) {
   delete C.dd; delete C.first;
 }
 // my club's できごと: a youngster shows himself (伸びしろ +1), a new position clicks (+15 aptitude), two players click
-// (+10 連携), a veteran takes a youngster under his wing (+8). 鹿児島 favours positions, 海外 the youngsters.
+// (+10 連携), a veteran takes a youngster under his wing (+8). 沖縄 favours positions, 海外 the youngsters.
 function campEvents(S, T, share) {
   const C = S.camp, c = S.clubs[S.my], out = [], used = new Set();
   const n = ri(T.ev[0], T.ev[1]); if (!n) return out;

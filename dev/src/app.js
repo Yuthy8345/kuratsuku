@@ -884,10 +884,10 @@ Object.assign(SEC_VIEW, {
 // キャンプ (2026-10-16): her question on 1/4 (it stops the days)
 Object.assign(SEC_VIEW, {
   camp: {
-    bubble: () => E.campPending(S) ? '冬のキャンプの行き先を決めましょう ›' : 'キャンプの行き先は決まっています ›',
-    title: () => '冬のキャンプ',
+    bubble: () => E.campPending(S) ? '夏のキャンプの行き先を決めましょう ›' : 'キャンプの行き先は決まっています ›',
+    title: () => '夏のキャンプ',
     body: () => { const C = E.campOf(S);
-      return E.campPending(S) ? `<p class="small" style="margin:0">${jdw(C.from)}〜${jdw(C.to)}の${E.CAMP.len}日間、冬のキャンプに行きます。行き先を決めてください。決めないままだと宮崎（標準）にします。</p><button class="btn primary block" data-act="campOpen" style="min-height:44px">行き先を選ぶ</button>` : '<p class="small" style="margin:0">キャンプの行き先は決まっています。</p>'; },
+      return E.campPending(S) ? `<p class="small" style="margin:0">${jdw(C.from)}〜${jdw(C.to)}の${E.CAMP.len}日間、開幕前の夏のキャンプに行きます。行き先を決めてください。決めないままだと${E.CAMP.d[E.CAMP.std].jp}（標準）にします。</p><button class="btn primary block" data-act="campOpen" style="min-height:44px">行き先を選ぶ</button>` : '<p class="small" style="margin:0">キャンプの行き先は決まっています。</p>'; },
     done: 'わかりました',
   },
 });
@@ -2400,27 +2400,31 @@ function sheetMatchTactics() {
     '<button class="btn primary block" data-act="closeSheet">試合に戻る</button>');
 }
 
-/* ---------- キャンプ (2026-10-16, 作業7, ユーザーの選んだ案A＝九州の地図ボード) ----------
-   Her question on 1/4 opens a sheet with a chalk map of 九州 and 沖縄 on the board: the destinations are magnets (海外 off
-   the map with a dotted flight line, 行かない is the club's own magnet), the chosen one gets a yellow chalk ring and its
-   card underneath (cost, 10 days, 成長・連携・調子・ケガ as dots and words, a line). Her suggestion and who can't come
-   follow. At the end, the camp report: the 10 days (practice matches, who joined, knocks), the XI's chalk lines after the
-   camp (yellow = past 70 at the camp), new combos and the nearest ones, who grew, what happened, the practice matches and
-   how the team comes back. Home: a card from 1/4 until the first match after the break. */
-const CP_COL = { miya: '#2E8B57', oki: '#1C8FB5', kago: '#C8402F', abr: '#D99A1E', none: '#7F868C' };
-const CP_CH = { miya: '宮', oki: '沖', kago: '鹿', abr: '海' };
+/* ---------- キャンプ (2026-10-16, 作業7, ユーザーの選んだ案A＝作戦ボードの地図) ----------
+   Three weeks before the summer camp (2027/28: 6/21 for 7/12〜25) her question opens a sheet with a chalk map on the
+   board, each region in its own dashed frame (北海道, 九州, 沖縄; scales differ): the destinations are magnets (海外 with a
+   dotted flight line off the board, 行かない is the club's own magnet), the chosen one gets a yellow chalk ring and its
+   card underneath (cost, 14 days, 成長・連携・調子・ケガ as dots and words, a line). Her suggestion and who can't come
+   follow. At the end, the camp report: the 14 days in two rows (practice matches, who joined, knocks), the XI's chalk
+   lines after the camp (yellow = past 70 at the camp), new combos and the nearest ones, who grew, what happened, the
+   practice matches and how the team goes into the opening. Home: a card from her question until the opening. */
+const CP_COL = { hok: '#2F6FB0', miya: '#2E8B57', oki: '#1C8FB5', abr: '#D99A1E', none: '#7F868C' };
+const CP_CH = { hok: '北', miya: '宮', oki: '沖', abr: '海' };
 const CP_TXT = {
-  miya: { tag: '標準', dots: [2, 2, 2, 1], injT: '少ない', line: '暖かくグラウンドも多い、定番のキャンプ地。どれもふつうに伸びる。ほかのクラブもここと同じだけのキャンプをします。' },
-  oki: { dots: [2, 2, 3, 0], injT: 'ほとんどない', line: 'いちばん暖かい。体を作り直せて調子が上がる。負傷中の選手も連れて行き、リハビリが2倍の速さで進む。' },
-  kago: { dots: [2, 3, 2, 2], injT: '少し多い', line: '練習試合の相手が多く、連携が深まる。新しいポジションを試す「できごと」も起きやすい。' },
-  abr: { dots: [3, 2, 0, 3], injT: '多い', line: '欧州のクラブと練習試合。若手がいちばん伸び、アピールする若手も出やすい。費用が大きく、長旅の疲れが再開まで残る。' },
+  hok: { tag: '標準', dots: [2, 2, 3, 0], injT: 'ほとんどない', line: '夏でも涼しく、練習の質を保てる。J1でいちばん多くのクラブが選ぶので練習試合の相手も多い。ほかのクラブもここと同じだけのキャンプをします。' },
+  miya: { dots: [2, 2, 2, 1], injT: '少ない', line: '施設が整っていて、費用がいちばん安い。負傷中の選手も連れて行き、リハビリが2倍の速さで進む。' },
+  oki: { dots: [2, 3, 2, 2], injT: '少し多い', line: '多くのクラブが集まり、練習試合がいちばん多い。暑さで調子の上がり方は控えめ。新しいポジションを試す「できごと」も起きやすい。' },
+  abr: { dots: [3, 2, 0, 3], injT: '多い', line: '欧州のクラブと練習試合。若手がいちばん伸び、アピールする若手も出やすい。費用が大きく、長旅の疲れが開幕まで残る。' },
   none: { dots: [0, 0, 0, 0], injT: 'なし', line: 'クラブハウスで調整。お金はかからないが、ほかのクラブより一歩遅れる。' },
 };
-// 九州 and 沖縄 in chalk (lon/lat → the 360×300 board; 沖縄 sits in an inset, larger than the scale of 九州)
+// 北海道, 九州 and 沖縄 in chalk, each in its own frame on the 360×300 board (lon/lat → the frame; the scales differ)
+const CP_HK = [[141.94, 45.52], [142.5, 45.0], [143.4, 44.35], [144.25, 44.0], [144.9, 44.15], [145.33, 44.34], [145.15, 43.95], [145.3, 43.6], [145.82, 43.38], [145.25, 43.15], [144.4, 42.98], [143.7, 42.62], [143.25, 41.93], [142.6, 42.25], [141.6, 42.62], [140.97, 42.32], [140.75, 42.55], [140.37, 42.5], [140.28, 42.25], [140.58, 42.1], [140.82, 42.0], [141.15, 41.82], [140.75, 41.75], [140.45, 41.6], [140.22, 41.42], [140.08, 41.8], [139.85, 42.15], [139.8, 42.5], [140.35, 43.3], [140.95, 43.2], [141.35, 43.2], [141.65, 43.85], [141.75, 44.45], [141.68, 45.0]];
 const CP_KY = [[130.96, 33.96], [131.03, 33.86], [131.17, 33.63], [131.43, 33.57], [131.66, 33.66], [131.74, 33.47], [131.6, 33.3], [131.86, 33.27], [131.86, 33.06], [132.06, 32.93], [131.88, 32.8], [131.72, 32.58], [131.63, 32.42], [131.5, 32.12], [131.47, 31.92], [131.4, 31.6], [131.33, 31.37], [131.06, 31.42], [130.95, 31.23], [130.8, 31.08], [130.66, 30.99], [130.7, 31.25], [130.78, 31.45], [130.75, 31.68], [130.57, 31.6], [130.55, 31.4], [130.65, 31.22], [130.52, 31.17], [130.3, 31.25], [130.18, 31.4], [130.28, 31.7], [130.2, 31.98], [130.38, 32.17], [130.55, 32.45], [130.62, 32.65], [130.55, 32.8], [130.5, 32.95], [130.42, 33.05], [130.3, 33.15], [130.2, 33.05], [130.25, 32.88], [130.37, 32.77], [130.3, 32.6], [130.15, 32.62], [130.1, 32.78], [130.0, 32.86], [129.85, 32.72], [129.8, 32.58], [129.73, 32.8], [129.65, 33.0], [129.7, 33.15], [129.6, 33.3], [129.88, 33.43], [130.18, 33.58], [130.38, 33.62], [130.5, 33.85], [130.75, 33.92]];
 const CP_OK = [[127.68, 26.08], [127.67, 26.21], [127.71, 26.44], [127.86, 26.52], [127.86, 26.68], [127.97, 26.62], [128.12, 26.75], [128.26, 26.87], [128.33, 26.75], [128.25, 26.62], [128.05, 26.5], [127.98, 26.32], [127.82, 26.17]];
-const cpKx = lon => 152 + (lon - 129.5) * 70, cpKy = lat => 22 + (34 - lat) * 82;
-const cpOx = lon => 73 + (lon - 127.97) * 101.5, cpOy = lat => 237 - (lat - 26.47) * 119;
+const cpHx = lon => 264 + (lon - 142.8) * 22.5, cpHy = lat => 80 - (lat - 43.47) * 30;     // 北海道: top right
+const cpKx = lon => 91 + (lon - 130.85) * 35.3, cpKy = lat => 214 - (lat - 32.49) * 42;     // 九州: bottom left
+const cpOx = lon => 227 + (lon - 128.0) * 103, cpOy = lat => 238 - (lat - 26.47) * 115;     // 沖縄: bottom middle
+const CP_FRAME = [['北海道', 180, 8, 172, 146], ['九州', 10, 150, 164, 142], ['沖縄', 184, 176, 88, 116]];
 // a closed Catmull-Rom curve through the points: drawn by hand rather than ruled
 function cpPath(pts, fx, fy) {
   const q = pts.map(([a, b]) => [fx(a), fy(b)]), n = q.length, f = v => v.toFixed(1);
@@ -2429,13 +2433,13 @@ function cpPath(pts, fx, fy) {
     d += ` C${f(p1[0] + (p2[0] - p0[0]) / 6)} ${f(p1[1] + (p2[1] - p0[1]) / 6)} ${f(p2[0] - (p3[0] - p1[0]) / 6)} ${f(p2[1] - (p3[1] - p1[1]) / 6)} ${f(p2[0])} ${f(p2[1])}`; }
   return d + ' Z';
 }
-const CP_POS = { miya: [cpKx(131.42), cpKy(31.91)], kago: [cpKx(130.56), cpKy(31.6)], oki: [cpOx(127.86), cpOy(26.45)], abr: [62, 42], none: [62, 130] };
+const CP_POS = { hok: [cpHx(142.75), cpHy(43.4)], miya: [cpKx(131.42), cpKy(31.91)], oki: [cpOx(127.98), cpOy(26.58)], abr: [66, 46], none: [320, 232] };
 let cpMapSvg = null;
 function cpMap() {
   if (!cpMapSvg) {
-    const [ax, ay] = CP_POS.abr, [kx, ky] = CP_POS.kago;
+    const [ax, ay] = CP_POS.abr;
     cpMapSvg = `<svg viewBox="0 0 360 300" class="cpA-svg" aria-hidden="true"><defs><filter id="cp-chalk"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" seed="4"/><feDisplacementMap in="SourceGraphic" scale="1.6"/></filter></defs>
-      <g filter="url(#cp-chalk)"><path class="cpA-land" d="${cpPath(CP_KY, cpKx, cpKy)}"/><path class="cpA-land" d="${cpPath(CP_OK, cpOx, cpOy)}"/><rect class="cpA-inset" x="12" y="178" width="124" height="114" rx="6"/><path class="cpA-air" d="M ${ax + 4} ${ay + 26} C 60 120, 110 150, ${kx - 30} ${ky - 6}"/></g></svg>`;
+      <g filter="url(#cp-chalk)">${CP_FRAME.map(([, x, y, w, h]) => `<rect class="cpA-inset" x="${x}" y="${y}" width="${w}" height="${h}" rx="6"/>`).join('')}<path class="cpA-land" d="${cpPath(CP_HK, cpHx, cpHy)}"/><path class="cpA-land" d="${cpPath(CP_KY, cpKx, cpKy)}"/><path class="cpA-land" d="${cpPath(CP_OK, cpOx, cpOy)}"/><path class="cpA-air" d="M ${ax - 22} ${ay - 6} C ${ax - 40} ${ay - 18}, ${ax - 52} ${ay - 30}, -4 ${ay - 40}"/></g></svg>`;
   }
   return cpMapSvg;
 }
@@ -2444,7 +2448,7 @@ const cpMoney = v => v ? E.money(v).replace(/円$/, '') : '0円';
 const cpDots = (n, warn) => `<span class="cp-dots${warn ? ' warn' : ''}" aria-hidden="true">${[1, 2, 3].map(i => `<i class="${i <= n ? 'on' : ''}"></i>`).join('')}</span>`;
 function cpMeters(k) {
   const T = E.CAMP.d[k], X = CP_TXT[k];
-  const fm = T.form ? `再開時 ${T.form > 0 ? '+' : '−'}${Math.abs(T.form)}` : '±0';
+  const fm = T.form ? `開幕時 ${T.form > 0 ? '+' : '−'}${Math.abs(T.form)}` : '±0';
   const rows = [['成長', T.wk ? `${T.wk}週間分` : 'なし'], ['連携', T.pm ? `練習試合${T.pm}試合分` : 'なし'], ['調子', fm], ['ケガ', X.injT]];
   return `<div class="cp-meters">${rows.map(([l, t], i) => `<div><span class="l">${l}</span>${cpDots(X.dots[i], i === 3 || (i === 2 && T.form < 0))}<small>${t}</small></div>`).join('')}</div>`;
 }
@@ -2454,15 +2458,16 @@ function cpRestart(C) { return S.fixtures.find(f => !f.cup && f.date === C.re &&
 const cpPeriod = C => `${jdw(C.from)}〜${jdw(C.to)}`;
 function cpRecLine(r) {
   const p = r.pid && S.players[r.pid];
-  if (r.why === 'rehab' && p) return `<b>おすすめは沖縄です。</b>${esc(p.short)}のリハビリが進み、再開に間に合います。`;
-  if (r.why === 'link') return `<b>おすすめは鹿児島です。</b>連携の平均がまだ${r.v}なので、練習試合で深めましょう。`;
-  if (r.why === 'young') return `<b>おすすめは海外です。</b>若い先発が${r.n}人いて、資金にも余裕があります。`;
-  return `<b>おすすめは宮崎です。</b>いつもどおりの準備で十分だと思います。`;
+  const jp = E.CAMP.d[r.k].jp;
+  if (r.why === 'rehab' && p) return `<b>おすすめは${jp}です。</b>${esc(p.short)}のリハビリが進み、開幕に間に合います。`;
+  if (r.why === 'link') return `<b>おすすめは${jp}です。</b>連携の平均がまだ${r.v}なので、練習試合で深めましょう。`;
+  if (r.why === 'young') return `<b>おすすめは${jp}です。</b>若い先発が${r.n}人いて、資金にも余裕があります。`;
+  return `<b>おすすめは${jp}です。</b>いつもどおりの準備で十分だと思います。`;
 }
 function cpAbsent(C) {
   const out = E.campAbsent(S); if (!out.length) return '';
   const row = x => { const p = S.players[x.pid]; if (!p) return '';
-    const t = x.why === 'nt' ? `${/^ac/.test(((S.nt || {}).cur || {}).k || '') ? 'アジアカップ' : '代表'}に参加中（${esc(E.natJp(x.cc))}代表）。戻ったら途中から合流` : x.why === 'inj' ? `負傷中（キャンプインの日にあと${x.left}日）。沖縄なら連れて行き、リハビリが2倍の速さに` : `${esc(S.clubs[x.to] ? S.clubs[x.to].short : 'J2')}へ期限付き移籍中`;
+    const t = x.why === 'nt' ? `${/^ac/.test(((S.nt || {}).cur || {}).k || '') ? 'アジアカップ' : '代表'}に参加中（${esc(E.natJp(x.cc))}代表）。戻ったら途中から合流` : x.why === 'inj' ? `負傷中（キャンプインの日にあと${x.left}日）。${E.CAMP.d[E.CAMP.keys.find(k => E.CAMP.d[k].rehab)].jp}なら連れて行き、リハビリが2倍の速さに` : `${esc(S.clubs[x.to] ? S.clubs[x.to].short : 'J2')}へ期限付き移籍中`;
     return `<div class="cp-abs">${SEC_MAG(p, x.why === 'inj')}<span><b>${esc(p.name)}</b><small>${t}</small></span></div>`; };
   return `<section class="sec-sec"><h4>キャンプに来られない選手</h4>${out.map(row).join('')}</section>`;
 }
@@ -2475,21 +2480,21 @@ function sheetCamp() {
   const k = UI.cmp.k, T = E.CAMP.d[k], c = S.clubs[S.my], f = cpRestart(C), opp = f && S.clubs[f.h === S.my ? f.a : f.h];
   const decided = C.dest && !C.auto;
   const tok = x => { const [px, py] = CP_POS[x], X = E.CAMP.d[x], on = x === k;
-    return `<button class="cpA-tok${on ? ' on' : ''}${x === 'oki' ? ' r' : ''}" style="${cpPct(px, py)}" data-act="campSel" data-k="${x}" aria-pressed="${on}" aria-label="${X.jp}${X.cost ? '・' + E.money(X.cost) : ''}">${cpMag(x)}<span class="cpA-lbl"><b>${X.jp}${X.sub ? `<small>（${X.sub}）</small>` : ''}</b><small>${X.cost ? cpMoney(X.cost) : 'クラブで調整'}</small></span></button>`; };
+    return `<button class="cpA-tok${on ? ' on' : ''}" style="${cpPct(px, py)}" data-act="campSel" data-k="${x}" aria-pressed="${on}" aria-label="${X.jp}${X.cost ? '・' + E.money(X.cost) : ''}">${cpMag(x)}<span class="cpA-lbl"><b>${X.jp}${X.sub ? `<small>（${X.sub}）</small>` : ''}</b><small>${X.cost ? cpMoney(X.cost) : 'クラブで調整'}</small></span></button>`; };
   const [kx, ky] = CP_POS[k];
-  const ring = k === 'none' || k === 'abr' || k === 'oki' ? '' : `<svg class="cpA-ringw" viewBox="0 0 360 300" aria-hidden="true"><path class="cpA-ring" d="M ${kx - 30} ${ky - 2} C ${kx - 30} ${ky - 30}, ${kx + 30} ${ky - 30}, ${kx + 30} ${ky - 2} S ${kx - 20} ${ky + 30}, ${kx - 32} ${ky - 8}" filter="url(#cp-chalk)"/></svg>`;
-  const map = `<div class="cpA-map">${cpMap()}${ring}<span class="cpA-note" style="${cpPct(146, 280)}">沖縄（縮尺は別）</span><span class="cpA-note" style="${cpPct(170, 14)}">九州</span><span class="cpA-note faint" style="${cpPct(300, 128)}">日向灘</span>${E.CAMP.keys.map(tok).join('')}</div>`;
+  const ring = k === 'none' ? '' : `<svg class="cpA-ringw" viewBox="0 0 360 300" aria-hidden="true"><path class="cpA-ring" d="M ${kx - 30} ${ky - 2} C ${kx - 30} ${ky - 30}, ${kx + 30} ${ky - 30}, ${kx + 30} ${ky - 2} S ${kx - 20} ${ky + 30}, ${kx - 32} ${ky - 8}" filter="url(#cp-chalk)"/></svg>`;
+  const map = `<div class="cpA-map">${cpMap()}${ring}${CP_FRAME.map(([t, x, y]) => `<span class="cpA-note" style="${cpPct(x + 6, y + 3)}">${t}</span>`).join('')}<span class="cpA-note faint" style="${cpPct(16, 122)}">縮尺はそれぞれ別</span>${E.CAMP.keys.map(tok).join('')}</div>`;
   const card = `<section class="card cpA-pick"><div class="cpA-ph">${cpMag(k, 'sm')}<div style="flex:1;min-width:0"><b class="nm">${k === 'none' ? '今年は行かない' : `${T.jp}キャンプ`}${CP_TXT[k].tag ? `<span class="chip acc">${CP_TXT[k].tag}</span>` : ''}</b><small>${k === 'none' ? `${cpPeriod(C)}はクラブで調整` : `${cpPeriod(C)}・${E.CAMP.len}日間`}</small></div><b class="cost">${T.cost ? E.money(T.cost) : '0円'}</b></div>
     ${cpMeters(k)}<p class="small" style="margin:0">${CP_TXT[k].line}</p></section>`;
-  const intro = decided ? `<p class="small" style="margin:0">冬のキャンプは<b>${E.CAMP.d[C.dest].jp}</b>${C.dest === 'none' ? '（行かない）' : ''}に決まっています。${jd(C.from)}のキャンプインまでなら変えられます。</p>`
-    : `<p class="small" style="margin:0">冬のキャンプの行き先を決めましょう。<b>${cpPeriod(C)}の${E.CAMP.len}日間</b>で、${f && opp ? `第${f.r}節（${jd(f.date)} ${esc(opp.short)}戦）` : '再開'}の${D_GAP(C)}日前に戻ります。</p>`;
+  const intro = decided ? `<p class="small" style="margin:0">夏のキャンプは<b>${E.CAMP.d[C.dest].jp}</b>${C.dest === 'none' ? '（行かない）' : ''}に決まっています。${jd(C.from)}のキャンプインまでなら変えられます。</p>`
+    : `<p class="small" style="margin:0">開幕前の夏のキャンプの行き先を決めましょう。<b>${cpPeriod(C)}の${E.CAMP.len}日間</b>で、開幕（${f && opp ? `${jd(f.date)} ${esc(opp.short)}戦` : jd(C.re)}）の${D_GAP(C)}日前に戻ります。</p>`;
   const short = T.cost > c.funds;
   const foot = (k === C.dest && decided ? `<button class="btn primary block" style="min-height:54px;font-size:16px" disabled>${k === 'none' ? '行かないことに決まっています' : `${T.jp}に決まっています`}</button>`
       : `<button class="btn primary block" style="min-height:54px;font-size:16px" data-act="campPick" data-k="${k}" ${short ? 'disabled' : ''}>${short ? `資金が足りません（あと${E.money(T.cost - c.funds)}）` : k === 'none' ? '今年は行かない' : `${T.jp}に${decided ? '変更する' : '決める'}（${E.money(T.cost)}）`}</button>`)
     + `<button class="btn ghost block" data-act="closeSheet">${decided ? '閉じる' : 'あとで決める'}</button>`;
   openSheet(`<div class="sec-head">${akiMag('md')}<div style="min-width:0;flex:1"><div class="eyebrow">${E.SEC.role}からの連絡</div><b class="sec-name">${esc(secWho())}</b></div></div>
     ${intro}${map}${card}<div class="cp-rec">${akiMag('sm')}<p>${cpRecLine(rec)}</p></div>${cpAbsent(C)}
-    <p class="fine" style="margin:0">決めないまま${jd(C.from)}になると、宮崎（標準）にします。費用はキャンプインの日に払います。ほかのクラブも宮崎と同じだけのキャンプをします。</p>`, foot);
+    <p class="fine" style="margin:0">決めないまま${jd(C.from)}になると、${E.CAMP.d[E.CAMP.std].jp}（標準）にします。費用はキャンプインの日に払います。ほかのクラブも${E.CAMP.d[E.CAMP.std].jp}と同じだけのキャンプをします。</p>`, foot);
   render();
 }
 const D_GAP = C => E.D.diff(C.re, C.to);
@@ -2548,16 +2553,16 @@ function sheetCampRep() {
     return `<div class="r"><small>${jd(m.d)}</small><span>${m.cid && S.clubs[m.cid] ? esc(S.clubs[m.cid].short) : '大学選抜'}</span><b>${m.gf}-${m.ga}</b><i class="${res[0]}">${res[1]}</i></div>`; }).join('');
   const f = S.fixtures.find(x => !x.cup && x.date === r.re && (x.h === S.my || x.a === S.my)), opp = f && S.clubs[f.h === S.my ? f.a : f.h];
   const left = E.D.diff(r.re, S.date);
-  const back = r.fm > 0 ? `調子が上がって戻ってきました（再開から数試合 <b>調子 +${r.fm}</b>）。` : r.fm < 0 ? `長旅の疲れが少し残っています（再開から数試合 <b>調子 −${-r.fm}</b>）。` : '';
+  const back = r.fm > 0 ? `調子が上がって戻ってきました（開幕から数試合 <b>調子 +${r.fm}</b>）。` : r.fm < 0 ? `長旅の疲れが少し残っています（開幕から数試合 <b>調子 −${-r.fm}</b>）。` : '';
   const none = r.none.length ? `<p class="fine" style="margin:0">参加できなかった選手: ${r.none.map(x => S.players[x.pid] ? esc(S.players[x.pid].short) : '').filter(Boolean).join('・')}</p>` : '';
-  openSheet(`<div class="cpA-rh"><div class="eyebrow">キャンプ・レポート</div><h2>${T.jp}キャンプ${T.sub ? `<small>（${T.sub}）</small>` : ''}</h2><div class="small muted">${jdw(r.from)}〜${jdw(r.to)}・${E.CAMP.len}日間・参加${r.n}人・費用${E.money(r.cost)}</div>${r.auto ? `<p class="fine" style="margin:4px 0 0">行き先が決まらなかったので、標準の宮崎に行きました。</p>` : ''}</div>
+  openSheet(`<div class="cpA-rh"><div class="eyebrow">キャンプ・レポート</div><h2>${T.jp}キャンプ${T.sub ? `<small>（${T.sub}）</small>` : ''}</h2><div class="small muted">${jdw(r.from)}〜${jdw(r.to)}・${E.CAMP.len}日間・参加${r.n}人・費用${E.money(r.cost)}</div>${r.auto ? `<p class="fine" style="margin:4px 0 0">行き先が決まらなかったので、標準の${E.CAMP.d[E.CAMP.std].jp}に行きました。</p>` : ''}</div>
     ${cal}
     <section class="card cpA-sec"><div class="lk-head"><span class="eyebrow">連携</span><span class="lk-sum">平均 ${Math.floor(r.avg0)} → <b>${Math.floor(r.avg1)}</b><span class="lk-plus">+${Math.max(0, Math.floor(r.avg1) - Math.floor(r.avg0))}</span></span></div>
       ${board}<p class="fine" style="margin:0">${up ? `黄色の線は、キャンプで70を超えた組（${up}組）。` : ''}先発の組に練習試合${T.pm}試合分。</p>${plates}${near}</section>
     <section class="card cpA-sec"><div class="lk-head"><span class="eyebrow">伸びた選手</span><span class="lk-sum">チーム全体で <b>+${r.gsum.toFixed(1)}</b></span></div><div class="cp-grow">${growRows}</div></section>
     ${ev ? `<section class="card cpA-sec"><div class="eyebrow">できごと</div><div class="cp-ev">${ev}</div></section>` : ''}
     ${pm ? `<section class="card cpA-sec"><div class="lk-head"><span class="eyebrow">練習試合</span><span class="lk-sum">${w}勝${dr}分${l}敗</span></div><div class="cp-pmt">${pm}</div></section>` : ''}
-    <section class="card cpA-sec cpA-go"><div class="eyebrow">再開に向けて</div><p class="small" style="margin:0">${back}${f && opp ? `第${f.r}節は ${jdw(f.date)} ${esc(opp.short)}戦${left > 0 ? `、あと${left}日です` : ''}。` : ''}</p>${none}</section>`,
+    <section class="card cpA-sec cpA-go"><div class="eyebrow">開幕に向けて</div><p class="small" style="margin:0">${back}${f && opp ? `開幕は ${jdw(f.date)} ${esc(opp.short)}戦${left > 0 ? `、あと${left}日です` : ''}。` : ''}</p>${none}</section>`,
     '<button class="btn primary block" style="min-height:54px;font-size:16px" data-act="campRepDone">わかりました</button>');
   const b = sheetEl.querySelector('.sheet-body'); if (b) b.scrollTop = 0;
 }
@@ -2568,13 +2573,13 @@ function campCard() {
   if (C.club && C.club !== S.my) return '';
   const T = C.dest && E.CAMP.d[C.dest];
   if (!C.st) {
-    if (!C.dest) return `<section class="card cp-home"><div class="cp-hh"><span class="cpA-mag sm" style="--dc:#5F6B66">？</span><div style="flex:1;min-width:0"><div class="eyebrow">冬のキャンプ</div><b>行き先がまだ決まっていません</b><div class="small muted">${cpPeriod(C)}。決めないと宮崎（標準）になります</div></div></div><button class="btn primary block" data-act="campOpen">行き先を選ぶ</button></section>`;
-    return `<section class="card cp-home"><div class="cp-hh">${cpMag(C.dest, 'sm')}<div style="flex:1;min-width:0"><div class="eyebrow">冬のキャンプ</div><b>${C.dest === 'none' ? '今年は行かない' : `${T.jp}キャンプ`}</b><div class="small muted">${cpPeriod(C)}${T.cost ? `・${E.money(T.cost)}` : ''}</div></div><button class="btn ghost" data-act="campOpen" style="min-height:40px">変更</button></div></section>`;
+    if (!C.dest) return `<section class="card cp-home"><div class="cp-hh"><span class="cpA-mag sm" style="--dc:#5F6B66">？</span><div style="flex:1;min-width:0"><div class="eyebrow">夏のキャンプ</div><b>行き先がまだ決まっていません</b><div class="small muted">${cpPeriod(C)}。決めないと${E.CAMP.d[E.CAMP.std].jp}（標準）になります</div></div></div><button class="btn primary block" data-act="campOpen">行き先を選ぶ</button></section>`;
+    return `<section class="card cp-home"><div class="cp-hh">${cpMag(C.dest, 'sm')}<div style="flex:1;min-width:0"><div class="eyebrow">夏のキャンプ</div><b>${C.dest === 'none' ? '今年は行かない' : `${T.jp}キャンプ`}</b><div class="small muted">${cpPeriod(C)}${T.cost ? `・${E.money(T.cost)}` : ''}</div></div><button class="btn ghost" data-act="campOpen" style="min-height:40px">変更</button></div></section>`;
   }
   if (C.st === 'run') { const n = E.D.diff(S.date, C.from) + 1;
-    return `<section class="card cp-home"><div class="cp-hh">${cpMag(C.dest, 'sm')}<div style="flex:1;min-width:0"><div class="eyebrow">冬のキャンプ</div><b>${C.dest === 'none' ? 'クラブで調整中' : `${T.jp}キャンプ中`}</b><div class="small muted">${n}日目／${E.CAMP.len}日・${jd(C.to)}まで</div></div></div><div class="cp-prog"><i style="width:${n / E.CAMP.len * 100}%"></i></div></section>`; }
+    return `<section class="card cp-home"><div class="cp-hh">${cpMag(C.dest, 'sm')}<div style="flex:1;min-width:0"><div class="eyebrow">夏のキャンプ</div><b>${C.dest === 'none' ? 'クラブで調整中' : `${T.jp}キャンプ中`}</b><div class="small muted">${n}日目／${E.CAMP.len}日・${jd(C.to)}まで</div></div></div><div class="cp-prog"><i style="width:${n / E.CAMP.len * 100}%"></i></div></section>`; }
   if (!C.rep || C.rep.k === 'none') return '';
-  return `<section class="card cp-home"><div class="cp-hh">${cpMag(C.rep.k, 'sm')}<div style="flex:1;min-width:0"><div class="eyebrow">冬のキャンプ</div><b>${E.CAMP.d[C.rep.k].jp}キャンプ 終了</b><div class="small muted">チーム全体で +${C.rep.gsum.toFixed(1)}・連携の平均 ${Math.floor(C.rep.avg0)} → ${Math.floor(C.rep.avg1)}</div></div></div><button class="btn ghost block" data-act="campRep">キャンプ・レポートを見る</button></section>`;
+  return `<section class="card cp-home"><div class="cp-hh">${cpMag(C.rep.k, 'sm')}<div style="flex:1;min-width:0"><div class="eyebrow">夏のキャンプ</div><b>${E.CAMP.d[C.rep.k].jp}キャンプ 終了</b><div class="small muted">チーム全体で +${C.rep.gsum.toFixed(1)}・連携の平均 ${Math.floor(C.rep.avg0)} → ${Math.floor(C.rep.avg1)}</div></div></div><button class="btn ghost block" data-act="campRep">キャンプ・レポートを見る</button></section>`;
 }
 
 /* ---------- actions ---------- */

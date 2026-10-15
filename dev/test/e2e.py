@@ -60,6 +60,8 @@ async def main():
                 elif await has('#sheet [data-act="campPick"]:not([disabled])'):   # キャンプ (2026-10-16): her pick
                     if stats['camp'] == 0: await page.screenshot(path=str(OUT / 'camp.png'))
                     await click('#sheet [data-act="campPick"]', 250); stats['camp'] += 1
+                elif await has('#sheet [data-act="campOpen"]'):   # her note read first (her sheet): open the map sheet from it
+                    await click('#sheet [data-act="campOpen"]', 250)
                 elif await has('#sheet [data-act="campRepDone"]'):   # the camp report
                     if stats['campRep'] == 0: await page.screenshot(path=str(OUT / 'camp-report.png'))
                     await click('#sheet [data-act="campRepDone"]', 250); stats['campRep'] += 1
