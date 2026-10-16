@@ -82,6 +82,17 @@ async def main():
         await page.goto('file://' + str(ROOT/'test/page.html')); await page.wait_for_timeout(400)
         await page.click('[data-act="continue"]'); await page.wait_for_timeout(900)
         again = await page.locator('#sheet.on .reborn').count(); print('after reload:', again); bad += [] if not again else ['came back']
+        # on the bench: 転生 sits top-left and the condition bar still shows (2026-10-17: it used to take the bar's place)
+        await edit(f'const c = st.clubs[st.my]; c.tac.xi = c.tac.xi.map(x => x === {pid} ? 0 : x); c.tac.bench = [{pid}].concat(c.tac.bench.filter(x => x !== {pid})).slice(0, 9); st.players[{pid}].cond = 62;')
+        await page.click('[data-act="continue"]'); await page.wait_for_timeout(900)
+        for _ in range(3):
+            if await page.locator('#sheet.on [data-act="closeSheet"]').count(): await page.click('#sheet.on [data-act="closeSheet"]'); await page.wait_for_timeout(300)
+        await page.click('[data-tab="tactics"]'); await page.wait_for_timeout(300)
+        tile = page.locator(f'.btile[data-id="{pid}"]'); await tile.scroll_into_view_if_needed()
+        geo = await tile.evaluate('''t => { const b = t.querySelector('.bt-rb'); if (!b) return null; const r = b.getBoundingClientRect(), tr = t.getBoundingClientRect();
+          return { left: r.left - tr.left, top: r.top - tr.top, bar: !!t.querySelector('.bar'), chip: !!t.querySelector('.bt-st .rbchip') }; }''')
+        print('bench tile:', geo); bad += [] if geo and geo['left'] < 12 and geo['top'] < 12 and geo['bar'] and not geo['chip'] else ['bench badge']
+        await page.screenshot(path=str(OUT/'rb-6-bench.png'))
         # the same pop-up on the whiteboard look (pending again)
         await page.evaluate("localStorage.setItem('kuratsuku.board','white')")
         await edit(f'st.reborn.show = {pid};')

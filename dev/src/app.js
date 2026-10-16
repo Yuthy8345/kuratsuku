@@ -1542,9 +1542,9 @@ function sheetPlan() {
 // condition; × = can't play (injury / suspension), ! = tired
 function benchTile(p, c) {
   const out = !avail(p), tired = !out && p.cond < 70;
-  const st = out ? `<span class="chip warn">${p.inj > 0 ? `負傷 ${p.inj}日` : '出場停止'}</span>` : p.hot ? '<span class="chip fire">燃えている</span>' : p.reborn ? '<span class="chip rbchip">転生</span>' : '';
+  const st = out ? `<span class="chip warn">${p.inj > 0 ? `負傷 ${p.inj}日` : '出場停止'}</span>` : p.hot ? '<span class="chip fire">燃えている</span>' : '';
   return `<button class="btile${out ? ' out' : ''}${p.hot ? ' hot' : ''}" role="listitem" data-act="benchPick" data-id="${p.id}" aria-label="ベンチ ${esc(p.name)} ${dpOf(p)} 能力${E.ovr(p)}${out ? ' ' + outShort(p) : ''}">
-    <span class="bt-ovr ${oc(p.ovr)}">${E.ovr(p)}</span>
+    <span class="bt-ovr ${oc(p.ovr)}">${E.ovr(p)}</span>${p.reborn ? '<span class="bt-rb">転生</span>' : ''}
     <span class="bt-mag uni-b${tired ? ' warn' : ''}">${uniSvg(out ? OUT_KIT : uniOf(c.id), { num: p.num })}</span>
     <b class="bt-name">${esc(p.name)}</b>
     <span class="bt-meta">${posTag(p)}${E.age(p, S.date)}歳</span>
