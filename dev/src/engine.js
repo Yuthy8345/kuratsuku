@@ -1776,27 +1776,53 @@ function teamRating(S, side) {
 // faster; it grows more slowly the higher it is. A match of the club they weren't in together takes a little off, and
 // leaving the club wipes it (moveP, rollover). Every club (the AI's too) builds it the same way.
 // adj/far: per 90 minutes together, top: the curve (v += rate × (1 − v/top), at least floor), decay: per club match apart,
-// dist: neighbours on the design board (y × 1.326 = the board's 4:5.1), max: what an average of 100 adds to attack,
+// dist: neighbours on the design board (y × 1.326 = the board's 4:5.1), flank: a full-back and the wide player in front of him,
+// supply: a midfielder with no one in front to pass to and the nearest forward (linkAdj), max: what an average of 100 adds to attack,
 // midfield and defence, combos: how many count at once, est: old saves (minutes together ≈ the smaller share × est)
-const LINK = { adj: 5, far: 2, top: 110, floor: 0.12, decay: 0.8, dist: 43, max: 1, combos: 3, est: 0.85 };
+const LINK = { adj: 5, far: 2, top: 110, floor: 0.12, decay: 0.8, dist: 43, flank: 70, supply: 56, max: 1, combos: 3, est: 0.85 };
 const _lkAdj = {};
 function linkAdj(form) {
   if (_lkAdj[form]) return _lkAdj[form];
   const F = FORMATIONS[form] || FORMATIONS['4-4-2'], out = [];
   const d = (a, b) => Math.hypot(a[1] - b[1], (a[2] - b[2]) * 1.326);
+  const has = (i, j) => out.some(e => (e[0] === i && e[1] === j) || (e[0] === j && e[1] === i));
+  const add = (i, j) => { if (i !== j && !has(i, j)) out.push(i < j ? [i, j] : [j, i]); };
+  const nbr = i => out.filter(e => e[0] === i || e[1] === i).map(e => e[0] === i ? e[1] : e[0]);
+  // the nearest of ks to slot i, and any other of them as near (within 0.5: a tie on the other side, so both sides get it)
+  const nearest = (i, ks) => { const s = ks.slice().sort((a, b) => d(F[i], F[a]) - d(F[i], F[b])); return s.filter(k => d(F[i], F[k]) <= d(F[i], F[s[0]]) + 0.5); };
   for (let i = 0; i < F.length; i++) for (let j = i + 1; j < F.length; j++) if (d(F[i], F[j]) <= LINK.dist) out.push([i, j]);
-  // the flank: a full-back and the nearest wide player in front of him on his side (4-2-3-1's LSB and LSH), if not too far
-  const wide = s => s[1] <= 30 || s[1] >= 70, same = (a, b) => (a[1] < 50) === (b[1] < 50);
+  // the flank: a full-back and the nearest wide player in front of him on his side (4-2-3-1's LSB and LSH, 4-3-3's LSB and
+  // LWG), if not too far
+  // (on the touchline: x ≤ 20 or ≥ 80, so 4-3-3's CMF at 28 isn't taken for the winger)
+  const wide = s => s[1] <= 20 || s[1] >= 80, same = (a, b) => (a[1] < 50) === (b[1] < 50);
   F.forEach((s, i) => {
     if (!BACKS.has(s[0])) return;
-    const j = F.map((t, k) => k).filter(k => k !== i && wide(F[k]) && same(s, F[k]) && F[k][2] > s[2] && F[k][0] !== 'CB').sort((a, b) => d(s, F[a]) - d(s, F[b]))[0];
-    if (j != null && d(s, F[j]) <= 60 && !out.some(e => (e[0] === i && e[1] === j) || (e[0] === j && e[1] === i))) out.push(i < j ? [i, j] : [j, i]);
+    const ks = F.map((t, k) => k).filter(k => k !== i && wide(F[k]) && same(s, F[k]) && F[k][2] > s[2] && F[k][0] !== 'CB');
+    if (ks.length) for (const j of nearest(i, ks)) if (d(s, F[j]) <= LINK.flank) add(i, j);
   });
-  // nobody is alone: a slot with fewer than two neighbours gets its nearest ones (5-4-1's lone striker, a wide wing-back)
-  const deg = i => out.filter(e => e[0] === i || e[1] === i).length;
+  // 2026-10-17 (the user: 「右SHと右SBが繋がっていない。ほかのフォーメーションも」): what the distance alone missed
+  // the midfield line: two central midfielders side by side with nobody between them (4-3-3's two CMF)
+  const mid = new Set(['CM', 'DM']);
+  F.forEach((s, i) => F.forEach((t, j) => {
+    if (j <= i || !mid.has(s[0]) || !mid.has(t[0]) || Math.abs(s[2] - t[2]) > 3) return;
+    const lo = Math.min(s[1], t[1]), hi = Math.max(s[1], t[1]);
+    if (!F.some((u, k) => k !== i && k !== j && Math.abs(u[2] - s[2]) <= 3 && u[1] > lo && u[1] < hi)) add(i, j);
+  }));
+  // a supply line: a central or wide midfielder with no one in front to pass to (a forward or an attacking midfielder) gets
+  // the nearest forward (3-4-3's CMF and wingers, 4-1-4-1's and 5-4-1's SH and the lone striker)
+  const front = k => ROLE[F[k][0]].cat === 'FW' || ['AM', 'LAM', 'RAM'].includes(F[k][0]);
+  const fws = F.map((s, k) => k).filter(k => ROLE[F[k][0]].cat === 'FW');
+  F.forEach((s, i) => {
+    if (!['CM', 'LM', 'RM'].includes(s[0]) || !fws.length || nbr(i).some(front)) return;
+    for (const j of nearest(i, fws)) if (d(s, F[j]) <= LINK.supply) add(i, j);
+  });
+  // nobody is alone: a slot with fewer than two neighbours gets its nearest ones, both of two that are as near (4-4-1-1's
+  // striker gets both CMF, not just the left one)
   for (let i = 0; i < F.length; i++) {
-    const near = F.map((s, j) => j).filter(j => j !== i && !out.some(e => (e[0] === i && e[1] === j) || (e[0] === j && e[1] === i))).sort((a, b) => d(F[i], F[a]) - d(F[i], F[b]));
-    while (deg(i) < 2 && near.length) { const j = near.shift(); out.push(i < j ? [i, j] : [j, i]); }
+    while (nbr(i).length < 2) {
+      const rest = F.map((s, j) => j).filter(j => j !== i && !has(i, j)); if (!rest.length) break;
+      for (const j of nearest(i, rest)) add(i, j);
+    }
   }
   return (_lkAdj[form] = out);
 }

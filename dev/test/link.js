@@ -36,6 +36,22 @@ const key = (a, b) => (a < b ? a + '-' + b : b + '-' + a);
   const A = E.linkAdj('4-4-2'), has = (i, j) => A.some(e => e[0] === i && e[1] === j);
   ok(has(0, 2) && has(0, 3) && has(2, 3) && has(1, 5) && has(9, 10) && !has(1, 4) && !has(0, 9), '4-4-2: GK–CB, CB–CB, LB–LM, ST–SS are neighbours; LB–RB and GK–ST are not');
   const A5 = E.linkAdj('5-4-1'); ok(A5.filter(e => e[0] === 10 || e[1] === 10).length >= 2, '5-4-1: the lone striker has neighbours too');
+  // 2026-10-17 (the user: 「右SHと右SBが繋がっていない。ほかのフォーメーションも」): left and right alike, and what the
+  // distance alone missed
+  const F = E.FORMATIONS, link = (f, a, b) => { const i = F[f].findIndex(s => s[0] === a[0] && s[1] === a[1]), j = F[f].findIndex(s => s[0] === b[0] && s[1] === b[1]); return E.linkAdj(f).some(e => (e[0] === i && e[1] === j) || (e[0] === j && e[1] === i)); };
+  const asym = [];
+  for (const f of Object.keys(F)) {
+    const S = F[f], mir = i => S.findIndex(s => Math.abs(s[1] - (100 - S[i][1])) < 1.5 && Math.abs(s[2] - S[i][2]) < 1.5);
+    const set = new Set(E.linkAdj(f).map(e => e.join('-')));
+    for (const [i, j] of E.linkAdj(f)) { const a = mir(i), b = mir(j); if (a < 0 || b < 0 || !set.has(Math.min(a, b) + '-' + Math.max(a, b))) asym.push(`${f} ${S[i][0]}${i}-${S[j][0]}${j}`); }
+  }
+  ok(!asym.length, `every formation: the same lines on the left and the right ${asym.join(', ')}`);
+  ok(link('4-1-4-1', ['LB', 13], ['LM', 13]) && link('4-1-4-1', ['RB', 87], ['RM', 87]), '4-1-4-1: LSB–LSH and RSB–RSH (the user\'s screenshot)');
+  ok(link('4-1-4-1', ['LM', 13], ['ST', 50]) && link('4-1-4-1', ['RM', 87], ['ST', 50]) && link('5-4-1', ['LM', 14], ['ST', 50]) && link('5-4-1', ['RM', 86], ['ST', 50]), '4-1-4-1 and 5-4-1: both SH and the lone striker');
+  ok(link('4-3-3', ['LB', 13], ['LW', 15]) && link('4-3-3', ['RB', 87], ['RW', 85]) && link('4-3-3', ['CM', 28], ['CM', 72]), '4-3-3: SB–WG on both flanks, the two CMF');
+  ok(link('3-4-3', ['CM', 37], ['LW', 17]) && link('3-4-3', ['CM', 63], ['RW', 83]), '3-4-3: each CMF and the winger in front of him');
+  ok(link('4-4-1-1', ['CM', 37], ['ST', 50]) && link('4-4-1-1', ['CM', 63], ['ST', 50]), '4-4-1-1: the striker and both CMF (it was the left one only)');
+  ok(!link('4-2-3-1', ['LB', 13], ['RB', 87]) && !link('4-3-3', ['LB', 13], ['CM', 72]) && !link('4-1-4-1', ['GK', 50], ['ST', 50]), 'and not across the pitch (LB–RB, LB–the far CMF, GK–ST)');
 }
 
 /* growth: a match made by hand (linkMatch reads M.h / M.a, M.pm and M.min) */

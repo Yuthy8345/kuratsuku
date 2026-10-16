@@ -1433,12 +1433,22 @@ function formSelect(c) {
 /* ---------- 連携とコンボ (2026-10-15, the user's 案A: chalk lines on the board, the card under it) ---------- */
 // the board's lines: thickness = how well the two know each other (〜39 dotted, 40〜, 70〜, 90〜), yellow = in a combo.
 // The board is 4:5.1, so a 100 × 127.5 viewBox keeps the slots' % positions (top = 88 − (y − 7) × 1.04) undistorted.
+// a chalk line between slots i and j of formation F (the 100 × 127.5 board). One that would be exactly upright or level
+// is tilted by 0.05 (a fifth of a pixel): iPhone's Safari drew no dotted line (〜39) whose box has no width or height —
+// 4-1-4-1's RSH and RSB stood linked with nothing between them (2026-10-17, the user's screenshot), while the solid ones
+// and every slanted dotted one showed
+function lkXY(F, i, j) {
+  const at = k => [F[k][1], (88 - (F[k][2] - 7) * 1.04) * 1.275];
+  let [x1, y1] = at(i), [x2, y2] = at(j);
+  if (Math.abs(x1 - x2) < 0.05) x2 = x1 + 0.05;
+  if (Math.abs(y1 - y2) < 0.05) y2 = y1 + 0.05;
+  return `x1="${x1}" y1="${y1.toFixed(2)}" x2="${x2}" y2="${y2.toFixed(2)}"`;
+}
 function lkLines(F, xi, L) {
-  const at = i => [F[i][1], (88 - (F[i][2] - 7) * 1.04) * 1.275];
   const key = (i, j) => Math.min(i, j) * 32 + Math.max(i, j);
   const hot = new Set(); for (const it of L.combos) for (const [i, j] of it.lines || []) hot.add(key(i, j));
   const tier = v => v >= 90 ? 't4' : v >= 70 ? 't3' : v >= 40 ? 't2' : 't1';
-  const ln = (i, j, cls) => { const [x1, y1] = at(i), [x2, y2] = at(j); return `<line class="${cls}" x1="${x1}" y1="${y1.toFixed(2)}" x2="${x2}" y2="${y2.toFixed(2)}"/>`; };
+  const ln = (i, j, cls) => `<line class="${cls}" ${lkXY(F, i, j)}/>`;
   let glow = '', out = '';
   const drawn = new Set();
   for (const [i, j, v] of L.pairs) { const h = hot.has(key(i, j)); drawn.add(key(i, j)); if (h) glow += ln(i, j, 'glow'); out += ln(i, j, tier(v) + (h ? ' cb' : '')); }
@@ -1476,7 +1486,7 @@ function lkWho(it) {
 // 連携 shown as a whole number is rounded down, so 74.7 of 75 reads 74 (not a 75 that doesn't count yet)
 const lkProg = it => ['yo', 'local', 'nat'].includes(it.k) ? `${it.val}人／${it.need}人` : it.k === 'legend' ? 'まだ' : `${Math.floor(it.val)}／${it.need}`;
 function linkCard(L) {
-  const leg = (cls, t) => `<span><svg viewBox="0 0 24 8" aria-hidden="true"><line class="${cls}" x1="2" y1="4" x2="22" y2="4"/></svg>${t}</span>`;
+  const leg = (cls, t) => `<span><svg viewBox="0 0 24 8" aria-hidden="true"><line class="${cls}" x1="2" y1="4" x2="22" y2="4.05"/></svg>${t}</span>`;
   const plates = L.combos.map(it => `<div class="lk-plate"><span class="ic">${lkIc(it.k)}</span><span class="nm"><b>${esc(it.jp)}</b><small>${lkWho(it)}</small></span><span class="lk-fx">${lkFx(it)}</span></div>`).join('');
   const over = L.over.length ? `<p class="fine" style="margin:0">ほかに${L.over.map(it => `「${esc(it.jp)}」`).join('')}も条件を満たしています（同時に${E.LINK.combos}つまで、強いものから）。</p>` : '';
   const near = L.near.slice(0, 3).map(it => `<div class="lk-wrow"><span><b>${esc(it.jp)}</b>${esc(it.cond)}</span><span class="pg"><span class="lk-bar"><i style="width:${Math.min(100, Math.floor(it.val / it.need * 100))}%"></i></span><span>${lkProg(it)}</span></span></div>`).join('');
@@ -2616,7 +2626,7 @@ function sheetCampRep() {
   for (const [a, b, v0, v1] of r.lk) {
     const i = idx.get(a), j = idx.get(b); if (i == null || j == null || !F[i] || !F[j]) continue;
     const hi = v1 >= 70 && v0 < 70; if (hi) up++;
-    const xy = `x1="${F[i][1]}" y1="${(topY(F[i][2]) * 1.275).toFixed(2)}" x2="${F[j][1]}" y2="${(topY(F[j][2]) * 1.275).toFixed(2)}"`;
+    const xy = lkXY(F, i, j);
     lines += (hi ? `<line class="glow" ${xy}/>` : '') + `<line class="${tier(v1)}${hi ? ' cb' : ''}" ${xy}/>`;
   }
   const toks = r.xi.map((id, i) => { const p = S.players[id]; if (!p || !F[i]) return ''; return `<div class="tok" style="left:${F[i][1]}%;top:${topY(F[i][2])}%">${tokShirt(S.my, p.num, '')}<span class="lbl">${esc(p.short)}</span></div>`; }).join('');

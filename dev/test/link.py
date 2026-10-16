@@ -155,6 +155,9 @@ async def main(vw, vh, board):
         R = I['rating']
         ok([int(x) for x in tr] == [round(R['att']), round(R['mid']), round(R['def'])], f"the numbers above the board include 連携 and combos: {tr}")
         f = await fits(); ok(not f['bad'] and not f['hs'], f"the board and the card fit the screen {f['bad']}")
+        # iPhone's Safari drew no dotted line that was exactly upright or level (2026-10-17: 4-1-4-1's RSH–RSB)
+        flat = await page.evaluate("() => [...document.querySelectorAll('.lk-lines line, .lk-leg line')].filter(l => ['x', 'y'].some(a => +l.getAttribute(a + '1') === +l.getAttribute(a + '2'))).length")
+        ok(flat == 0, f"no chalk line is exactly upright or level (Safari): {flat}")
         await to_board(); await shot('board')
         await to_card(); await shot('card')
 
