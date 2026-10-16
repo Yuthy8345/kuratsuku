@@ -1789,9 +1789,9 @@ function viewClub() {
       <h3 class="sec-h">ボードの見た目</h3>
       <div class="seg" role="group" aria-label="ボードの見た目">${[['chalk', '黒板（緑）'], ['white', 'ホワイトボード']].map(([k, l]) => `<button data-act="board" data-k="${k}" aria-pressed="${getBoard() === k}">${l}</button>`).join('')}</div>
       <h3 class="sec-h">データ</h3>
-      <section class="card" style="display:grid;gap:8px"><dl class="kv"><dt>この端末</dt><dd>${UI.localOk === false ? '保存できません' : '自動保存中'}</dd><dt>クラウド</dt><dd>${Cloud.status === 'on' ? (Cloud.err ? '保存に失敗（' + esc(Cloud.err) + '）' : Cloud.last ? '保存済み ' + new Date(Cloud.last).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) : '有効（試合後に保存）') : Cloud.status === 'checking' ? '確認中' : 'なし（引き継ぎコードで保管できます）'}</dd><dt>監督</dt><dd>${esc(S.manager)}</dd></dl>
-      <div class="grid2"><button class="btn" data-act="exportOpen">引き継ぎコードを作る</button><button class="btn" data-act="importOpen">コードで復元</button></div>
-      <p class="fine" style="margin:0">別の端末やホーム画面版のアプリにセーブを移すときに使います。</p>
+      <section class="card" style="display:grid;gap:8px"><dl class="kv"><dt>この端末</dt><dd>${UI.localOk === false ? '保存できません' : '自動保存中'}</dd><dt>クラウド</dt><dd class="phr">${Cloud.status === 'on' ? (Cloud.err ? '保存に失敗（' + esc(Cloud.err) + '）' : Cloud.last ? '保存済み ' + new Date(Cloud.last).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) : '有効（試合後に保存）') : Cloud.status === 'checking' ? '確認中' : 'なし（引き継ぎコードで<wbr>保管できます）'}</dd><dt>監督</dt><dd>${esc(S.manager)}</dd></dl>
+      <div class="grid2"><button class="btn" data-act="exportOpen">コードを作る</button><button class="btn" data-act="importOpen">コードで復元</button></div>
+      <p class="fine phr" style="margin:0">引き継ぎコードは、<wbr>別の端末や<wbr>ホーム画面版の<wbr>アプリに<wbr>セーブを<wbr>移すときに<wbr>使います。</p>
       <button class="btn danger block" data-act="askReset">はじめからやり直す</button></section>`;
   } else if (v === 'town') {
     body = viewTown();
@@ -2169,7 +2169,7 @@ function sheetExport() {
   sheetState = { type: 'export' };
   const code = makeCode();
   openSheet(`<div class="eyebrow">引き継ぎコード</div><h2>セーブをコードにしました</h2>
-    <p class="fine">「コピー」を押して、移したい先のアプリで「コードで復元」に貼り付けてください。${E.seasonLabel(S.season)}・${esc(S.clubs[S.my].short)}・${fmtDate(S.date)}時点のセーブです（${Math.round(code.length / 1024)}KB）。</p>
+    <p class="fine phr">「コピー」を押して、<wbr>移したい先の<wbr>アプリで<wbr>「コードで復元」に<wbr>貼り付けてください。${E.seasonLabel(S.season)}・<wbr>${esc(S.clubs[S.my].short)}・<wbr>${fmtDate(S.date)}時点の<wbr>セーブです<wbr>（${Math.round(code.length / 1024)}KB）。</p>
     <textarea id="exp-code" class="input" readonly style="height:120px;padding:10px;font-size:11px;font-family:ui-monospace,monospace;word-break:break-all">${esc(code)}</textarea>
     <p class="fine" id="exp-msg" style="margin:0"></p>`,
     '<button class="btn primary block" data-act="copyCode">コピー</button><button class="btn ghost block" data-act="closeSheet">閉じる</button>');
@@ -2177,7 +2177,7 @@ function sheetExport() {
 function sheetImport() {
   sheetState = { type: 'import' };
   openSheet(`<div class="eyebrow">引き継ぎコード</div><h2>コードで復元</h2>
-    <p class="fine">「引き継ぎコードを作る」でコピーしたコードを貼り付けてください。${S ? '<b>今のセーブは上書きされます。</b>' : ''}</p>
+    <p class="fine phr">「コードを作る」<wbr>（クラブ → 経営 の「データ」）で<wbr>コピーした<wbr>コードを<wbr>貼り付けてください。${S ? '<b>今のセーブは<wbr>上書きされます。</b>' : ''}</p>
     <textarea id="imp-code" class="input" placeholder="KTK1. から始まるコード" style="height:140px;padding:10px;font-size:12px;font-family:ui-monospace,monospace;word-break:break-all" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
     <p class="fine" id="imp-msg" style="margin:0"></p>`,
     '<button class="btn primary block" data-act="doImport">復元する</button><button class="btn ghost block" data-act="closeSheet">やめる</button>');

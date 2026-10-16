@@ -800,6 +800,7 @@ html.ios-app { min-height: calc(var(--apph) + 1px); }
 .led .ln { display: flex; justify-content: space-between; font-size: 15px; }
 .led .ln span:last-child { color: color-mix(in srgb, var(--led) 65%, #fff); }
 .fine { font-size: 12px; color: var(--muted); line-height: 1.6; margin: 0; }
+.phr { word-break: keep-all; overflow-wrap: anywhere; } /* 改行は <wbr> と句読点のところだけ（「使い／ます」のように語の途中で折れない） */
 .title-actions { display: grid; gap: 8px; padding: 12px 0 calc(16px + env(safe-area-inset-bottom, 0px)); position: sticky; bottom: 0; background: linear-gradient(to top, var(--bg) 80%, transparent); }
 .title-actions .btn { min-height: 56px; font-size: 16px; }
 .crow { display: grid; grid-template-columns: 44px 1fr auto; gap: 12px; align-items: center; width: 100%; padding: 12px; text-align: left; }
