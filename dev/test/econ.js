@@ -42,7 +42,7 @@ for (let run = 0; run < RUNS; run++) {
       const spTxt = sp ? ` | スポンサー ${E.money(my.fin.spon)}（以前の ${Math.round(spon[spon.length - 1] * 100)}%・達成 ${sp.deals.filter(d => d.st === 'done').length}/${sp.deals.length}）` : ' | スポンサー 以前の形';
       const inf = E.townInfo ? E.townInfo(S) : null;
       const town = inf ? ` | サポーター ${inf.fans.toLocaleString()}・観客 ${inf.att == null ? '-' : inf.att.toLocaleString()}/${inf.cap.toLocaleString()} | 建物 ${inf.b.filter(b => b.built).map(b => AB[b.k] + (b.k === 'exp' ? b.built : '')).join('') || 'なし'}${inf.job ? `（工事中 ${AB[inf.job.k]}）` : ''}・維持費 年${oku(my.fin.up || 0)}億` : '';
-      const fin = `入場 ${oku(my.fin.gate)} スポ ${oku(my.fin.spon)} 賞金 ${oku(my.fin.prize)} 移籍 ${oku(my.fin.trans)} 人件 ${oku(my.fin.wages)} 投資 ${oku(my.fin.fac)}`;
+      const fin = `入場 ${oku(my.fin.gate)} スポ ${oku(my.fin.spon)} 配分 ${oku(my.fin.dist || 0)} 賞金 ${oku(my.fin.prize)} 移籍 ${oku(my.fin.trans)} 人件 ${oku(my.fin.wages)} 投資 ${oku(my.fin.fac)}`;
       console.log(`S${s + 1} ${S.seasonEnd.label} ${my.short} ${S.seasonEnd.myPos}位 | 自クラブ ${E.money(my.funds)} | リーグ 中央値 ${E.money(med(f))} 最大 ${E.money(Math.max(...f))} 最小 ${E.money(Math.min(...f))} | ${fin}${spTxt} | 施設 ${FAC.map(k => my.fac[k]).join('')}${town} | ${((Date.now() - t0) / 1000).toFixed(0)}s`);
       (per[s] || (per[s] = [])).push([my.funds, med(f), Math.max(...f), inf ? inf.fans : 0, my.fin.up || 0]);
       E.rollover(S); if (S.fired) { console.log('FIRED', S.fired.reason); E.takeJob(S, S.fired.offers[0]); }

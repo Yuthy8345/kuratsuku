@@ -1907,7 +1907,7 @@ function addClub(S, c, guest) {
     pres: c.pres || 2, titles: Object.assign({ j1: 0, lc: 0, ec: 0, acl: 0 }, c.titles || {}), o10: !!c.o10,
     funds: startFunds, fac: { train: 2, youth: 2, medical: 2, scout: 1 },
     tac: { form: FORMATIONS[c.form] ? c.form : '4-4-2', ment: 'bal', press: 'mid', ...TAC_DEF, xi: [], bench: [] },
-    fin: { gate: 0, spon: 0, wages: 0, trans: 0, prize: 0, fac: 0, up: 0, camp: 0 },
+    fin: { gate: 0, spon: 0, wages: 0, trans: 0, prize: 0, fac: 0, up: 0, camp: 0, dist: 0 },
   };
   fansInit(S.clubs[c.id]);
   if (!guest && !S.order.includes(c.id)) S.order.push(c.id);
@@ -1932,15 +1932,24 @@ function setSponsors(S) {
     c.spon = Math.round((w * 0.6 + c.tier * 5000) / 12 / 10) * 10;
   }
 }
+// 開幕前予想と目標 (2026-10-16, 作業8の続き): the forecast is the squad (strength) plus what the club's standing does in a
+// match (PRES_MATCH); the board of a bigger club asks a little more (ask), and from a club's second J1 season it also
+// looks at where the club finished last season (last = its weight). Before, both used power (格 ×0.8) and the target
+// added 格 ×0.9 more, so a big club's target ran 4〜5 places ahead of where its side finishes (横浜FM: forecast 6th,
+// 7位以内, finishing 10〜12th on average with the best XI) and some clubs kept missing it season after season.
+const EXPECT = { pres: PRES_MATCH, ask: 0.25, last: 0.5 };
+function expectPower(S, cid) { return strength(S, cid) + ((S.clubs[cid].pres || 2) - 3) * EXPECT.pres; }
 function setExpectations(S, opts) {
-  const pw = Object.fromEntries(S.order.map(cid => [cid, power(S, cid)]));
+  const pw = Object.fromEntries(S.order.map(cid => [cid, expectPower(S, cid)]));
   const ranked = [...S.order].sort((a, b) => pw[b] - pw[a]);
   ranked.forEach((cid, i) => { S.clubs[cid].pred = i + 1; });
-  // the board of a bigger club asks for more than the squad alone would suggest
-  const exp = [...S.order].sort((a, b) => (pw[b] + ((S.clubs[b].pres || 2) - 3) * 0.9) - (pw[a] + ((S.clubs[a].pres || 2) - 3) * 0.9));
+  // the board of a bigger club asks a little more than the squad alone would suggest
+  const ask = cid => pw[cid] + ((S.clubs[cid].pres || 2) - 3) * EXPECT.ask;
+  const exp = [...S.order].sort((a, b) => ask(b) - ask(a));
   if (opts && opts.keepTargets) return; // mid-season: only the forecast moves
+  const last = Object.fromEntries((S.lastTable || []).map((id, i) => [id, i + 1]));   // last season's J1 table
   exp.forEach((cid, i) => {
-    const r = i + 1; let t;
+    const lp = last[cid], r = lp ? Math.round((1 - EXPECT.last) * (i + 1) + EXPECT.last * lp) : i + 1; let t;
     if (r <= 3) t = { pos: 3, jp: '優勝争い（3位以内）' };
     else if (r <= 7) t = { pos: 7, jp: '上位進出（7位以内）' };
     else if (r <= 13) t = { pos: 13, jp: '中位確保（13位以内）' };
@@ -3432,8 +3441,7 @@ function finishMatch(S, M) {
   // board
   if (M.userSide) {
     const k = M.userSide, opp = k === 'h' ? fx.a : fx.h;
-    const myS = strength(S, S.my), opS = strength(S, opp) - (k === 'h' ? 1 : -1);
-    const expPts = clamp(1.35 + (myS - opS) * 0.18, 0.4, 2.4);
+    const expPts = boardExp(S, S.my, opp, fx.neutral ? 0 : k === 'h' ? 1 : -1);
     const pts = res[k] === 'W' ? 3 : res[k] === 'D' ? 1 : 0;
     const B = boardLv(S), b0 = S.board;
     S.board = clamp(Math.round(S.board + (pts - expPts) * B.match * (cup ? 0.5 : 1)), 0, 100);
@@ -3608,8 +3616,14 @@ function matchdayPrep(S) {
   }
   if (today.some(f => f.h === S.my || f.a === S.my)) validateLineup(S, S.my);
 }
+// J1の均等配分金 (2026-10-16): Jリーグ「2026/27シーズンの配分金について」(2026-07-28) — J1 1クラブあたり 2億7,500万円
+// (2025年は2億5,000万円)。ゲームでは J1 の20クラブに毎月1日に12分の1ずつ（8月〜翌7月で年額ちょうど）。賞金・理念強化配分金・
+// ファン指標配分金などは入れていない（賞金は順位の PRIZE）。J1以外のクラブは毎月のお金を動かしていないので無し。
+const DIST = { j1: 27500 };
+function distMonth(S) { const i = (D.m(S.date) + 4) % 12; return Math.floor(DIST.j1 * (i + 1) / 12) - Math.floor(DIST.j1 * i / 12); }
 function monthly(S) {
-  // wages & sponsors for every club
+  // wages & sponsors for every club, the league's 配分金
+  const dist = distMonth(S);
   for (const cid of S.order) {
     const c = S.clubs[cid];
     const w = Math.round(squad(S, cid).reduce((a, p) => a + wage(p), 0) / 12);
@@ -3618,6 +3632,7 @@ function monthly(S) {
     if (cid === S.my) c._sp = sp;
     const up = townUpkeep(c);   // ホームタウン: the buildings' and the facilities' upkeep
     if (up) { c.funds -= up; c.fin.up = (c.fin.up || 0) + up; }
+    c.funds += dist; c.fin.dist = (c.fin.dist || 0) + dist;
   }
   fansMonth(S); fansLog(S);
   // development report for my club (change since last month)
@@ -3643,7 +3658,7 @@ function monthly(S) {
   secMonth(S, rows);
   const my = S.clubs[S.my];
   const myUp = townUpkeep(my);
-  news(S, `${D.m(S.date)}月の収支：スポンサー収入 ${money(my._sp != null ? my._sp : my.spon || 0)}／人件費 ${money(Math.round(squad(S, S.my).reduce((a, p) => a + wage(p), 0) / 12))}${myUp ? `／維持費 ${money(myUp)}` : ''}`, 'money');
+  news(S, `${D.m(S.date)}月の収支：スポンサー収入 ${money(my._sp != null ? my._sp : my.spon || 0)}／配分金 ${money(dist)}／人件費 ${money(Math.round(squad(S, S.my).reduce((a, p) => a + wage(p), 0) / 12))}${myUp ? `／維持費 ${money(myUp)}` : ''}`, 'money');
   if (my.funds < 0) { S.board = clamp(S.board - 6, 0, 100); news(S, '資金がマイナスになっている。フロントは財政を懸念している。', 'warn'); }
 }
 
@@ -4889,6 +4904,11 @@ const BOARD_LV = {
   hard: { jp: 'きびしい', sub: '1試合ごとの評価が大きく、目標未達ならすぐ解任もある（以前のルール）。', match: 3.2, met: 20, near: -5, nearBand: 3, perPos: 0, missMax: 25, keep: 1, fireEnd: 15, grace: 0, fireMid: 8, fireAfter: 10, zone: 99, warn: [30, 16] },
 };
 const BOARD = BOARD_LV.mid;  // overridable in tests (hard = the rules before 2026-10-12)
+// the points the board expects from one match (2026-10-16, 作業8の続き): fitted to the league (全クラブのリーグ戦 3,040 試合:
+// 勝点 = 1.376 + 0.120×能力差 + 0.131×ホーム). The old 1.35 + 0.18×(能力差 ± 1) asked 1.5 times too much of the stronger
+// side (expected 2.0 → got 1.66, expected 0.5 → got 0.99), so the manager of a strong club lost trust match after match.
+const BOARD_EXP = { c: 1.37, k: 0.12, home: 0.13 };
+function boardExp(S, cid, opp, home) { return clamp(BOARD_EXP.c + (strength(S, cid) - strength(S, opp)) * BOARD_EXP.k + home * BOARD_EXP.home, 0.4, 2.4); }
 function boardLv(S) { const k = S.settings && S.settings.boardLv; return k && BOARD_LV[k] ? BOARD_LV[k] : BOARD; }
 // seasons in a row at this club (the season just finished included)
 function tenure(S) { let n = 0; for (const h of S.history) { if (h.club !== S.my) break; n++; } return n; }
@@ -5049,7 +5069,7 @@ function rollover(S) {
   // new season
   S.season += 1;
   S.date = newDate;
-  for (const cid of S.order) { const c = S.clubs[cid]; c.fin = { gate: 0, spon: 0, wages: 0, trans: 0, prize: 0, fac: 0, up: 0, camp: 0 }; }
+  for (const cid of S.order) { const c = S.clubs[cid]; c.fin = { gate: 0, spon: 0, wages: 0, trans: 0, prize: 0, fac: 0, up: 0, camp: 0, dist: 0 }; }
   delete S.camp;   // next winter's camp is planned from the new fixtures
   for (const p of Object.values(S.players)) p.cond = 100;
   S.fixtures = genFixtures(S.order, null, S.season);
@@ -5706,7 +5726,7 @@ const API = {
   NATIONS, NT, natJp, ntName, ntEvents, ntWindows, inNtWindow, ntNow, inNtBreak, recentNt, ntScore, ntForm, ntDay, ntCall, ntPower, abShare, EURO, euroWanted, euroOffer, euroDay, seasonDates, cupSchedule, J1_2026, AC_2027,
   LC_OLD, LC_STAGE, cupNames, roundName, fxEn, cupDepth, cupFinal, tieLegs, tieAgg, lcNew, lc1Alive,
   ABROAD, abroadOf, isAbroadClub, price, addAbroad, abroadReluct, nameKey, realNames, reservedNames, freshName, renamePlayer, genPlayer,
-  CARDS, BOARD, BOARD_LV, boardLv, tenure, CUPS, CUP_PRIZE, NATIONAL, fxLabel, cupResult, cupWinner, hypeMatch, HYPE, SUB_RATE, subRate, STYLE, GROW, RARE, INTAKE, potCap, clubBase, devWeek, shareFor, LOAN, GEM, REBORN, LEGENDS, legendOf, rebornCheck, makeReborn, rebornNum, myLoans, loanCan, loanOptions, loanOut, growthOutlook, weeksLeft, yearsTo, bigGame, rivalry, SCOUT, sendScout, playShare, marketList, ensureFreeAgents, upgrade, facCost, TOWN, townOf, built, townNext, townCan, townBuild, townDay, townUpkeep, townInfo, townSeason, townInj, townAtt, gatePer, attEst, fansLog, addMonths, fansOf, fansTarget, fansAdd, fansMatch, fansSeason, fansMonth, intakePot, takeJob, rollover, endSeason, news, fire,
+  CARDS, BOARD, BOARD_LV, BOARD_EXP, boardExp, boardLv, tenure, DIST, distMonth, EXPECT, expectPower, setExpectations, CUPS, CUP_PRIZE, NATIONAL, fxLabel, cupResult, cupWinner, hypeMatch, HYPE, SUB_RATE, subRate, STYLE, GROW, RARE, INTAKE, potCap, clubBase, devWeek, shareFor, LOAN, GEM, REBORN, LEGENDS, legendOf, rebornCheck, makeReborn, rebornNum, myLoans, loanCan, loanOptions, loanOut, growthOutlook, weeksLeft, yearsTo, bigGame, rivalry, SCOUT, sendScout, playShare, marketList, ensureFreeAgents, upgrade, facCost, TOWN, townOf, built, townNext, townCan, townBuild, townDay, townUpkeep, townInfo, townSeason, townInj, townAtt, gatePer, attEst, fansLog, addMonths, fansOf, fansTarget, fansAdd, fansMatch, fansSeason, fansMonth, intakePot, takeJob, rollover, endSeason, news, fire,
 };
 if (typeof module !== 'undefined' && module.exports) module.exports = API; else root.Engine = API;
 })(typeof window !== 'undefined' ? window : globalThis);
@@ -7854,7 +7874,7 @@ function viewClub() {
   const v = UI.cl.view; let body = '';
   const c = S.clubs[S.my];
   if (v === 'main') {
-    const fin = c.fin; const inc = fin.gate + fin.spon + fin.prize + Math.max(0, fin.trans); const exp = fin.wages + fin.fac + (fin.up || 0) + (fin.camp || 0) + Math.max(0, -fin.trans);
+    const fin = c.fin; const inc = fin.gate + fin.spon + (fin.dist || 0) + fin.prize + Math.max(0, fin.trans); const exp = fin.wages + fin.fac + (fin.up || 0) + (fin.camp || 0) + Math.max(0, -fin.trans);
     const wages = E.squad(S, S.my).reduce((a, p) => a + E.wage(p), 0);
     body = `<section class="card" style="display:grid;gap:10px">
         <div class="row"><div class="eyebrow">フロントの信頼</div><span class="spacer"></span><b class="tnum">${S.board} / 100</b></div>
@@ -7872,7 +7892,7 @@ function viewClub() {
       ${sponCard('club')}
       <section class="card" style="display:grid;gap:10px">
         <div class="row"><div class="eyebrow">資金</div><span class="spacer"></span><b style="font-family:var(--f-display);font-weight:400;font-size:22px" class="${c.funds < 0 ? 'o-low' : ''}">${E.money(c.funds)}</b></div>
-        <dl class="kv"><dt>入場料収入</dt><dd>${E.money(fin.gate)}</dd><dt>スポンサー収入</dt><dd>${E.money(fin.spon)}</dd><dt>賞金</dt><dd>${E.money(fin.prize)}</dd><dt>移籍収支</dt><dd>${fin.trans >= 0 ? '+' : ''}${E.money(fin.trans)}</dd><dt>人件費</dt><dd>-${E.money(fin.wages)}</dd><dt>施設・建設</dt><dd>-${E.money(fin.fac)}</dd><dt>維持費</dt><dd>-${E.money(fin.up || 0)}</dd>${fin.camp ? `<dt>キャンプ</dt><dd>-${E.money(fin.camp)}</dd>` : ''}</dl>
+        <dl class="kv"><dt>入場料収入</dt><dd>${E.money(fin.gate)}</dd><dt>スポンサー収入</dt><dd>${E.money(fin.spon)}</dd><dt>配分金（Jリーグ）</dt><dd>${E.money(fin.dist || 0)}</dd><dt>賞金</dt><dd>${E.money(fin.prize)}</dd><dt>移籍収支</dt><dd>${fin.trans >= 0 ? '+' : ''}${E.money(fin.trans)}</dd><dt>人件費</dt><dd>-${E.money(fin.wages)}</dd><dt>施設・建設</dt><dd>-${E.money(fin.fac)}</dd><dt>維持費</dt><dd>-${E.money(fin.up || 0)}</dd>${fin.camp ? `<dt>キャンプ</dt><dd>-${E.money(fin.camp)}</dd>` : ''}</dl>
         <div class="small muted">今季の収支 ${inc - exp >= 0 ? '+' : ''}${E.money(inc - exp)}　／　年俸総額 ${E.money(wages)}・月のスポンサー収入 ${(m => E.money(m.base + m.guar))(E.sponMonth(S))}・月の維持費 ${E.money(E.townUpkeep(c))}</div>
       </section>
       <h3 class="sec-h">施設とスタジアム</h3>

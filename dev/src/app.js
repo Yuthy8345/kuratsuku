@@ -1685,7 +1685,7 @@ function viewClub() {
   const v = UI.cl.view; let body = '';
   const c = S.clubs[S.my];
   if (v === 'main') {
-    const fin = c.fin; const inc = fin.gate + fin.spon + fin.prize + Math.max(0, fin.trans); const exp = fin.wages + fin.fac + (fin.up || 0) + (fin.camp || 0) + Math.max(0, -fin.trans);
+    const fin = c.fin; const inc = fin.gate + fin.spon + (fin.dist || 0) + fin.prize + Math.max(0, fin.trans); const exp = fin.wages + fin.fac + (fin.up || 0) + (fin.camp || 0) + Math.max(0, -fin.trans);
     const wages = E.squad(S, S.my).reduce((a, p) => a + E.wage(p), 0);
     body = `<section class="card" style="display:grid;gap:10px">
         <div class="row"><div class="eyebrow">フロントの信頼</div><span class="spacer"></span><b class="tnum">${S.board} / 100</b></div>
@@ -1703,7 +1703,7 @@ function viewClub() {
       ${sponCard('club')}
       <section class="card" style="display:grid;gap:10px">
         <div class="row"><div class="eyebrow">資金</div><span class="spacer"></span><b style="font-family:var(--f-display);font-weight:400;font-size:22px" class="${c.funds < 0 ? 'o-low' : ''}">${E.money(c.funds)}</b></div>
-        <dl class="kv"><dt>入場料収入</dt><dd>${E.money(fin.gate)}</dd><dt>スポンサー収入</dt><dd>${E.money(fin.spon)}</dd><dt>賞金</dt><dd>${E.money(fin.prize)}</dd><dt>移籍収支</dt><dd>${fin.trans >= 0 ? '+' : ''}${E.money(fin.trans)}</dd><dt>人件費</dt><dd>-${E.money(fin.wages)}</dd><dt>施設・建設</dt><dd>-${E.money(fin.fac)}</dd><dt>維持費</dt><dd>-${E.money(fin.up || 0)}</dd>${fin.camp ? `<dt>キャンプ</dt><dd>-${E.money(fin.camp)}</dd>` : ''}</dl>
+        <dl class="kv"><dt>入場料収入</dt><dd>${E.money(fin.gate)}</dd><dt>スポンサー収入</dt><dd>${E.money(fin.spon)}</dd><dt>配分金（Jリーグ）</dt><dd>${E.money(fin.dist || 0)}</dd><dt>賞金</dt><dd>${E.money(fin.prize)}</dd><dt>移籍収支</dt><dd>${fin.trans >= 0 ? '+' : ''}${E.money(fin.trans)}</dd><dt>人件費</dt><dd>-${E.money(fin.wages)}</dd><dt>施設・建設</dt><dd>-${E.money(fin.fac)}</dd><dt>維持費</dt><dd>-${E.money(fin.up || 0)}</dd>${fin.camp ? `<dt>キャンプ</dt><dd>-${E.money(fin.camp)}</dd>` : ''}</dl>
         <div class="small muted">今季の収支 ${inc - exp >= 0 ? '+' : ''}${E.money(inc - exp)}　／　年俸総額 ${E.money(wages)}・月のスポンサー収入 ${(m => E.money(m.base + m.guar))(E.sponMonth(S))}・月の維持費 ${E.money(E.townUpkeep(c))}</div>
       </section>
       <h3 class="sec-h">施設とスタジアム</h3>

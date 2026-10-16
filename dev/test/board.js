@@ -29,8 +29,14 @@ let S = E.newGame(DATA, 'yokohamafm', 't', '2026-10-12');
 midTable(S, 14); let se = season(S, null, 30);
 ok(se.verdict === 'missed' && !S.fired, `ふつう 1年目: ${se.myPos}位（目標 ${se.target}）でも続投、信頼 → ${S.board}`);
 ok(S.board > 20 && S.board < 55, `new season starts nearer the middle (${S.board})`);
-midTable(S, 14); se = season(S, null, 20);
-ok(!!S.fired && /目標未達/.test(S.fired.reason), `ふつう 2年目も ${se.myPos}位 → ${S.fired && S.fired.reason}`);
+// the second season's target also looks at last season (2026-10-16): after a 14th place 横浜FM is asked for 13位以内
+ok(S.clubs[S.my].target.pos === 13, `2年目の目標は前の季の14位も見て ${S.clubs[S.my].target.jp}`);
+midTable(S, 17); se = season(S, null, 20);
+ok(!!S.fired && /目標未達/.test(S.fired.reason), `ふつう 2年目も目標を大きく下回る ${se.myPos}位 → ${S.fired && S.fired.reason}`);
+// the per-match expectation follows the league (2026-10-16): even sides 1.37, at home +0.13, 0.12 a point of strength
+{ const T = E.newGame(DATA, 'yokohamafm', 't', '2026-10-12'), a = 'kashima', b = 'mito';
+  const ev = E.boardExp(T, a, a, 0), eh = E.boardExp(T, a, a, 1), d = E.strength(T, a) - E.strength(T, b), es = E.boardExp(T, a, b, 0);
+  ok(Math.abs(ev - 1.37) < 1e-9 && Math.abs(eh - 1.5) < 1e-9 && Math.abs(es - (1.37 + 0.12 * d)) < 1e-9 && es < 2.4, `期待勝点: 同じ強さ ${ev}・ホーム ${eh}・能力が${d.toFixed(1)}下の相手に ${es.toFixed(2)}`); }
 
 // きびしい: fired after the first missed season
 S = E.newGame(DATA, 'yokohamafm', 't', '2026-10-12'); S.settings.boardLv = 'hard';
