@@ -3,11 +3,14 @@
 それで直らなければ戦術画面でベストメンバー）、ポップアップは閉じる。
 xi＝先発を直した回数（試合に進めなかった回数）、taps＝そのために押した回数（秘書の1タップで直れば1回）、xi_left＝1タップで
 直らなかった回数。新しいポップアップを足したら resolve() に1行足す。
-usage: python3 dev/test/e2e.py [club] [seasons] [outdir]   （1シーズン約70秒）"""
-import asyncio, pathlib, sys, time, json
+usage: python3 dev/test/e2e.py [club] [seasons] [outdir]   （1シーズン約70秒）
+KTK_SAVE=<セーブのファイル> を付けると、新しく始める代わりにそのセーブで「つづきから」（旧セーブの通し。club は使わない。
+seasons はシーズン総括を何回通るか＝途中のシーズンの残りも1回と数える）"""
+import asyncio, pathlib, sys, time, json, os
 from playwright.async_api import async_playwright
 ROOT = pathlib.Path('/home/claude/kuratsuku/dev'); OUT = pathlib.Path(sys.argv[3] if len(sys.argv) > 3 else str(ROOT / 'test' / 'shots' / 'e2e')); OUT.mkdir(parents=True, exist_ok=True)
 CLUB = sys.argv[1] if len(sys.argv) > 1 else 'kashiwa'; SEASONS = int(sys.argv[2]) if len(sys.argv) > 2 else 2
+SAVE = pathlib.Path(os.environ['KTK_SAVE']).read_text() if os.environ.get('KTK_SAVE') else None   # セーブ（JSON か lz:）から続ける
 LZ = (ROOT / 'test/vendor/lz-string.min.js').read_text()
 page_html = (ROOT / 'dist/touchline.html').read_text()
 wrapped = '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>body{margin:0;font:14px system-ui}[hidden]{display:none!important}</style></head><body>' + page_html + '</body></html>'
@@ -25,8 +28,12 @@ async def main():
             else: await r.abort()
         await page.route('https://**/*', route)
         await page.goto('file://' + str(PAGE)); await page.wait_for_timeout(300)
-        await page.click('text=新しく始める'); await page.click(f'[data-id="{CLUB}"]'); await page.wait_for_timeout(300)
-        await page.click('[data-act="nameClub"]'); await page.wait_for_timeout(200); await page.click('#sheet [data-act="startClub"]'); await page.wait_for_timeout(300)
+        if SAVE:   # 旧セーブで続きから（2026-10-16〜、KTK_SAVE）: そのまま localStorage に入れて「つづきから」（読むときに migrate）
+            await page.evaluate('s => localStorage.setItem("touchline.j1.save", s.startsWith("lz:") ? s : "lz:" + LZString.compressToBase64(s))', SAVE)
+            await page.reload(); await page.wait_for_timeout(400); await page.click('text=つづきから'); await page.wait_for_timeout(500)
+        else:
+            await page.click('text=新しく始める'); await page.click(f'[data-id="{CLUB}"]'); await page.wait_for_timeout(300)
+            await page.click('[data-act="nameClub"]'); await page.wait_for_timeout(200); await page.click('#sheet [data-act="startClub"]'); await page.wait_for_timeout(300)
         async def has(sel): return await page.locator(sel).count() > 0
         async def click(sel, w=120):
             await page.locator(sel).first.click(); await page.wait_for_timeout(w)
@@ -34,10 +41,19 @@ async def main():
         LOAD = "() => JSON.parse(LZString.decompressFromBase64(localStorage.getItem('touchline.j1.save').slice(3)))"
         unknown = {}
         seasons = 0; t0 = time.time(); it = 0
+        wide = {}   # sheets with something wider than the screen (2026-10-16): first time per sheet → a screenshot
+        WIDE = '''() => { const W = innerWidth, s = document.querySelector('#sheet.on'); if (!s) return null; const out = [];
+          const clipped = e => { for (let a = e.parentElement; a && a !== s; a = a.parentElement) { if (getComputedStyle(a).overflowX !== 'visible') { const r = a.getBoundingClientRect(); if (r.left >= -1 && r.right <= W + 1) return true; } } return false; };   // e.g. 転生's rays, cut by their frame
+          for (const e of s.querySelectorAll('*')) { const q = e.getBoundingClientRect(); if (q.width && q.height && (q.right > W + 1 || q.left < -1) && !e.closest('svg') && !clipped(e)) out.push((typeof e.className === 'string' ? e.className : e.tagName) + ' ' + Math.round(q.left) + '-' + Math.round(q.right)); }
+          return out.length ? [(s.querySelector('.eyebrow, h2, b') || s).textContent.trim().slice(0, 16), out.slice(0, 4)] : null; }'''
         async def resolve():
             nonlocal seasons
             for _ in range(12):
                 if not await has('#sheet.on'): break
+                wd = await page.evaluate(WIDE)
+                if wd and wd[0] not in wide:
+                    wide[wd[0]] = wd[1]; await page.screenshot(path=str(OUT / f'wide-{len(wide)}.png')); print('wider than the screen:', wd, flush=True)
+                    (OUT / f'wide-{len(wide)}.save').write_text(await page.evaluate("localStorage.getItem('touchline.j1.save')"))   # to reproduce it
                 if await has('#sheet [data-act="quick"]'):
                     await click('#sheet [data-act="quick"]', 150); stats['matches'] += 1
                     if await has('[data-act="mClose"]'): await click('[data-act="mClose"]', 150)
@@ -53,7 +69,7 @@ async def main():
                     await click('[data-act="autoXI"]', 150)
                 elif await has('#sheet [data-act="spSign"]'):   # スポンサー契約 (2026-10-15): sign her three
                     if stats['spon'] == 0: await page.screenshot(path=str(OUT / 'spon.png'))
-                    await click('#sheet [data-act="spSign"]', 250); stats['spon'] += 1
+                    await click('#sheet [data-act="spSign"]', 500); stats['spon'] += 1   # her camp map may follow (0.32 s)
                 elif await has('#sheet .ht-done'):   # ホームタウン (2026-10-15): a building done → her note → the board
                     if stats['done'] == 0: await page.screenshot(path=str(OUT / 'built.png'))
                     stats['done'] += 1; await click('#sheet [data-act="htGo"]', 250)
@@ -131,7 +147,9 @@ async def main():
                 stats['stuck'] += 1; await page.screenshot(path=str(OUT / f'stuck-{it}.png')); await click('[data-act="tab"][data-tab="home"]', 100)
                 if stats['stuck'] > 5: break
                 continue
-            if not await has('#sheet.on'): await click('[data-act="go"]', 140)
+            if not await has('#sheet.on'):
+                try: await page.locator('[data-act="go"]').first.click(timeout=3000); await page.wait_for_timeout(140)
+                except Exception: pass   # a pop-up opened a moment later (解任 → the offers): resolve() takes it
             await resolve()
             # her bubble: a player back → 戻す; otherwise open her sheet now and then (reads the month's summary)
             if not await has('#sheet.on') and await has('#sec-float [data-act="secBack"]'):
@@ -145,6 +163,7 @@ async def main():
         print('stats', json.dumps(stats, ensure_ascii=False), 'iterations', it, f'{time.time() - t0:.0f}s')
         print(f"lineup fixes: {stats['xi']}, taps {stats['taps']} ({stats['taps'] / max(1, stats['xi']):.2f} per fix), not fixed by her one tap {stats['xi_left']}")
         print('sheets closed by closeSheet:', json.dumps(unknown, ensure_ascii=False)[:1500])
+        print('sheets wider than the screen:', json.dumps(wide, ensure_ascii=False) if wide else 'none')
         # reload and continue works
         await page.reload(); await page.wait_for_timeout(500)
         await click('text=つづきから', 400)

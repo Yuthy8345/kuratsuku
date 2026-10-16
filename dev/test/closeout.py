@@ -96,7 +96,9 @@ async def main():
         txt = await page.locator('#sheet [data-act="closeOut"]').inner_text()
         check('いま逃げ切り中' in txt and await pressed('[data-act="mMent"][data-k="def"]') == 1, 'a minute later: 逃げ切り again')
         await page.click('#sheet [data-act="closeSheet"]'); await page.wait_for_timeout(300)
-        await page.click('[data-act="mSkip"]'); await page.wait_for_timeout(800)
+        # ×4 is 50 ms a minute: the last minutes can run out while the sheets open and close (2026-10-16) → skip or the result
+        await page.evaluate('''() => (document.querySelector('[data-act="mSkip"]') || document.querySelector('[data-act="mResult"]')).click()''')
+        await page.wait_for_timeout(800)
         st = await page.evaluate(LOAD)
         check(st['clubs'][st['my']]['tac']['ment'] == ment0, "after the match the club's own plan is unchanged")
         print('\n'.join(errs) or 'no errors')

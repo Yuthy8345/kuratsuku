@@ -36,10 +36,17 @@ const play = (S, until, A, fix, ready) => { const X = A || E; let at = null;
 const S = E.newGame(D, 'yokohamafm', 'ソーイ', '2026-10-15'); E.sponPick(S, E.sponRec(S)); tidy(S);
 out.start = clone(S); info.startAdj = E.linkAdj(S.clubs[S.my].tac.form).length;
 // mid: the same club from March, the manager keeping his XI, stopped on the first match day the XI makes a pair combo
-// (yellow lines; mid-May at the latest), nobody out
+// (yellow lines; mid-May usually — 2026-10-16: one run in a few has none by then, so until the last weeks), nobody out
 const M = E.newGame(D, 'yokohamafm', 'ソーイ', '2026-10-15'); E.sponPick(M, E.sponRec(M));
 const PAIR = ['hot', 'heart', 'wall', 'wings', 'mentor'];
-const fx = play(M, '2027-03-01', null, true, X => { const c = X.clubs[X.my]; return X.date >= '2027-05-15' || E.linkEval(X, X.my, c.tac.form, c.tac.xi).combos.some(it => PAIR.includes(it.k)); }); tidy(M);
+const fx = play(M, '2027-03-01', null, true, X => { const c = X.clubs[X.my]; return X.date >= '2027-05-26' || E.linkEval(X, X.my, c.tac.form, c.tac.xi).combos.some(it => PAIR.includes(it.k)); }); tidy(M);
+// 2026-10-16: in about one run in four no pair combo comes in the whole season (link.js tests the curve) → the nearest one is
+// completed here (its pairs at 85) so that the screen can still be checked
+info.forced = null;
+{ const c = M.clubs[M.my];
+  if (!E.linkEval(M, M.my, c.tac.form, c.tac.xi).combos.some(it => PAIR.includes(it.k))) {
+    const nr = E.linkEval(M, M.my, c.tac.form, c.tac.xi, { near: true }).near.find(it => PAIR.includes(it.k));
+    if (nr) { const w = nr.who; c.lk = c.lk || {}; for (let i = 0; i < w.length; i++) for (let j = i + 1; j < w.length; j++) { const k = Math.min(w[i], w[j]) + '-' + Math.max(w[i], w[j]), e = c.lk[k] || [0, 0]; c.lk[k] = [Math.max(e[0], 85), e[1]]; } info.forced = nr.jp; } } }
 for (const p of E.squad(M, M.my)) { p.inj = 0; delete p.bans; delete p.away; p.cond = 100; }
 if (E.lineupIssues(M, M.my).block) E.autoLineup(M, M.my);
 const mc = M.clubs[M.my], L = E.linkEval(M, M.my, mc.tac.form, mc.tac.xi, { near: true });
@@ -132,7 +139,7 @@ async def main(vw, vh, board):
         cb = await page.locator('#view .pitch svg.lk-lines line.cb').count()
         ok(len(ls) >= len(I['tiers']) and [x.split(' ')[0] for x in ls[:len(I['tiers'])]] == I['tiers'], f"mid-season ({I['date']}): {len(ls)} lines, thickness as the engine says ({', '.join(f'{t}×{I['tiers'].count(t)}' for t in ['t1', 't2', 't3', 't4'])})")
         pair = any(c in I['combos'] for c in ['ホットライン', '中盤の心臓', '鉄壁', '両翼', '師弟'])
-        ok(pair and cb > 0, f"mid-season ({I['date']}): a pair combo ({'・'.join(I['combos'])}), {cb} yellow lines")
+        ok(pair and cb > 0, f"mid-season ({I['date']}): a pair combo ({'・'.join(I['combos'])}), {cb} yellow lines" + (f" — none came this season, {INFO['forced']} completed by hand" if INFO.get('forced') else ''))
         txt = (await page.locator('.lk-card').inner_text()).replace('\n', ' ')
         ok(f"平均{I['avg']}" in txt.replace(' ', '') and f"+{I['bonus']}" in txt, f"mid-season ({I['date']}): 平均 {I['avg']}・チーム力 +{I['bonus']}")
         plates = await page.locator('.lk-plate b').all_inner_texts()

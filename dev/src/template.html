@@ -302,7 +302,7 @@ table.tbl { border-collapse: collapse; width: 100%; font-size: 13px; }
 .lk-lines .t1.cb { stroke-width: 2.4; }
 .lk-lines .glow { stroke: var(--lk4); stroke-width: 12; opacity: .22; }
 :root[data-board="white"] .lk-lines .glow { opacity: .18; }
-.lk-card { display: grid; gap: 10px; }
+.lk-card { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
 .lk-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 .lk-sum { font-size: 13px; color: var(--muted); white-space: nowrap; }
 .lk-sum b { font-family: var(--f-display); font-weight: 400; font-size: 22px; color: var(--ink); margin: 0 2px; }
@@ -1017,7 +1017,7 @@ html.ios-app { min-height: calc(var(--apph) + 1px); }
 .cpA-ph small { font-size: 12px; color: var(--muted); }
 .cpA-ph .cost { font-family: var(--f-display); font-weight: 400; font-size: 17px; white-space: nowrap; }
 .cpA-rh h2 { margin-top: 2px; } .cpA-rh h2 small { font-family: var(--f-body); font-size: 13px; font-weight: 700; }
-.cpA-sec { display: grid; gap: 10px; } .cpA-go { border-color: color-mix(in srgb, var(--win) 45%, var(--line)); }
+.cpA-sec { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }   /* minmax: a combo plate's one-line names must not widen the card (2026-10-16) */ .cpA-go { border-color: color-mix(in srgb, var(--win) 45%, var(--line)); }
 .cp-pitch { aspect-ratio: 4 / 4.6; } .cp-pitch .tok { pointer-events: none; } .cp-pitch .tok .lbl { font-size: 10px; }
 .cp-cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }   /* the 14 days in two weeks */
 .cp-cal > div { display: grid; justify-items: center; gap: 1px; padding: 5px 0 4px; border-radius: 7px; background: color-mix(in srgb, var(--ink) 6%, transparent); border: 1px solid var(--line); min-width: 0; }

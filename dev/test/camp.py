@@ -38,6 +38,9 @@ const play = (S, until, A) => { const X = A || E;
 const S = E.newGame(D, 'yokohamafm', 'ソーイ', '2026-10-16'); E.sponPick(S, E.sponRec(S));
 info.first = E.campOf(S).skip;
 play(S, '2027-06-20'); if (S.spon && E.sponPending(S)) E.sponPick(S, E.sponRec(S)); tidy(S);
+// 2026-10-16: no offer for my players on her day (an offer stops the days first and her sheet comes a day later — fine in
+// the game, but this test checks the day she asks)
+for (const p of E.squad(S, S.my)) p.keep = true;
 const c = S.clubs[S.my];
 for (const p of E.squad(S, S.my)) { delete p.bans; if (!p.away) p.inj = 0; p.cond = 100; }
 E.autoLineup(S, S.my);
@@ -47,6 +50,9 @@ info.jan = { date: S.date, ask: C.ask, from: C.from, to: C.to, re: C.re, rec: E.
 out.jan = clone(S);
 // the 4th day of a 沖縄 camp (the home card)
 const R = clone(S); play(R, C.ask); E.secSeen(R); E.campPick(R, 'oki'); play(R, E.D.add(C.from, 3)); tidy(R); out.run = clone(R);
+// a new job before her day (2026-10-16): the sponsors of the new club are still to choose (sponJob, no stop) → on her day
+// the sponsor sheet opens first, and once they're signed her map follows
+const B = clone(S); E.sponOffer(B); out.both = clone(B);
 // old saves (be3e2da) of 2026/27: no camp that season
 const tmp = path.join(os.tmpdir(), `engine_be3e2da_cp_${process.pid}.js`);
 fs.writeFileSync(tmp, execSync('git show be3e2da:dev/src/engine.js', { cwd: path.join(root, '..') }));
@@ -122,6 +128,7 @@ async def main(vw, vh, board):
         await click('[data-act="go"]', 700)
         st = await save()
         ok(st['date'] == I['ask'] and await has('#sheet .cpA-map'), f"{I['ask']}: the days stop ({st['date']}) and the map sheet opens")
+        if not await has('#sheet .cpA-map'): print('   shown instead:', (await page.locator('#sheet.on').inner_text())[:120] if await has('#sheet.on') else 'no sheet', [x.get('type') for x in st['inbox'] if not x.get('seen')])
         toks = await page.locator('#sheet .cpA-tok').count()
         on = await page.locator('#sheet .cpA-tok.on .cpA-lbl b').all_inner_texts()
         rec = I['rec']['k']
@@ -209,6 +216,13 @@ async def main(vw, vh, board):
         ok('沖縄キャンプ中' in ht and '4日目／14日' in ht, f"in the camp: {ht}")
         await page.evaluate("() => { const h = document.querySelector('.cp-home'); window.scrollTo(0, h.getBoundingClientRect().top + scrollY - 120); }")
         await shot('home-run')
+
+        # ---- sponsors still to choose on her day: the sponsor sheet first, then (signed) her map
+        await load(SAVES['both'])
+        await click('[data-act="go"]', 700)
+        ok(await has('#sheet [data-act="spSign"]'), 'sponsors still open on her day: the sponsor sheet first')
+        await click('#sheet [data-act="spSign"]', 900)
+        ok(await has('#sheet.on .cpA-map'), 'signed → her map sheet follows')
 
         # ---- an old save (be3e2da) of 2026/27: no camp that season (it was before the game began)
         await load(SAVES['old2'])

@@ -2544,7 +2544,7 @@ function sheetCampRep() {
   }
   const toks = r.xi.map((id, i) => { const p = S.players[id]; if (!p || !F[i]) return ''; return `<div class="tok" style="left:${F[i][1]}%;top:${topY(F[i][2])}%;${kv}"><span class="shirt">${p.num}</span><span class="lbl">${esc(p.short)}</span></div>`; }).join('');
   const board = `<div class="pitch cp-pitch">${PITCH_SVG}<svg class="lk-lines" viewBox="0 0 100 127.5" preserveAspectRatio="none" aria-hidden="true"><defs><filter id="cp-lk" filterUnits="userSpaceOnUse" x="-5" y="-5" width="110" height="137.5"><feTurbulence type="fractalNoise" baseFrequency="3" numOctaves="2" seed="7"/><feDisplacementMap in="SourceGraphic" scale=".5"/></filter></defs><g filter="url(#cp-lk)">${lines}</g></svg>${toks}</div>`;
-  const plates = r.cb.map(it => `<div class="lk-plate"><span class="ic">${lkIc(it.k)}</span><span class="nm"><b>${esc(it.jp)}</b><small>キャンプで組めるようになった・${lkWho(it)}</small></span><span class="lk-fx">${lkFx(it)}</span></div>`).join('');
+  const plates = r.cb.map(it => `<div class="lk-plate"><span class="ic">${lkIc(it.k)}</span><span class="nm"><b>${esc(it.jp)}</b><small>${lkWho(it)}</small></span><span class="lk-fx">${lkFx(it)}</span></div>`).join('');
   const near = r.near.map(it => `<div class="lk-wrow"><span><b>${esc(it.jp)}</b>${esc(it.cond)}</span><span class="pg"><span class="lk-bar"><i style="width:${Math.min(100, Math.floor(it.val / it.need * 100))}%"></i></span><span>${lkProg(it)}</span></span></div>`).join('');
   const growRows = r.grow.map(g => { const p = S.players[g.pid]; if (!p) return ''; return `<div class="r">${SEC_MAG(p)}<span class="n"><b>${esc(p.name)}</b><small>${E.age(p, S.date)}歳・${dpOf(p)}</small></span><span class="v">${g.a.toFixed(1)}<i>→</i>${g.b.toFixed(1)}</span><b class="d">+${(g.b - g.a).toFixed(1)}</b></div>`; }).join('');
   const ev = r.ev.map(e => cpEv(e, r)).filter(Boolean).join('');
@@ -2558,7 +2558,7 @@ function sheetCampRep() {
   openSheet(`<div class="cpA-rh"><div class="eyebrow">キャンプ・レポート</div><h2>${T.jp}キャンプ${T.sub ? `<small>（${T.sub}）</small>` : ''}</h2><div class="small muted">${jdw(r.from)}〜${jdw(r.to)}・${E.CAMP.len}日間・参加${r.n}人・費用${E.money(r.cost)}</div>${r.auto ? `<p class="fine" style="margin:4px 0 0">行き先が決まらなかったので、標準の${E.CAMP.d[E.CAMP.std].jp}に行きました。</p>` : ''}</div>
     ${cal}
     <section class="card cpA-sec"><div class="lk-head"><span class="eyebrow">連携</span><span class="lk-sum">平均 ${Math.floor(r.avg0)} → <b>${Math.floor(r.avg1)}</b><span class="lk-plus">+${Math.max(0, Math.floor(r.avg1) - Math.floor(r.avg0))}</span></span></div>
-      ${board}<p class="fine" style="margin:0">${up ? `黄色の線は、キャンプで70を超えた組（${up}組）。` : ''}先発の組に練習試合${T.pm}試合分。</p>${plates}${near}</section>
+      ${board}<p class="fine" style="margin:0">${up ? `黄色の線は、キャンプで70を超えた組（${up}組）。` : ''}先発の組に練習試合${T.pm}試合分。${r.cb.length ? `<b>キャンプで新しく組めるようになったコンボ</b>が${r.cb.length}つ。` : ''}</p>${plates}${near}</section>
     <section class="card cpA-sec"><div class="lk-head"><span class="eyebrow">伸びた選手</span><span class="lk-sum">チーム全体で <b>+${r.gsum.toFixed(1)}</b></span></div><div class="cp-grow">${growRows}</div></section>
     ${ev ? `<section class="card cpA-sec"><div class="eyebrow">できごと</div><div class="cp-ev">${ev}</div></section>` : ''}
     ${pm ? `<section class="card cpA-sec"><div class="lk-head"><span class="eyebrow">練習試合</span><span class="lk-sum">${w}勝${dr}分${l}敗</span></div><div class="cp-pmt">${pm}</div></section>` : ''}
@@ -2769,7 +2769,12 @@ const ACT = {
     if (!n || !E.sponPick(S, pick)) return;
     UI.spk = null; persist(true);
     toast(`スポンサー${n}社と契約しました`);
-    if (st.back === 'pre' && st.fid) sheetPrematch(st.fid); else { closeSheet(); render(); }
+    if (st.back === 'pre' && st.fid) sheetPrematch(st.fid);
+    else {
+      closeSheet(); render();
+      // her camp question came the same day (2026-10-16: after a new job the sponsor sheet opens first) → the map next
+      if (E.campPending(S) && E.secNotes(S).some(x => x.k === 'camp' && !x.seen)) setTimeout(() => { if (!sheetState) sheetCamp(); }, 320);
+    }
   },
   youthOpen() { sheetYouth('sec'); },
   youthDone(d) { const it = S.inbox.find(x => x.id === Number(d.id)); if (it) it.done = true; persist(false); render(); },

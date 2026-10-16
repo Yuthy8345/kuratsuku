@@ -29,8 +29,29 @@ def font_css():
         css += (FONTS/f).read_text()
     return re.sub(r"url\(\./files/([^)]+)\)", lambda m: f"url(https://fonts.gstatic.com/fs/{m.group(1)})", css)
 SAVE_JS = '''() => { localStorage.setItem('touchline.j1.save', 'x'); }'''
+# キャンプ (2026-10-16, 作業8): two saves of 横浜FM in 2027/28 — the day before her question (6/21: the map sheet opens
+# on 次へ進む) and the last day of a 沖縄 camp (次へ進む opens the report). Made with the current engine (about 15 s).
+MAKE = r"""
+const E = require(process.argv[1] + '/dev/src/engine.js'), D = require(process.argv[1] + '/dev/data.json');
+const play = (S, until) => { for (let g = 0; g < 9000 && S.date < until; g++) { const st = E.advance(S, 1);
+  if (st.stop === 'match') { const f = S.fixtures.find(y => y.id === st.fid); E.autoLineup(S, S.my, { comp: E.compOf(f) }); const M = E.createMatch(S, f); E.simulateFull(S, M); E.finishMatch(S, M); S.board = Math.max(S.board, 50); }
+  else if (st.stop === 'inbox') S.inbox.forEach(y => { y.seen = true; if (y.type === 'offer') E.rejectOffer(S, y.id); });
+  else if (st.stop === 'seasonEnd') E.rollover(S); else if (st.stop === 'fired') E.takeJob(S, S.fired.offers[0]);
+  else if (st.stop === 'camp') { if (S.date < until) E.campSeen(S); else break; }
+  else if (st.stop) { E.secSeen(S); S.cele = []; if (E.sponPending(S)) E.sponPick(S, E.sponRec(S)); } } };
+const tidy = S => { E.secSeen(S); S.sec.notes = S.sec.notes.filter(n => n.k === 'camp' && !n.seen); S.sec.back = []; S.inbox.forEach(y => { y.seen = true; y.done = true; }); if (S.reborn) delete S.reborn.show; S.cele = [];
+  for (const p of E.squad(S, S.my)) { delete p.bans; if (!p.away) p.inj = 0; } E.autoLineup(S, S.my); };
+const S = E.newGame(D, 'yokohamafm', 'ソーイ', '2026-10-16'); E.sponPick(S, E.sponRec(S));
+const C0 = E.campOf(S); play(S, '2027-06-20'); tidy(S); for (const p of E.squad(S, S.my)) p.keep = true;   // no offer on her day
+const C = E.campOf(S); const ask = JSON.stringify(S);
+play(S, C.ask); E.secSeen(S); E.campPick(S, 'oki'); play(S, C.to); tidy(S);
+console.log(JSON.stringify({ ask, rep: JSON.stringify(S), info: [C.ask, C.from, C.to, S.date, S.camp.show] }));
+"""
 async def main():
     srv = serve(); css = font_css(); bad = []
+    import subprocess, json
+    CAMP = json.loads(subprocess.run(['node', '-e', MAKE, str(REPO)], capture_output=True, text=True, check=True).stdout)
+    print('camp saves', CAMP['info'])
     async with async_playwright() as p:
         b = await p.chromium.launch()
         for save in (False, True):
@@ -116,7 +137,10 @@ async def main():
                         await page.evaluate('scrollTo(0, 0)')
                     async def bottom_of(sel, where):
                         await again(where)
-                        b_ = await page.evaluate(f"document.querySelector('{sel}').getBoundingClientRect().bottom")
+                        for _ in range(10):   # a sheet still sliding in (slow when the machine is busy): wait up to 1.5 s
+                            b_ = await page.evaluate(f"document.querySelector('{sel}').getBoundingClientRect().bottom")
+                            if abs(b_ - h) <= 1: break
+                            await page.wait_for_timeout(150)
                         if abs(b_ - h) > 1: print(f"   {name} {where}: {sel} bottom {b_:.0f}, screen {h}"); bad.append(f'{tag} {where}')
                     await page.click('[data-act="continue"]'); await page.wait_for_timeout(400)
                     for tab in ('home', 'squad', 'tactics', 'league', 'club'):
@@ -173,16 +197,44 @@ async def main():
                         await bottom_of('#sheet', 'secretary sheet')
                         if w == 393: await page.screenshot(path=str(OUT/f"ip-sec-{mode}-{w}x{h}.png"))
                         await page.locator('#sheet [data-act="closeSheet"]').last.dispatch_event('click'); await page.wait_for_timeout(300)
+                    # スポンサー契約 (2026-10-15): the sheet with the contracts and the kit, from the home card
+                    await page.locator('[data-tab="home"]').dispatch_event('click'); await page.wait_for_timeout(150)
+                    if await page.locator('[data-act="sponOpen"]').count():
+                        await page.locator('[data-act="sponOpen"]').first.dispatch_event('click'); await page.wait_for_timeout(600)
+                        await bottom_of('#sheet', 'sponsor sheet')
+                        if w == 393: await page.screenshot(path=str(OUT/f"ip-spon-{mode}-{w}x{h}.png"))
+                        await page.locator('#sheet [data-act="closeSheet"]').last.dispatch_event('click'); await page.wait_for_timeout(300)
+                    else: print(f"   {name}: no sponsor card"); bad.append(f'{tag} sponsor card')
                     await page.locator('[data-tab="home"]').dispatch_event('click'); await page.wait_for_timeout(150)
                     await again('home again')
                     await page.screenshot(path=str(OUT/f"ip-home-{mode}-{w}x{h}.png"))
-                    # the match: the controls sit on the home bar
+                    # the match: the pre-match sheet (連携・観客), then the controls sit on the home bar
                     await page.locator('[data-act="go"]').dispatch_event('click'); await page.wait_for_timeout(300)
+                    await bottom_of('#sheet', 'pre-match sheet')
                     await page.locator('#sheet [data-act="kickoff"]').dispatch_event('click'); await page.wait_for_timeout(500)
                     await bottom_of('#mlayer', 'match')
                     mb = await page.evaluate("document.querySelector('#mctl').getBoundingClientRect().bottom")
                     if abs(mb - h) > 1: print(f"   {name} match: controls bottom {mb:.0f}, screen {h}"); bad.append(f'{tag} match controls')
                     if w == 393: await page.screenshot(path=str(OUT/f"ip-match-{mode}-{w}x{h}.png"))
+                    # キャンプ (2026-10-16): her question opens the map sheet, the report after the last day; both reach the bottom
+                    # of the screen and the map sits inside it; the home card during the run-up
+                    for k, sel, where in (('ask', '.cpA-map', 'camp sheet'), ('rep', '.cp-cal', 'camp report')):
+                        # leave the game first: leaving a page with a game open saves it (pagehide) over the save put in
+                        await page.goto('http://127.0.0.1:8766/index.html'); await page.wait_for_timeout(200)
+                        await page.evaluate('s => localStorage.setItem("touchline.j1.save", s)', CAMP[k])
+                        await page.goto('http://127.0.0.1:8766/index.html'); await page.wait_for_timeout(300)
+                        await page.locator('[data-act="continue"]').dispatch_event('click'); await page.wait_for_timeout(400)
+                        await again(f'{where} home')
+                        # her question: 次へ進む (the next day she asks); the report: the home card's button (the day it ended)
+                        await page.locator('[data-act="go"]' if k == 'ask' else '[data-act="campRep"]').first.dispatch_event('click'); await page.wait_for_timeout(750)   # the map / the report take a moment longer
+                        if not await page.locator(f'#sheet.on {sel}').count(): print(f"   {name}: no {where}"); bad.append(f'{tag} {where}'); continue
+                        await bottom_of('#sheet', where)
+                        fit = await page.evaluate(f'''() => {{ const m = document.querySelector('#sheet {sel}').getBoundingClientRect();
+                          return m.left >= -0.5 && m.right <= innerWidth + 0.5 && document.scrollingElement.scrollWidth <= innerWidth + 1; }}''')
+                        if not fit: print(f"   {name} {where}: wider than the screen"); bad.append(f'{tag} {where} width')
+                        if w == 393 or w == 375: await page.screenshot(path=str(OUT/f"ip-camp-{k}-{mode}-{w}x{h}.png"))
+                        await page.locator('#sheet [data-act="closeSheet"], #sheet [data-act="campRepDone"]').last.dispatch_event('click'); await page.wait_for_timeout(300)
+                        if not await page.locator('.cp-home, [data-act="campRep"], [data-act="campOpen"]').count(): print(f"   {name}: no camp card ({k})"); bad.append(f'{tag} camp card {k}')
                 await ctx.close()
         await b.close()
     srv.shutdown()
