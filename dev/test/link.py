@@ -158,6 +158,8 @@ async def main(vw, vh, board):
         # iPhone's Safari drew no dotted line that was exactly upright or level (2026-10-17: 4-1-4-1's RSH–RSB)
         flat = await page.evaluate("() => [...document.querySelectorAll('.lk-lines line, .lk-leg line')].filter(l => ['x', 'y'].some(a => +l.getAttribute(a + '1') === +l.getAttribute(a + '2'))).length")
         ok(flat == 0, f"no chalk line is exactly upright or level (Safari): {flat}")
+        box = await page.evaluate("() => [...document.querySelectorAll('.lk-lines g[filter]')].map(g => g.firstElementChild && g.firstElementChild.matches('rect.lk-box') && g.firstElementChild.getAttribute('width') === '100')")
+        ok(box and all(box), f"the chalk lines' group starts with the board-sized box (WebKit cut the rightmost upright line): {box}")
         await to_board(); await shot('board')
         await to_card(); await shot('card')
 

@@ -1433,10 +1433,9 @@ function formSelect(c) {
 /* ---------- 連携とコンボ (2026-10-15, the user's 案A: chalk lines on the board, the card under it) ---------- */
 // the board's lines: thickness = how well the two know each other (〜39 dotted, 40〜, 70〜, 90〜), yellow = in a combo.
 // The board is 4:5.1, so a 100 × 127.5 viewBox keeps the slots' % positions (top = 88 − (y − 7) × 1.04) undistorted.
-// a chalk line between slots i and j of formation F (the 100 × 127.5 board). One that would be exactly upright or level
-// is tilted by 0.05 (a fifth of a pixel): iPhone's Safari drew no dotted line (〜39) whose box has no width or height —
-// 4-1-4-1's RSH and RSB stood linked with nothing between them (2026-10-17, the user's screenshot), while the solid ones
-// and every slanted dotted one showed
+// a chalk line between slots i and j of formation F (the 100 × 127.5 board). WebKit (iPhone's Safari) draws no dotted
+// line (〜39) that is exactly level (4-4-2's two CMF, a front two): one like that, or exactly upright, is tilted by 0.05
+// (a fifth of a pixel). Found in WebKitGTK (dev/test/webkit.py), 2026-10-17
 function lkXY(F, i, j) {
   const at = k => [F[k][1], (88 - (F[k][2] - 7) * 1.04) * 1.275];
   let [x1, y1] = at(i), [x2, y2] = at(j);
@@ -1444,6 +1443,11 @@ function lkXY(F, i, j) {
   if (Math.abs(y1 - y2) < 0.05) y2 = y1 + 0.05;
   return `x1="${x1}" y1="${y1.toFixed(2)}" x2="${x2}" y2="${y2.toFixed(2)}"`;
 }
+// the filtered group of chalk lines starts with an empty box the size of the board: WebKit cut the chalk filter's picture
+// to the lines' own extent, and the rightmost upright line (RSB–RSH at x 87 in 4-4-2, 4-1-4-1 and 4-4-1-1) fell outside it
+// and vanished, solid or dotted, whoever played there (2026-10-17, the user's screenshots; reproduced in WebKitGTK,
+// dev/test/webkit.py). The box makes the extent the whole board. Chromium showed both all along.
+const LK_BOX = '<rect class="lk-box" x="0" y="0" width="100" height="127.5" fill="none"/>';
 function lkLines(F, xi, L) {
   const key = (i, j) => Math.min(i, j) * 32 + Math.max(i, j);
   const hot = new Set(); for (const it of L.combos) for (const [i, j] of it.lines || []) hot.add(key(i, j));
@@ -1455,7 +1459,7 @@ function lkLines(F, xi, L) {
   // a combo between players who aren't neighbours (鉄壁 with the outer centre-backs of a back three)
   for (const it of L.combos) for (const [i, j] of it.lines || []) if (!drawn.has(key(i, j))) { drawn.add(key(i, j)); glow += ln(i, j, 'glow'); out += ln(i, j, tier(E.linkOf(S, S.my, xi[i], xi[j])) + ' cb'); }
   if (!out) return '';
-  return `<svg class="lk-lines" viewBox="0 0 100 127.5" preserveAspectRatio="none" aria-hidden="true"><defs><filter id="lk-chalk" filterUnits="userSpaceOnUse" x="-5" y="-5" width="110" height="137.5"><feTurbulence type="fractalNoise" baseFrequency="3" numOctaves="2" seed="7"/><feDisplacementMap in="SourceGraphic" scale=".5"/></filter></defs><g filter="url(#lk-chalk)">${glow}${out}</g></svg>`;
+  return `<svg class="lk-lines" viewBox="0 0 100 127.5" preserveAspectRatio="none" aria-hidden="true"><defs><filter id="lk-chalk" filterUnits="userSpaceOnUse" x="-5" y="-5" width="110" height="137.5"><feTurbulence type="fractalNoise" baseFrequency="3" numOctaves="2" seed="7"/><feDisplacementMap in="SourceGraphic" scale=".5"/></filter></defs><g filter="url(#lk-chalk)">${LK_BOX}${glow}${out}</g></svg>`;
 }
 const LK_IC = {
   hot: '<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>',
@@ -2630,7 +2634,7 @@ function sheetCampRep() {
     lines += (hi ? `<line class="glow" ${xy}/>` : '') + `<line class="${tier(v1)}${hi ? ' cb' : ''}" ${xy}/>`;
   }
   const toks = r.xi.map((id, i) => { const p = S.players[id]; if (!p || !F[i]) return ''; return `<div class="tok" style="left:${F[i][1]}%;top:${topY(F[i][2])}%">${tokShirt(S.my, p.num, '')}<span class="lbl">${esc(p.short)}</span></div>`; }).join('');
-  const board = `<div class="pitch cp-pitch">${PITCH_SVG}<svg class="lk-lines" viewBox="0 0 100 127.5" preserveAspectRatio="none" aria-hidden="true"><defs><filter id="cp-lk" filterUnits="userSpaceOnUse" x="-5" y="-5" width="110" height="137.5"><feTurbulence type="fractalNoise" baseFrequency="3" numOctaves="2" seed="7"/><feDisplacementMap in="SourceGraphic" scale=".5"/></filter></defs><g filter="url(#cp-lk)">${lines}</g></svg>${toks}</div>`;
+  const board = `<div class="pitch cp-pitch">${PITCH_SVG}<svg class="lk-lines" viewBox="0 0 100 127.5" preserveAspectRatio="none" aria-hidden="true"><defs><filter id="cp-lk" filterUnits="userSpaceOnUse" x="-5" y="-5" width="110" height="137.5"><feTurbulence type="fractalNoise" baseFrequency="3" numOctaves="2" seed="7"/><feDisplacementMap in="SourceGraphic" scale=".5"/></filter></defs><g filter="url(#cp-lk)">${LK_BOX}${lines}</g></svg>${toks}</div>`;
   const plates = r.cb.map(it => `<div class="lk-plate"><span class="ic">${lkIc(it.k)}</span><span class="nm"><b>${esc(it.jp)}</b><small>${lkWho(it)}</small></span><span class="lk-fx">${lkFx(it)}</span></div>`).join('');
   const near = r.near.map(it => `<div class="lk-wrow"><span><b>${esc(it.jp)}</b>${esc(it.cond)}</span><span class="pg"><span class="lk-bar"><i style="width:${Math.min(100, Math.floor(it.val / it.need * 100))}%"></i></span><span>${lkProg(it)}</span></span></div>`).join('');
   const growRows = r.grow.map(g => { const p = S.players[g.pid]; if (!p) return ''; return `<div class="r">${SEC_MAG(p)}<span class="n"><b>${esc(p.name)}</b><small>${E.age(p, S.date)}歳・${dpOf(p)}</small></span><span class="v">${g.a.toFixed(1)}<i>→</i>${g.b.toFixed(1)}</span><b class="d">+${(g.b - g.a).toFixed(1)}</b></div>`; }).join('');
