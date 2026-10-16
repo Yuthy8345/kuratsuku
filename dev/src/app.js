@@ -240,13 +240,9 @@ const uniPat = cid => uniOf(cid).p !== 'so' ? ' pat' : '';
 // a shirt (140×128), front or back: the body with its pattern, cuffs and collar in the trim colours; num on the chest
 const SH_BODY = 'M43.4,0 L23.8,6.4 L0,34.6 L15.4,57.6 L32.2,48.6 L32.2,128 L107.8,128 L107.8,48.6 L124.6,57.6 L140,34.6 L116.2,6.4 L96.6,0 L84,9 L70,11.5 L56,9 Z';
 let shN = 0;
-// a player magnet on a board: round (the kit's body and trim) or, with the shirt magnets, the shirt itself
-const KITB = (() => { try { return localStorage.getItem('kuratsuku.kitmode') === 'B'; } catch (e) { return false; } })();
+// a player magnet on a board or the bench is the shirt itself (2026-10-16 案B); a player who can't play wears grey
 const OUT_KIT = { p: 'so', b: '#5A5F5C', pc: null, t1: '#474B49', t2: null, n: '#FFFFFF' };
-function tokShirt(cid, num, cls, out) {
-  if (KITB) return `<span class="shirt uni-b ${cls}">${uniSvg(out ? OUT_KIT : uniOf(cid), { num })}</span>`;
-  return `<span class="shirt ${cls}${uniPat(cid)}">${num}</span>`;
-}
+const tokShirt = (cid, num, cls, out) => `<span class="shirt uni-b ${cls}">${uniSvg(out ? OUT_KIT : uniOf(cid), { num })}</span>`;
 function uniSvg(u, o) {
   o = o || {}; const id = 'sh' + (++shN);
   const pat = u.p === 'st' ? Array.from({ length: 5 }, (_, i) => `<rect x="${19 + i * 22}" y="0" width="11" height="128" fill="${u.pc}"/>`).join('')
@@ -753,7 +749,7 @@ function sheetNum(id, sel) {
   const tgt = sel && who[sel];
   openSheet(`<div class="row">${posTag(p)}<span class="small muted">${esc(p.name)}・${E.age(p, S.date)}歳</span></div>
     <h2>背番号の変更</h2>
-    <div class="numnow"><span class="numnow-mag" style="--k1:${S.clubs[S.my].c1};--k2:${S.clubs[S.my].c2};--kt:${lum(S.clubs[S.my].c1) > 0.6 ? '#141414' : '#ffffff'}">${p.num}</span>${sel ? `<span class="numnow-arrow" aria-hidden="true">→</span><span class="numnow-mag new" style="--k1:${S.clubs[S.my].c1};--k2:${S.clubs[S.my].c2};--kt:${lum(S.clubs[S.my].c1) > 0.6 ? '#141414' : '#ffffff'}">${sel}</span>` : ''}
+    <div class="numnow"><span class="numnow-mag${uniPat(S.my)}" style="${uniVars(S.my)}">${p.num}</span>${sel ? `<span class="numnow-arrow" aria-hidden="true">→</span><span class="numnow-mag new" style="--k1:${S.clubs[S.my].c1};--k2:${S.clubs[S.my].c2};--kt:${lum(S.clubs[S.my].c1) > 0.6 ? '#141414' : '#ffffff'}">${sel}</span>` : ''}
       <span class="small" style="flex:1;min-width:0">${!open ? `今は変更できません。${E.numNext(S)}変更できます。` : sel ? (tgt ? `${esc(tgt.name)}の${sel}番と入れ替えます（${esc(tgt.short)}は${p.num}番へ）。` : `空いている${sel}番に変えます。`) : '新しい番号をタップしてください。'}</span></div>
     <p class="fine" style="margin:0">変更できるのはオフシーズン（シーズン総括〜開幕前）と冬の移籍期間（12/20〜2/26）です。ほかの選手が着けている番号を選ぶと、その選手と番号を入れ替えます。${leg && leg.num ? `金色の${leg.num}は「${esc(leg.epi)}」の番号です。` : ''}</p>
     <div class="numgrid${open ? '' : ' closed'}">${Array.from({ length: E.NUM_MAX }, (_, i) => cell(i + 1)).join('')}</div>`,
@@ -1009,7 +1005,7 @@ function secPlace() {
   fl.style.bottom = ((dock ? dock.offsetHeight : 124) + 8) + 'px';
 }
 function secMagLine(fix) { return `<div class="sec-line">${akiMag('sm')}<p><b>${secFixLine(fix)}。</b><span class="small">（${pairs(fix)}）</span></p></div>`; }
-const SEC_MAG = (p, out) => { const c = S.clubs[S.my]; const kt = lum(c.c1) > 0.6 ? '#141414' : '#ffffff'; return `<span class="sec-pm${out ? ' out' : ''}" style="--k1:${c.c1};--k2:${c.c2};--kt:${kt}">${p ? p.num : '+'}</span>`; };
+const SEC_MAG = (p, out) => `<span class="sec-pm${out ? ' out' : ''}${uniPat(S.my)}" style="${uniVars(S.my)}">${p ? p.num : '+'}</span>`;
 function secFixRows(fix) {
   const F = E.FORMATIONS[S.clubs[S.my].tac.form];
   return `<ul class="sec-list">${fix.items.map(it => {
@@ -1497,9 +1493,8 @@ function linkBlock(p) {
   if (!ps.length) return p.club === S.my ? '<div><div class="eyebrow" style="margin-bottom:6px">相性のいい選手（連携）</div><p class="fine" style="margin:0">まだ一緒にピッチに立った選手がいません。試合に出るほど連携が上がります。</p></div>' : '';
   const L = E.linkEval(S, p.club, c.tac.form, c.tac.xi);
   const tags = q => L.combos.filter(it => ['hot', 'heart', 'wall', 'wings', 'mentor'].includes(it.k) && (it.who || []).includes(p.id) && it.who.includes(q)).map(it => `<span class="lk-tag">${esc(it.jp)}</span>`).join('');
-  const kt = lum(c.c1) > 0.6 ? '#141414' : '#ffffff';
   // yellow = the two make a combo in the XI now (as on the board), not just a high number
-  const rows = ps.map(x => { const q = S.players[x.pid], tg = tags(q.id); return `<button class="lk-prow" data-act="player" data-id="${q.id}"><span class="lk-mag" style="--k1:${c.c1};--k2:${c.c2};--kt:${kt}">${q.num}</span><span class="nm"><b>${esc(q.short)}${tg}</b><span>${dpOf(q)}・一緒に約${(Math.round(x.m / 10) * 10).toLocaleString('ja-JP')}分</span></span><span class="lk-cbar${tg ? ' hi' : ''}"><i style="width:${Math.floor(x.v)}%"></i></span><span class="v">${Math.floor(x.v)}</span></button>`; }).join('');
+  const rows = ps.map(x => { const q = S.players[x.pid], tg = tags(q.id); return `<button class="lk-prow" data-act="player" data-id="${q.id}"><span class="lk-mag${uniPat(c.id)}" style="${uniVars(c.id)}">${q.num}</span><span class="nm"><b>${esc(q.short)}${tg}</b><span>${dpOf(q)}・一緒に約${(Math.round(x.m / 10) * 10).toLocaleString('ja-JP')}分</span></span><span class="lk-cbar${tg ? ' hi' : ''}"><i style="width:${Math.floor(x.v)}%"></i></span><span class="v">${Math.floor(x.v)}</span></button>`; }).join('');
   return `<div><div class="eyebrow" style="margin-bottom:6px">相性のいい選手（連携）</div><div class="lk-pl">${rows}</div><p class="fine" style="margin:8px 0 0">一緒にピッチに立つほど上がり、離れていると少しずつ下がります。</p></div>`;
 }
 // 戦術 (posture, counter, press, the extra instructions, substitutions): a summary plate on the tactics screen; the
@@ -1530,12 +1525,11 @@ function sheetPlan() {
 // the bench as magnets on the board, three to a row: number magnet in the club's colours, name, position, age, rating,
 // condition; × = can't play (injury / suspension), ! = tired
 function benchTile(p, c) {
-  const kt = lum(c.c1) > 0.6 ? '#141414' : '#ffffff';
   const out = !avail(p), tired = !out && p.cond < 70;
   const st = out ? `<span class="chip warn">${p.inj > 0 ? `負傷 ${p.inj}日` : '出場停止'}</span>` : p.hot ? '<span class="chip fire">燃えている</span>' : p.reborn ? '<span class="chip rbchip">転生</span>' : '';
   return `<button class="btile${out ? ' out' : ''}${p.hot ? ' hot' : ''}" role="listitem" data-act="benchPick" data-id="${p.id}" aria-label="ベンチ ${esc(p.name)} ${dpOf(p)} 能力${E.ovr(p)}${out ? ' ' + outShort(p) : ''}">
     <span class="bt-ovr ${oc(p.ovr)}">${E.ovr(p)}</span>
-    ${KITB ? `<span class="bt-mag uni-b${tired ? ' warn' : ''}">${uniSvg(out ? OUT_KIT : uniOf(c.id), { num: p.num })}</span>` : `<span class="bt-mag${tired ? ' warn' : ''}${uniPat(c.id)}" style="${uniVars(c.id)}">${p.num}</span>`}
+    <span class="bt-mag uni-b${tired ? ' warn' : ''}">${uniSvg(out ? OUT_KIT : uniOf(c.id), { num: p.num })}</span>
     <b class="bt-name">${esc(p.name)}</b>
     <span class="bt-meta">${posTag(p)}${E.age(p, S.date)}歳</span>
     ${st ? `<span class="bt-st">${st}</span>` : condBar(p.cond)}
@@ -1698,7 +1692,6 @@ function sheetTeam(cid, tab, back) {
   sheetState = { type: 'team', id: cid, tab, back: back || null };
   const t = E.table(S); const ri = t.findIndex(r => r.id === cid); const row = ri >= 0 ? t[ri] : null;
   const j1 = inJ1(cid);
-  const kt = lum(c.c1) > 0.6 ? '#141414' : '#ffffff';
   const head = `<div class="team-head">${kitTag(cid, c, 'lg')}<div style="min-width:0"><div class="eyebrow">${esc(c.area || '')}・${j1 ? 'J1' : c.ab ? esc(c.ab.lg) : 'J2'}${c.coach ? `・監督 ${esc(c.coach)}` : ''}</div><h2>${esc(c.name)}</h2></div></div>`;
   const tabs = `<div class="seg" role="tablist">${[['info', '概要'], ['squad', `選手（${E.squad(S, cid).length}人）`]].map(([k, l]) => `<button data-act="teamTab" data-k="${k}" aria-pressed="${tab === k}">${l}</button>`).join('')}</div>`;
   let body = '';
@@ -2607,7 +2600,7 @@ function cpEv(e, r) {
 function sheetCampRep() {
   const C = S.camp, r = C && C.rep; if (!r) return;
   sheetState = { type: 'campRep' };
-  const T = E.CAMP.d[r.k], c = S.clubs[S.my], kv = `--k1:${c.c1};--k2:${c.c2};--kt:${lum(c.c1) > 0.6 ? '#141414' : '#ffffff'}`;
+  const T = E.CAMP.d[r.k], c = S.clubs[S.my];
   const days = Array.from({ length: E.CAMP.len }, (_, i) => E.D.add(r.from, i));
   const pmD = new Set(r.pm.map(m => m.d));
   const cal = `<div class="cp-cal">${days.map(d => { const w = E.D.dow(d), ev = r.ev.filter(e => e.d === d && (e.k === 'inj' || e.k === 'join'));
@@ -2624,7 +2617,7 @@ function sheetCampRep() {
     const xy = `x1="${F[i][1]}" y1="${(topY(F[i][2]) * 1.275).toFixed(2)}" x2="${F[j][1]}" y2="${(topY(F[j][2]) * 1.275).toFixed(2)}"`;
     lines += (hi ? `<line class="glow" ${xy}/>` : '') + `<line class="${tier(v1)}${hi ? ' cb' : ''}" ${xy}/>`;
   }
-  const toks = r.xi.map((id, i) => { const p = S.players[id]; if (!p || !F[i]) return ''; return `<div class="tok" style="left:${F[i][1]}%;top:${topY(F[i][2])}%;${kv}"><span class="shirt">${p.num}</span><span class="lbl">${esc(p.short)}</span></div>`; }).join('');
+  const toks = r.xi.map((id, i) => { const p = S.players[id]; if (!p || !F[i]) return ''; return `<div class="tok" style="left:${F[i][1]}%;top:${topY(F[i][2])}%">${tokShirt(S.my, p.num, '')}<span class="lbl">${esc(p.short)}</span></div>`; }).join('');
   const board = `<div class="pitch cp-pitch">${PITCH_SVG}<svg class="lk-lines" viewBox="0 0 100 127.5" preserveAspectRatio="none" aria-hidden="true"><defs><filter id="cp-lk" filterUnits="userSpaceOnUse" x="-5" y="-5" width="110" height="137.5"><feTurbulence type="fractalNoise" baseFrequency="3" numOctaves="2" seed="7"/><feDisplacementMap in="SourceGraphic" scale=".5"/></filter></defs><g filter="url(#cp-lk)">${lines}</g></svg>${toks}</div>`;
   const plates = r.cb.map(it => `<div class="lk-plate"><span class="ic">${lkIc(it.k)}</span><span class="nm"><b>${esc(it.jp)}</b><small>${lkWho(it)}</small></span><span class="lk-fx">${lkFx(it)}</span></div>`).join('');
   const near = r.near.map(it => `<div class="lk-wrow"><span><b>${esc(it.jp)}</b>${esc(it.cond)}</span><span class="pg"><span class="lk-bar"><i style="width:${Math.min(100, Math.floor(it.val / it.need * 100))}%"></i></span><span>${lkProg(it)}</span></span></div>`).join('');

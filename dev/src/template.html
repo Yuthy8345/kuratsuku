@@ -273,7 +273,8 @@ table.tbl { border-collapse: collapse; width: 100%; font-size: 13px; }
 .pitch svg.lines * { fill: none; stroke: var(--pitch-line); stroke-width: .55; stroke-linecap: round; }
 .tok { position: absolute; transform: translate(-50%, -21px); display: grid; justify-items: center; gap: 1px; width: 74px; }
 .tok .shirt { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-family: var(--f-body); font-weight: 900; font-size: 15px; border: 3px solid var(--k2); background: radial-gradient(circle at 34% 28%, rgba(255,255,255,.4) 0%, rgba(255,255,255,0) 48%), var(--kp, var(--k1)); color: var(--kt); box-shadow: inset 0 0 0 1.5px var(--k3, var(--k2)), 0 3px 0 rgba(0,0,0,.35), 0 6px 10px rgba(0,0,0,.25); position: relative; }
-.tok .shirt.pat, .bt-mag.pat { text-shadow: 0 0 2px rgba(0,0,0,.7), 0 1px 1px rgba(0,0,0,.6); }
+/* the smaller round player magnets wear the kit's body (--kp) and trim (--k2 ring, --k3 inner line) */
+.lk-mag.pat, .sec-pm.pat, .numnow-mag.pat { text-shadow: 0 0 2px rgba(0,0,0,.7), 0 1px 1px rgba(0,0,0,.6); }
 /* shirt magnets (2026-10-16 案B) */
 .tok .shirt.uni-b, .bt-mag.uni-b { width: 46px; height: 42px; border: 0; border-radius: 0; background: none; box-shadow: none; filter: drop-shadow(0 3px 0 rgba(0,0,0,.35)) drop-shadow(0 5px 6px rgba(0,0,0,.2)); }
 .uni-b svg { display: block; width: 100%; height: 100%; overflow: visible; }
@@ -333,7 +334,7 @@ table.tbl { border-collapse: collapse; width: 100%; font-size: 13px; }
 .lk-bar i { position: absolute; inset: 0 auto 0 0; border-radius: 3px; background: var(--muted); }
 .lk-pl { display: grid; gap: 4px; }
 .lk-prow { display: grid; grid-template-columns: 30px minmax(0, 1fr) 84px 28px; align-items: center; gap: 9px; padding: 3px 0; font-size: 13px; text-align: left; }
-.lk-mag { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-weight: 900; font-size: 12px; border: 2.5px solid var(--k2); background: radial-gradient(circle at 34% 28%, rgba(255,255,255,.4) 0%, rgba(255,255,255,0) 48%), var(--k1); color: var(--kt); box-shadow: var(--mag-shadow); }
+.lk-mag { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-weight: 900; font-size: 12px; border: 2.5px solid var(--k2); background: radial-gradient(circle at 34% 28%, rgba(255,255,255,.4) 0%, rgba(255,255,255,0) 48%), var(--kp, var(--k1)); color: var(--kt); box-shadow: inset 0 0 0 1px var(--k3, var(--k2)), var(--mag-shadow); }
 .lk-prow .nm b { display: block; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lk-prow .nm > span { font-size: 11px; color: var(--muted); }
 .lk-prow .v { font-family: var(--f-display); font-weight: 400; font-size: 16px; text-align: right; }
@@ -543,7 +544,7 @@ button.apc:not(:disabled):active { transform: scale(.97); }
 .numbtn span { font-size: 11px; font-weight: 700; color: var(--muted); }
 .numnow { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); }
 .numnow-mag { flex: none; width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; font-family: var(--f-display); font-size: 19px; color: var(--kt);
-  background: radial-gradient(circle at 34% 28%, rgba(255,255,255,.45) 0%, rgba(255,255,255,0) 48%), var(--k1); box-shadow: inset 0 0 0 4px var(--k2), 0 3px 0 rgba(0,0,0,.3); }
+  background: radial-gradient(circle at 34% 28%, rgba(255,255,255,.45) 0%, rgba(255,255,255,0) 48%), var(--kp, var(--k1)); box-shadow: inset 0 0 0 4px var(--k2), inset 0 0 0 5.5px var(--k3, var(--k2)), 0 3px 0 rgba(0,0,0,.3); }
 .numnow-mag.new { animation: numsnap .35s cubic-bezier(.3,1.6,.5,1) both; }
 @keyframes numsnap { from { transform: translateY(-14px) scale(1.25); opacity: 0; } to { transform: none; opacity: 1; } }
 .numnow-arrow { color: var(--accent); font-weight: 900; }
@@ -710,8 +711,8 @@ body:has(.sec-band) .toast { bottom: calc(var(--dock-h) + 84px + env(safe-area-i
 .sec-tx small.wrap { white-space: normal; }
 .sec-tx small.wrap > span { white-space: nowrap; }
 .sec-ar { width: 30px; flex: none; text-align: center; font: 400 16px var(--f-chalk); color: var(--muted); }
-.sec-pm { position: relative; width: 30px; height: 30px; flex: none; border-radius: 50%; display: grid; place-items: center; font: 900 12px var(--f-body); border: 2.5px solid var(--k2); background: radial-gradient(circle at 34% 28%, rgba(255,255,255,.4) 0%, rgba(255,255,255,0) 48%), var(--k1); color: var(--kt); box-shadow: 0 2px 0 rgba(0,0,0,.3); }
-.sec-pm.out { background: repeating-linear-gradient(135deg, #5a5f5c 0 4px, #474b49 4px 8px); border-color: var(--loss); color: #fff; }
+.sec-pm { position: relative; width: 30px; height: 30px; flex: none; border-radius: 50%; display: grid; place-items: center; font: 900 12px var(--f-body); border: 2.5px solid var(--k2); background: radial-gradient(circle at 34% 28%, rgba(255,255,255,.4) 0%, rgba(255,255,255,0) 48%), var(--kp, var(--k1)); color: var(--kt); box-shadow: inset 0 0 0 1px var(--k3, var(--k2)), 0 2px 0 rgba(0,0,0,.3); }
+.sec-pm.out { background: repeating-linear-gradient(135deg, #5a5f5c 0 4px, #474b49 4px 8px); border-color: var(--loss); color: #fff; box-shadow: 0 2px 0 rgba(0,0,0,.3); text-shadow: none; }
 .sec-pm.out::after { content: "×"; position: absolute; right: -5px; top: -5px; width: 15px; height: 15px; border-radius: 50%; background: var(--loss); color: #fff; font: 700 11px/15px var(--f-body); text-align: center; }
 .sec-fill { padding-left: 38px; font-size: 11.5px; color: var(--muted); line-height: 1.35; }
 .sec-do { min-height: 38px; padding: 0 12px; font-size: 13px; flex: none; }
