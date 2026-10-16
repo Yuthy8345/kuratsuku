@@ -2062,7 +2062,7 @@ function sheetCele() {
     ? (ce.left ? `${E.D.m(ce.d)}月${E.D.d(ce.d)}日、残り${ce.left}試合を残して優勝が決まった。` : '最後まで続いた争いを制し、頂点に立った。')
     : `決勝で${opp ? esc(opp.name) : ''}を${ce.my}-${ce.op}${ce.pk ? `（PK ${ce.pk[0]}-${ce.pk[1]}）` : ''}で下した。`;
   const stats = league
-    ? `<div><small>勝点</small><b>${ce.pts}</b></div><div><small>勝-分-敗</small><b class="sm">${ce.w}-${ce.dr}-${ce.l}</b></div><div><small>得失点</small><b>${ce.gf - ce.ga > 0 ? '+' : ''}${ce.gf - ce.ga}</b></div><div><small>2位と</small><b>${ce.gap}<i>差</i></b></div>`
+    ? `<div><small>勝点</small><b>${ce.pts}</b></div><div class="rec"><small>勝-分-敗</small><b class="sm">${ce.w}-${ce.dr}-${ce.l}</b></div><div><small>得失点</small><b>${ce.gf - ce.ga > 0 ? '+' : ''}${ce.gf - ce.ga}</b></div><div><small>2位と</small><b>${ce.gap}<i>差</i></b></div>`
     : `<div class="wide"><small>決勝・${esc(ce.venue || '')}</small><b class="sm">${esc(c.short)} ${ce.my}-${ce.op} ${opp ? esc(opp.short) : ''}${ce.pk ? `<i>PK ${ce.pk[0]}-${ce.pk[1]}</i>` : ''}</b></div>`;
   const goals = !league && ce.goals && ce.goals.length ? `<p class="ce-goals">得点　${ce.goals.map(g => `${esc(g.name)} ${g.m > 90 ? '90+' + (g.m - 90) : g.m}'`).join('、')}</p>` : '';
   const star = league && ce.top ? `<p class="ce-goals">チーム得点王　${esc(ce.top.name)}（${ce.top.g}得点）</p>` : '';
