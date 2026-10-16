@@ -176,6 +176,87 @@ function kitVars(cid, c) {
   return { cls: e[0] === 'so' ? '' : ' k-' + e[0], st: `--c1:${e[1]};--c2:${e[2]}${e[3] ? ';--c3:' + e[3] : ''}${e[4] ? ';--r:' + e[4] : ''}` };
 }
 function kitTag(cid, c, size, base) { const v = kitVars(cid, c); return `<span class="${base || 'kit'}${size ? ' ' + size : ''}${v.cls}" style="${v.st}" aria-hidden="true"></span>`; }
+// uniforms (2026-10-16): what the players wear — the club magnet above is the crest. Each club's 1st/2nd kit is the features
+// that run through its recent kits (base colour, recurring pattern, the trim colours), not a copy of one season's design.
+// [pattern, base, pattern colour, trim 1 (ring/collar/cuffs), trim 2 (inner line), number]; patterns: so plain, st stripes,
+// pn pinstripes. Sources: HANDOFF.md §4 (2026-10-16). Clubs not listed (海外組) wear their data colours c1 (2nd: c2).
+const W2 = '#F5F5F0';
+const UNI = {
+  // J1
+  kashima:    [['so', '#A6192E', null, '#14234B', '#C9A227', '#FFFFFF'], ['so', W2, null, '#A6192E', '#14234B', '#A6192E']],
+  mito:       [['so', '#1D4FA0', null, '#FFFFFF', '#14306B', '#FFFFFF'], ['so', W2, null, '#1D4FA0', '#14306B', '#1D4FA0']],
+  urawa:      [['so', '#D7000F', null, '#111111', '#FFFFFF', '#FFFFFF'], ['so', W2, null, '#111111', '#D7000F', '#111111']],
+  chiba:      [['so', '#F7D117', null, '#00753A', '#D7262E', '#00753A'], ['so', W2, null, '#00753A', '#F7D117', '#00753A']],
+  kashiwa:    [['so', '#F2CC0C', null, '#1A1A1A', null, '#1A1A1A'], ['so', W2, null, '#1A1A1A', '#F2CC0C', '#1A1A1A']],
+  fctokyo:    [['st', '#123E8C', '#C8102E', '#0B1E44', null, '#FFFFFF'], ['so', W2, null, '#0B1E44', '#C8102E', '#0B1E44']],
+  tokyov:     [['so', '#00843D', null, '#C9A227', '#FFFFFF', '#FFFFFF'], ['so', W2, null, '#00843D', '#C9A227', '#00843D']],
+  machida:    [['so', '#0A3D91', null, '#C9A227', null, '#FFFFFF'], ['so', W2, null, '#C9A227', '#0A3D91', '#0A3D91']],
+  kawasakif:  [['pn', '#2C9BDB', '#111111', '#111111', null, '#FFFFFF'], ['so', W2, null, '#111111', '#2C9BDB', '#111111']],
+  yokohamafm: [['so', '#1446A0', null, '#FFFFFF', '#D7192F', '#FFFFFF'], ['so', W2, null, '#1446A0', '#D7192F', '#1446A0']],
+  shimizu:    [['so', '#F28A00', null, '#123A7A', null, '#123A7A'], ['so', W2, null, '#F28A00', '#123A7A', '#123A7A']],
+  nagoya:     [['so', '#D6271C', null, '#F2A900', null, '#FFFFFF'], ['so', W2, null, '#D6271C', '#F2A900', '#D6271C']],
+  kyoto:      [['so', '#6B2A8F', null, '#111111', '#FFFFFF', '#FFFFFF'], ['so', W2, null, '#6B2A8F', null, '#6B2A8F']],
+  gosaka:     [['st', '#0A4AA6', '#111111', '#111111', null, '#FFFFFF'], ['so', W2, null, '#111111', '#0A4AA6', '#111111']],
+  cosaka:     [['so', '#E2187A', null, '#1B2A4A', null, '#FFFFFF'], ['so', W2, null, '#E2187A', '#1B2A4A', '#E2187A']],
+  kobe:       [['pn', '#8E1B2E', '#6A1020', '#C9A227', '#111111', '#FFFFFF'], ['so', W2, null, '#1B2A4A', '#C9A227', '#1B2A4A']],
+  okayama:    [['so', '#9E1B32', null, '#FFFFFF', '#1B2A4A', '#FFFFFF'], ['so', W2, null, '#1B2A4A', '#9E1B32', '#1B2A4A']],
+  hiroshima:  [['so', '#5A2D91', null, '#FFFFFF', null, '#FFFFFF'], ['so', W2, null, '#5A2D91', null, '#5A2D91']],
+  fukuoka:    [['st', '#0D2C6C', '#1F4FA0', '#FFFFFF', null, '#FFFFFF'], ['so', W2, null, '#0D2C6C', null, '#0D2C6C']],
+  nagasaki:   [['so', '#0F4C9C', null, '#F39800', null, '#FFFFFF'], ['so', W2, null, '#0F4C9C', '#F39800', '#0F4C9C']],
+  // J2
+  sapporo:    [['st', '#C8102E', '#111111', '#111111', null, '#FFFFFF'], ['so', W2, null, '#C8102E', '#111111', '#C8102E']],
+  yokohamafc: [['so', '#2BA6DE', null, '#FFFFFF', '#1B2E5A', '#FFFFFF'], ['so', W2, null, '#2BA6DE', '#1B2E5A', '#1B2E5A']],
+  shonan:     [['so', '#7AB800', null, '#2B8FD6', null, '#123A7A'], ['so', W2, null, '#7AB800', '#2B8FD6', '#123A7A']],
+  niigata:    [['so', '#F26B00', null, '#1F3C88', null, '#FFFFFF'], ['so', W2, null, '#F26B00', '#1F3C88', '#1F3C88']],
+  iwata:      [['so', '#6DB6E6', null, '#1D3F8C', '#C9A227', '#1D3F8C'], ['so', W2, null, '#6DB6E6', '#1D3F8C', '#1D3F8C']],
+  tosu:       [['so', '#5BA6DE', null, '#E7489B', null, '#FFFFFF'], ['so', W2, null, '#5BA6DE', '#E7489B', '#2F6FAE']],
+  omiya:      [['so', '#F37021', null, '#14224A', null, '#14224A'], ['so', W2, null, '#F37021', '#14224A', '#14224A']],
+  sendai:     [['so', '#F5C400', null, '#1B2E5A', '#FFFFFF', '#1B2E5A'], ['so', W2, null, '#1B2E5A', '#F5C400', '#1B2E5A']],
+  tokushima:  [['so', '#1B3A8C', null, '#4FA3DC', null, '#FFFFFF'], ['so', W2, null, '#1B3A8C', '#4FA3DC', '#1B3A8C']],
+  oita:       [['so', '#1D3C9C', null, '#F2C400', '#14254F', '#FFFFFF'], ['so', W2, null, '#1D3C9C', '#F2C400', '#1D3C9C']],
+  kofu:       [['so', '#1D4E9C', null, '#14306B', '#FFFFFF', '#FFFFFF'], ['so', W2, null, '#1D4E9C', '#14306B', '#1D4E9C']],
+  yamagata:   [['st', '#1D3F8C', '#FFFFFF', '#14254F', null, '#FFFFFF'], ['so', W2, null, '#1D3F8C', '#14254F', '#1D3F8C']],
+  iwaki:      [['so', '#C8102E', null, '#1B2A4A', '#FFFFFF', '#FFFFFF'], ['so', W2, null, '#1B2A4A', '#C8102E', '#1B2A4A']],
+  imabari:    [['so', '#1D4FA0', null, '#F2C400', '#4FA3DC', '#FFFFFF'], ['so', W2, null, '#1D4FA0', '#F2C400', '#1D4FA0']],
+};
+const uniClub = cid => (S && S.clubs[cid]) || (PREVIEW && PREVIEW.clubs[cid]) || null;
+// the kit a club wears: alt = the 2nd kit
+function uniOf(cid, alt) {
+  const e = UNI[cid];
+  if (e) { const k = e[alt ? 1 : 0]; return { p: k[0], b: k[1], pc: k[2], t1: k[3], t2: k[4], n: k[5] }; }
+  const c = uniClub(cid) || { c1: '#888888', c2: '#DDDDDD' };
+  const b = alt ? c.c2 : c.c1, t = alt ? c.c1 : c.c2;
+  return { p: 'so', b, pc: null, t1: t, t2: null, n: lum(b) > 0.6 ? '#141414' : '#FFFFFF' };
+}
+// the body of a round magnet (CSS background, left to right)
+function uniBg(u) {
+  if (u.p === 'st') return `linear-gradient(90deg, ${u.b} 0 20%, ${u.pc} 20% 40%, ${u.b} 40% 60%, ${u.pc} 60% 80%, ${u.b} 80%)`;
+  if (u.p === 'pn') return `linear-gradient(90deg, ${u.b} 0 26%, ${u.pc} 26% 31%, ${u.b} 31% 69%, ${u.pc} 69% 74%, ${u.b} 74%)`;
+  return u.b;
+}
+// CSS variables for a player magnet: --k1 base, --k2 ring, --k3 inner line, --kt number, --kp body
+function uniVars(cid, alt) { const u = uniOf(cid, alt); return `--k1:${u.b};--k2:${u.t1};--k3:${u.t2 || u.t1};--kt:${u.n};--kp:${uniBg(u)}`; }
+const uniPat = cid => uniOf(cid).p !== 'so' ? ' pat' : '';
+// a shirt (140×128), front or back: the body with its pattern, cuffs and collar in the trim colours; num on the chest
+const SH_BODY = 'M43.4,0 L23.8,6.4 L0,34.6 L15.4,57.6 L32.2,48.6 L32.2,128 L107.8,128 L107.8,48.6 L124.6,57.6 L140,34.6 L116.2,6.4 L96.6,0 L84,9 L70,11.5 L56,9 Z';
+let shN = 0;
+// a player magnet on a board: round (the kit's body and trim) or, with the shirt magnets, the shirt itself
+const KITB = (() => { try { return localStorage.getItem('kuratsuku.kitmode') === 'B'; } catch (e) { return false; } })();
+const OUT_KIT = { p: 'so', b: '#5A5F5C', pc: null, t1: '#474B49', t2: null, n: '#FFFFFF' };
+function tokShirt(cid, num, cls, out) {
+  if (KITB) return `<span class="shirt uni-b ${cls}">${uniSvg(out ? OUT_KIT : uniOf(cid), { num })}</span>`;
+  return `<span class="shirt ${cls}${uniPat(cid)}">${num}</span>`;
+}
+function uniSvg(u, o) {
+  o = o || {}; const id = 'sh' + (++shN);
+  const pat = u.p === 'st' ? Array.from({ length: 5 }, (_, i) => `<rect x="${19 + i * 22}" y="0" width="11" height="128" fill="${u.pc}"/>`).join('')
+    : u.p === 'pn' ? Array.from({ length: 6 }, (_, i) => `<rect x="${17 + i * 21}" y="0" width="3.2" height="128" fill="${u.pc}"/>`).join('') : '';
+  const cuff = (c, w) => `<path d="M0,34.6 L15.4,57.6 L20.2,52.5 L4.8,29.5 Z" fill="${c}"/><path d="M140,34.6 L124.6,57.6 L119.8,52.5 L135.2,29.5 Z" fill="${c}"/>${w ? `<path d="M3.2,32.4 L18.5,55" stroke="${w}" stroke-width="1.8" fill="none"/><path d="M136.8,32.4 L121.5,55" stroke="${w}" stroke-width="1.8" fill="none"/>` : ''}`;
+  const collar = o.back ? `<path d="M44,1.5 Q70,15 96,1.5" stroke="${u.t1}" stroke-width="6" fill="none"/>`
+    : `<path d="M46,1 L70,24 L94,1" stroke="${u.t1}" stroke-width="6.5" fill="none" stroke-linejoin="round"/>${u.t2 ? `<path d="M52,3.5 L70,20.5 L88,3.5" stroke="${u.t2}" stroke-width="2" fill="none" stroke-linejoin="round"/>` : ''}`;
+  const num = o.num != null ? `<text x="70" y="${o.back ? 86 : 84}" text-anchor="middle" style="font-family:var(--f-body),system-ui,sans-serif;font-weight:900" font-size="${String(o.num).length > 1 ? 50 : 56}" fill="${u.n}"${u.p !== 'so' ? ' stroke="rgba(0,0,0,.55)" stroke-width="5" paint-order="stroke"' : ''}>${o.num}</text>` : '';
+  return `<svg class="${o.cls || 'uni'}" viewBox="0 0 140 128" aria-hidden="true"><defs><clipPath id="${id}"><path d="${SH_BODY}"/></clipPath></defs><g clip-path="url(#${id})"><rect width="140" height="128" fill="${u.b}"/>${pat}${cuff(u.t1, u.t2)}${collar}</g><path d="${SH_BODY}" fill="none" stroke="rgba(0,0,0,.28)" stroke-width="2"/>${num}</svg>`;
+}
 function kit(cid, size) { const c = S && S.clubs[cid] || (PREVIEW && PREVIEW.clubs[cid]); if (!c) return '<span class="kit"></span>'; return kitTag(cid, c, size); }
 function oc(v) { return v >= 75 ? 'o-elite' : v >= 70 ? 'o-good' : v >= 64 ? 'o-mid' : 'o-low'; }
 function condBar(c) { const cls = c >= 85 ? '' : c >= 70 ? 'mid' : 'low'; return `<span class="bar" title="コンディション ${Math.round(c)}%"><i class="${cls}" style="width:${Math.round(c)}%"></i></span>`; }
@@ -996,9 +1077,8 @@ const spM = v => E.money(v).replace('円', '');
 const spCond = d => esc(E.sponText(d)).replace(/(で|を)/g, '$1<wbr>').replace(/ /g, '<wbr>');
 // the kit: the front carries the chest and the sleeve, the back the back; by = [chest, back, sleeve] (a contract or null)
 function spKit(back, by, mini) {
-  const v = kitVars(S.my, S.clubs[S.my]);
   const slot = (k, s) => { const d = by[s]; if (!d && mini) return ''; return `<span class="sp-slot ${k}${d ? '' : ' empty'}">${d ? (k === 'sleeve' ? esc(d.mk) : `<span class="sp-lg">${esc(d.br || d.co)}</span><span class="sp-mk">${esc(d.mk)}</span>`) : spSlotJp(s)}</span>`; };
-  return `<span class="sp-kit${mini ? ' mini' : ''}" aria-hidden="true"><span class="sp-body"><span class="sp-shirt${v.cls}" style="${v.st}"></span>${back ? slot('back', 1) : slot('chest', 0) + slot('sleeve', 2)}</span>${mini ? '' : `<span class="cap">${back ? '背中' : '胸・袖'}</span>`}</span>`;
+  return `<span class="sp-kit${mini ? ' mini' : ''}" aria-hidden="true"><span class="sp-body">${uniSvg(uniOf(S.my), { back, cls: 'sp-shirt' })}${back ? slot('back', 1) : slot('chest', 0) + slot('sleeve', 2)}</span>${mini ? '' : `<span class="cap">${back ? '背中' : '胸・袖'}</span>`}</span>`;
 }
 const spTag = s => { const c = S.clubs[S.my]; return `<span class="sp-tag" style="--k1:${c.c1};--kt:${lum(c.c1) > 0.6 ? '#141414' : '#ffffff'}">${spSlotJp(s)}</span>`; };
 // the pick (slot order), kept while the sheet is open; starts as the secretary's three
@@ -1314,12 +1394,11 @@ function viewTactics() {
   const r = E.clubRating(S, S.my);
   const toks = F.map((s, i) => {
     const pid = c.tac.xi[i]; const p = pid && S.players[pid];
-    const k1 = c.c1, k2 = c.c2, kt = lum(c.c1) > 0.6 ? '#141414' : '#ffffff';
-    const style = `left:${s[1]}%;top:${88 - (s[2] - 7) * 1.04}%;--k1:${k1};--k2:${k2};--kt:${kt}`;
+    const style = `left:${s[1]}%;top:${88 - (s[2] - 7) * 1.04}%;${uniVars(S.my)}`;
     if (!p) return `<button class="tok empty" style="${style}" data-act="slot" data-i="${i}"><span class="shirt">+</span><span class="lbl">${E.ROLE[s[0]].jp}</span></button>`;
-    if (!avail(p)) return `<button class="tok out" style="${style}" data-act="slot" data-i="${i}" aria-label="${E.ROLE[s[0]].jp} ${esc(p.name)} ${outShort(p)}"><span class="shirt">${p.num}</span><span class="lbl">${esc(p.short)}</span><span class="ov">${outShort(p)}</span></button>`;
+    if (!avail(p)) return `<button class="tok out" style="${style}" data-act="slot" data-i="${i}" aria-label="${E.ROLE[s[0]].jp} ${esc(p.name)} ${outShort(p)}">${tokShirt(S.my, p.num, '', true)}<span class="lbl">${esc(p.short)}</span><span class="ov">${outShort(p)}</span></button>`;
     const warn = E.posPenalty(p, s[0]) <= -1.5 || p.cond < 70;
-    return `<button class="tok ${p.hot ? 'hot' : ''}" style="${style}" data-act="slot" data-i="${i}" aria-label="${E.ROLE[s[0]].jp} ${esc(p.name)}${p.hot ? ' 燃えている' : ''}"><span class="shirt ${warn ? 'warn' : ''}">${p.num}</span><span class="lbl">${esc(p.short)}</span><span class="ov">${E.ROLE[s[0]].jp}・${E.ovr(p)}</span></button>`;
+    return `<button class="tok ${p.hot ? 'hot' : ''}" style="${style}" data-act="slot" data-i="${i}" aria-label="${E.ROLE[s[0]].jp} ${esc(p.name)}${p.hot ? ' 燃えている' : ''}">${tokShirt(S.my, p.num, warn ? 'warn' : '')}<span class="lbl">${esc(p.short)}</span><span class="ov">${E.ROLE[s[0]].jp}・${E.ovr(p)}</span></button>`;
   }).join('');
   const seg = (act, cur, opts) => `<div class="seg">${opts.map(([k, l]) => `<button data-act="${act}" data-k="${k}" aria-pressed="${cur === k}">${l}</button>`).join('')}</div>`;
   const iss = E.lineupIssues(S, S.my);
@@ -1456,7 +1535,7 @@ function benchTile(p, c) {
   const st = out ? `<span class="chip warn">${p.inj > 0 ? `負傷 ${p.inj}日` : '出場停止'}</span>` : p.hot ? '<span class="chip fire">燃えている</span>' : p.reborn ? '<span class="chip rbchip">転生</span>' : '';
   return `<button class="btile${out ? ' out' : ''}${p.hot ? ' hot' : ''}" role="listitem" data-act="benchPick" data-id="${p.id}" aria-label="ベンチ ${esc(p.name)} ${dpOf(p)} 能力${E.ovr(p)}${out ? ' ' + outShort(p) : ''}">
     <span class="bt-ovr ${oc(p.ovr)}">${E.ovr(p)}</span>
-    <span class="bt-mag${tired ? ' warn' : ''}" style="--k1:${c.c1};--k2:${c.c2};--kt:${kt}">${p.num}</span>
+    ${KITB ? `<span class="bt-mag uni-b${tired ? ' warn' : ''}">${uniSvg(out ? OUT_KIT : uniOf(c.id), { num: p.num })}</span>` : `<span class="bt-mag${tired ? ' warn' : ''}${uniPat(c.id)}" style="${uniVars(c.id)}">${p.num}</span>`}
     <b class="bt-name">${esc(p.name)}</b>
     <span class="bt-meta">${posTag(p)}${E.age(p, S.date)}歳</span>
     ${st ? `<span class="bt-st">${st}</span>` : condBar(p.cond)}
@@ -1644,7 +1723,7 @@ function sheetTeam(cid, tab, back) {
     }
     if (!c.ab && c.tac.xi.some(Boolean)) {
       const F = E.FORMATIONS[c.tac.form];
-      const toks = F.map((s, i) => { const p = S.players[c.tac.xi[i]]; if (!p) return ''; return `<button class="tok" style="left:${s[1]}%;top:${88 - (s[2] - 7) * 1.04}%;--k1:${c.c1};--k2:${c.c2};--kt:${kt}" data-act="teamPlayer" data-id="${p.id}" aria-label="${E.ROLE[s[0]].jp} ${esc(p.name)}"><span class="shirt">${p.num}</span><span class="lbl">${esc(p.short)}</span><span class="ov">${E.ROLE[s[0]].jp}・${E.ovr(p)}</span></button>`; }).join('');
+      const toks = F.map((s, i) => { const p = S.players[c.tac.xi[i]]; if (!p) return ''; return `<button class="tok" style="left:${s[1]}%;top:${88 - (s[2] - 7) * 1.04}%;${uniVars(cid)}" data-act="teamPlayer" data-id="${p.id}" aria-label="${E.ROLE[s[0]].jp} ${esc(p.name)}">${tokShirt(cid, p.num, '')}<span class="lbl">${esc(p.short)}</span><span class="ov">${E.ROLE[s[0]].jp}・${E.ovr(p)}</span></button>`; }).join('');
       const plan = [E.mentLabel(c.tac), E.tacLabel(c.tac)].filter(Boolean).join('・');
       parts.push(`<div style="display:grid;gap:8px"><div class="row"><div class="eyebrow">戦い方</div><span class="spacer"></span><b class="small">${c.tac.form}${cid !== S.my && j1 ? `・${esc(plan)}` : ''}</b></div>
         <div class="pitch team-pitch">${PITCH_SVG}${toks}</div>
@@ -1675,7 +1754,7 @@ function sheetFixture(id) {
   const goals = (f.sc || []).filter(e => e[2] === 'g');
   const line = side => goals.filter(e => e[1] === side).map(e => `<div>${e[0] > 90 ? '90+' + (e[0] - 90) : e[0]}' ${esc(S.players[e[3]] ? S.players[e[3]].name : '—')}</div>`).join('') || '<div class="muted">—</div>';
   openSheet(`<div class="eyebrow">${E.fxLabel(f)}・${jdw(f.date)}</div>
-    <div class="sb" style="margin:0"><div class="team"><button class="teamlink" data-act="team" data-id="${f.h}">${esc(H.short)}</button><span class="kitline" style="background:${H.c1}"></span></div><div><div class="score">${f.played ? `${f.hg}-${f.ag}` : 'vs'}</div><div class="clock">${f.played ? (f.pk ? `PK ${f.pk[0]}-${f.pk[1]}` : f.agg ? `合計 ${f.agg[0]}-${f.agg[1]}` : 'FULL TIME') : jd(f.date)}</div></div><div class="team"><button class="teamlink" data-act="team" data-id="${f.a}">${esc(A.short)}</button><span class="kitline" style="background:${A.c1}"></span></div></div>
+    <div class="sb" style="margin:0"><div class="team"><button class="teamlink" data-act="team" data-id="${f.h}">${esc(H.short)}</button><span class="kitline" style="background:${uniBar(matchKits(f.h, f.a).h)}"></span></div><div><div class="score">${f.played ? `${f.hg}-${f.ag}` : 'vs'}</div><div class="clock">${f.played ? (f.pk ? `PK ${f.pk[0]}-${f.pk[1]}` : f.agg ? `合計 ${f.agg[0]}-${f.agg[1]}` : 'FULL TIME') : jd(f.date)}</div></div><div class="team"><button class="teamlink" data-act="team" data-id="${f.a}">${esc(A.short)}</button><span class="kitline" style="background:${uniBar(matchKits(f.h, f.a).a)}"></span></div></div>
     ${f.played ? `<div class="scorers"><div>${line('h')}</div><div>${line('a')}</div></div><dl class="kv"><dt>会場</dt><dd>${esc(venueOf(f))}</dd><dt>入場者数</dt><dd>${(f.att || 0).toLocaleString('ja-JP')}人</dd></dl>` : `<dl class="kv"><dt>会場</dt><dd>${esc(venueOf(f))}</dd></dl>`}`,
     '<button class="btn ghost block" data-act="closeSheet">閉じる</button>');
 }
@@ -2213,14 +2292,14 @@ function startMatch(fid, quick) {
   tickLoop(); drawLoop();
 }
 function buildMatchLayer() {
-  const { M } = MATCH; const H = S.clubs[M.h.cid], A = S.clubs[M.a.cid];
+  const { M } = MATCH; const H = S.clubs[M.h.cid], A = S.clubs[M.a.cid], KT = matchKits(M.h.cid, M.a.cid);
   let el = document.getElementById('mlayer');
   if (!el) { el = document.createElement('div'); el.id = 'mlayer'; el.className = 'match'; document.body.appendChild(el); }
   el.innerHTML = `<div class="match-in">
-    <div class="sb" id="sb"><div class="team"><span>${esc(H.short)}</span><span class="kitline" style="background:${H.c1}"></span></div><div><div class="score" id="sb-score">0-0</div><div class="clock" id="sb-clock">KICK OFF</div></div><div class="team"><span>${esc(A.short)}</span><span class="kitline" style="background:${A.c1}"></span></div></div>
+    <div class="sb" id="sb"><div class="team"><span>${esc(H.short)}</span><span class="kitline" style="background:${uniBar(KT.h)}"></span></div><div><div class="score" id="sb-score">0-0</div><div class="clock" id="sb-clock">KICK OFF</div></div><div class="team"><span>${esc(A.short)}</span><span class="kitline" style="background:${uniBar(KT.a)}"></span></div></div>
     <div id="mbody" style="display:flex;flex-direction:column;flex:1;min-height:0">
       <div class="pitch2d"><canvas id="cv" aria-label="試合の2Dビュー"></canvas></div>
-      <div class="possbar"><span id="ph">50%</span><span class="pb"><i id="pbh" style="width:50%;background:${H.c1}"></i><i id="pba" style="width:50%;background:${kitClash(H, A) ? A.c2 : A.c1}"></i></span><span id="pa">50%</span></div>
+      <div class="possbar"><span id="ph">50%</span><span class="pb"><i id="pbh" style="width:50%;background:${uniBar(KT.h)}"></i><i id="pba" style="width:50%;background:${uniBar(KT.a)}"></i></span><span id="pa">50%</span></div>
       <ol class="feed" id="feed" aria-live="polite"></ol>
     </div>
     <div class="mctl" id="mctl"></div>
@@ -2228,10 +2307,14 @@ function buildMatchLayer() {
   if (!MATCH.locked) { MATCH.locked = true; lockScroll(); }
   renderMatchCtl();
 }
-function kitClash(H, A) {
+// the kits in a match: the home club in its 1st, the away club in its 1st unless the colours clash, then its 2nd
+function kitClash(hid, aid) {
   const d = (a, b) => { const x = a.replace('#', ''), y = b.replace('#', ''); let s = 0; for (let i = 0; i < 3; i++) s += Math.abs(parseInt(x.substr(i * 2, 2), 16) - parseInt(y.substr(i * 2, 2), 16)); return s; };
-  return d(H.c1, A.c1) < 140;
+  return d(uniOf(hid).b, uniOf(aid).b) < 140;
 }
+function matchKits(hid, aid) { return { h: uniOf(hid), a: uniOf(aid, kitClash(hid, aid)) }; }
+// a kit as one colour (score bar, possession, event dots): a white 2nd shows its trim
+const uniBar = u => lum(u.b) > 0.85 ? u.t1 : u.b;
 function renderMatchCtl() {
   if (!MATCH) return;
   const el = document.getElementById('mctl'); if (!el) return;
@@ -2307,8 +2390,8 @@ function feedAdd(e) {
   const li = document.createElement('li');
   const sys = ['ko', 'ht', 'ft'].includes(e.t);
   li.className = e.t === 'goal' ? 'goal' : e.t === 'red' ? 'red' : e.t === 'hot' ? 'hot' : e.t === 'pk' ? 'goal' : e.t === 'tac' ? 'tac' : e.t === 'combo' ? 'combo' : sys ? 'sys' : '';
-  const c = e.side ? S.clubs[M[e.side].cid] : null;
-  li.innerHTML = `<time>${e.m > 90 ? '90+' + (e.m - 90) : e.m}'</time><i class="pip" style="${c ? 'background:' + c.c1 : ''}"></i><span>${e.t === 'goal' ? '<b class="evb">GOAL</b>' : e.t === 'yc' ? '<i class="cardi y"></i>' : e.t === 'red' ? '<i class="cardi r"></i>' : ''}${esc(e.text)}</span>`;
+  const c = e.side ? matchKits(M.h.cid, M.a.cid)[e.side] : null;
+  li.innerHTML = `<time>${e.m > 90 ? '90+' + (e.m - 90) : e.m}'</time><i class="pip" style="${c ? 'background:' + uniBar(c) : ''}"></i><span>${e.t === 'goal' ? '<b class="evb">GOAL</b>' : e.t === 'yc' ? '<i class="cardi y"></i>' : e.t === 'red' ? '<i class="cardi r"></i>' : ''}${esc(e.text)}</span>`;
   feed.prepend(li);
   while (feed.children.length > 70) feed.lastChild.remove();
 }
@@ -2324,11 +2407,10 @@ function drawLoop() {
   if (!frozen) MATCH.viz.step(dt * (VIS_SPEED[MATCH.speed] || 1.7));
   if (!MATCH.col || (MATCH.colT = (MATCH.colT || 0) + 1) % 120 === 0) {
     const cs = getComputedStyle(document.documentElement); const M = MATCH.M;
-    const H = S.clubs[M.h.cid], A = S.clubs[M.a.cid]; const clash = kitClash(H, A);
-    const txt = c => lum(c) > 0.6 ? '#141414' : '#FFFFFF';
-    const ac1 = clash ? A.c2 : A.c1, ac2 = clash ? A.c1 : A.c2;
+    const K = matchKits(M.h.cid, M.a.cid);
+    const side = u => ({ c1: u.b, c2: u.t1, c3: u.t2, pat: u.p, pc: u.pc, txt: u.n });
     MATCH.col = { g1: cs.getPropertyValue('--pitch').trim() || '#2E6A45', g2: cs.getPropertyValue('--pitch2').trim() || '#2A6140', line: cs.getPropertyValue('--pitch-line').trim() || 'rgba(255,255,255,.6)', led: cs.getPropertyValue('--led').trim() || '#F5B43C',
-      home: { c1: H.c1, c2: H.c2, txt: txt(H.c1), gk: '#F28C28' }, away: { c1: ac1, c2: ac2, txt: txt(ac1), gk: '#B455E0' } };
+      home: { ...side(K.h), gk: '#F28C28' }, away: { ...side(K.a), gk: '#B455E0' } };
   }
   MATCH.viz.draw(ctx, cv.width, cv.height, MATCH.col);
   MATCH.raf = requestAnimationFrame(drawLoop);

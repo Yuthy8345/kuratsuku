@@ -423,8 +423,18 @@ function draw(V, ctx, W, H, col) {
     }
     ctx.beginPath(); ctx.arc(X(p.x), Y(p.y), r, 0, Math.PI * 2);
     ctx.fillStyle = p.gk ? k.gk : k.c1; ctx.fill();
+    // the kit's stripes (st: 2 bands, pn: 2 thin lines) inside the dot, the middle left clear for the number
+    if (!p.gk && k.pc && (k.pat === 'st' || k.pat === 'pn')) {
+      ctx.save(); ctx.clip(); ctx.fillStyle = k.pc;
+      const xs = k.pat === 'st' ? [[-0.6, 0.4], [0.2, 0.4]] : [[-0.52, 0.13], [0.39, 0.13]];
+      for (const [a, w] of xs) ctx.fillRect(X(p.x) + a * r, Y(p.y) - r, w * r, 2 * r);
+      ctx.restore();
+    }
     ctx.lineWidth = Math.max(1.2, r * 0.28); ctx.strokeStyle = p.gk ? '#111' : k.c2; ctx.stroke();
-    if (r >= 7) { ctx.fillStyle = p.gk ? '#111' : k.txt; ctx.font = `700 ${Math.round(r * 0.95)}px system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(String(p.num), X(p.x), Y(p.y) + 0.5); }
+    if (!p.gk && k.c3 && r >= 5) { ctx.beginPath(); ctx.arc(X(p.x), Y(p.y), r - ctx.lineWidth * 0.5 - Math.max(0.6, r * 0.07), 0, Math.PI * 2); ctx.lineWidth = Math.max(0.8, r * 0.12); ctx.strokeStyle = k.c3; ctx.stroke(); }
+    if (r >= 7) { ctx.fillStyle = p.gk ? '#111' : k.txt; ctx.font = `700 ${Math.round(r * 0.95)}px system-ui, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      if (!p.gk && k.pc) { ctx.lineWidth = Math.max(1, r * 0.18); ctx.strokeStyle = 'rgba(0,0,0,.55)'; ctx.strokeText(String(p.num), X(p.x), Y(p.y) + 0.5); }
+      ctx.fillText(String(p.num), X(p.x), Y(p.y) + 0.5); }
   }
   // carrier highlight + name
   const o = b.owner || (b.fl && b.fl.to);
