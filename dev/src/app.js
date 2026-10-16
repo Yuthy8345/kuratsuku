@@ -1542,8 +1542,8 @@ function sheetPlan() {
 // condition; × = can't play (injury / suspension), ! = tired
 function benchTile(p, c) {
   const out = !avail(p), tired = !out && p.cond < 70;
-  const st = out ? `<span class="chip warn">${p.inj > 0 ? `負傷 ${p.inj}日` : '出場停止'}</span>` : p.hot ? '<span class="chip fire">燃えている</span>' : '';
-  return `<button class="btile${out ? ' out' : ''}${p.hot ? ' hot' : ''}" role="listitem" data-act="benchPick" data-id="${p.id}" aria-label="ベンチ ${esc(p.name)} ${dpOf(p)} 能力${E.ovr(p)}${out ? ' ' + outShort(p) : ''}">
+  const st = out ? `<span class="chip warn">${p.inj > 0 ? `負傷 ${p.inj}日` : '出場停止'}</span>` : '';   // 燃えている: the shirt glows, no chip (it hid the condition bar)
+  return `<button class="btile${out ? ' out' : ''}${p.hot ? ' hot' : ''}" role="listitem" data-act="benchPick" data-id="${p.id}" aria-label="ベンチ ${esc(p.name)} ${dpOf(p)} 能力${E.ovr(p)}${out ? ' ' + outShort(p) : ''}${p.reborn ? ' 転生' : ''}${p.hot ? ' 燃えている' : ''}">
     <span class="bt-ovr ${oc(p.ovr)}">${E.ovr(p)}</span>${p.reborn ? '<span class="bt-rb">転生</span>' : ''}
     <span class="bt-mag uni-b${tired ? ' warn' : ''}">${uniSvg(out ? OUT_KIT : uniOf(c.id), { num: p.num })}</span>
     <b class="bt-name">${esc(p.name)}</b>
