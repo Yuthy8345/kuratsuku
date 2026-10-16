@@ -250,8 +250,10 @@ function uniSvg(u, o) {
   const cuff = (c, w) => `<path d="M0,34.6 L15.4,57.6 L20.2,52.5 L4.8,29.5 Z" fill="${c}"/><path d="M140,34.6 L124.6,57.6 L119.8,52.5 L135.2,29.5 Z" fill="${c}"/>${w ? `<path d="M3.2,32.4 L18.5,55" stroke="${w}" stroke-width="1.8" fill="none"/><path d="M136.8,32.4 L121.5,55" stroke="${w}" stroke-width="1.8" fill="none"/>` : ''}`;
   const collar = o.back ? `<path d="M44,1.5 Q70,15 96,1.5" stroke="${u.t1}" stroke-width="6" fill="none"/>`
     : `<path d="M46,1 L70,24 L94,1" stroke="${u.t1}" stroke-width="6.5" fill="none" stroke-linejoin="round"/>${u.t2 ? `<path d="M52,3.5 L70,20.5 L88,3.5" stroke="${u.t2}" stroke-width="2" fill="none" stroke-linejoin="round"/>` : ''}`;
-  const num = o.num != null ? `<text x="70" y="${o.back ? 86 : 84}" text-anchor="middle" style="font-family:var(--f-body),system-ui,sans-serif;font-weight:900" font-size="${String(o.num).length > 1 ? 50 : 56}" fill="${u.n}"${u.p !== 'so' ? ' stroke="rgba(0,0,0,.55)" stroke-width="5" paint-order="stroke"' : ''}>${o.num}</text>` : '';
-  return `<svg class="${o.cls || 'uni'}" viewBox="0 0 140 128" aria-hidden="true"><defs><clipPath id="${id}"><path d="${SH_BODY}"/></clipPath></defs><g clip-path="url(#${id})"><rect width="140" height="128" fill="${u.b}"/>${pat}${cuff(u.t1, u.t2)}${collar}</g><path d="${SH_BODY}" fill="none" stroke="rgba(0,0,0,.28)" stroke-width="2"/>${num}</svg>`;
+  const num = o.num != null ? `<text x="70" y="${o.back ? 86 : 84}" text-anchor="middle" style="font-family:${o.font || 'var(--f-body),system-ui,sans-serif;font-weight:900'}" font-size="${String(o.num).length > 1 ? 50 : 56}" fill="${u.n}"${u.p !== 'so' ? ' stroke="rgba(0,0,0,.55)" stroke-width="5" paint-order="stroke"' : ''}>${o.num}</text>` : '';
+  // the champions' shirt: a gold star on the chest
+  const star = o.star ? '<path d="M70,50 l7.6,15.4 17,2.5 -12.3,12 2.9,16.9 -15.2,-8 -15.2,8 2.9,-16.9 -12.3,-12 17,-2.5z" fill="#F3CF7A" stroke="#B8862B" stroke-width="2.5" stroke-linejoin="round"/>' : '';
+  return `<svg class="${o.cls || 'uni'}" viewBox="0 0 140 128" aria-hidden="true"><defs><clipPath id="${id}"><path d="${SH_BODY}"/></clipPath></defs><g clip-path="url(#${id})"><rect width="140" height="128" fill="${u.b}"/>${pat}${cuff(u.t1, u.t2)}${collar}</g><path d="${SH_BODY}" fill="none" stroke="rgba(0,0,0,.28)" stroke-width="2"/>${star}${num}</svg>`;
 }
 function kit(cid, size) { const c = S && S.clubs[cid] || (PREVIEW && PREVIEW.clubs[cid]); if (!c) return '<span class="kit"></span>'; return kitTag(cid, c, size); }
 function oc(v) { return v >= 75 ? 'o-elite' : v >= 70 ? 'o-good' : v >= 64 ? 'o-mid' : 'o-low'; }
@@ -1985,15 +1987,14 @@ const FAREWELL = {
 function sheetRetire(i) {
   const se = S.seasonEnd; const ret = se.ret.filter(r => S.players[r.id]); const r = ret[i]; if (!r) return;
   sheetState = { type: 'retire', i };
-  const c = S.clubs[r.club] || S.clubs[S.my];
-  const kt = lum(c.c1) > 0.6 ? '#141414' : '#ffffff';
+  const cid = S.clubs[r.club] ? r.club : S.my, c = S.clubs[cid];
   const lines = FAREWELL[r.pos] || FAREWELL.MF;
   const msg = r.g >= 20 ? `${S.clubs[S.my].short}で${r.g}ゴール。${lines[0]}` : r.apps >= 60 ? `${S.clubs[S.my].short}で${r.apps}試合に出場。${lines[0]}` : lines[r.id % 2];
   const left = ret.length - i - 1;
-  openSheet(`<div class="farewell" style="--k1:${c.c1};--k2:${c.c2};--kt:${kt}">
+  openSheet(`<div class="farewell" style="${uniVars(cid)}">
       <div class="fw-lights" aria-hidden="true">${'<i></i>'.repeat(14)}</div>
       <div class="fw-head"><span>${esc(se.label)}</span><span>${ret.length > 1 ? `${i + 1} / ${ret.length}` : 'FAREWELL'}</span></div>
-      <div class="fw-shirt">${r.num}</div>
+      <div class="fw-shirt" aria-label="背番号${r.num}">${uniSvg(uniOf(cid), { num: r.num, font: 'var(--f-led)' })}</div>
       <div class="fw-tag">現役引退</div>
       <h2 class="fw-name">${esc(r.name)}</h2>
       <div class="fw-sub">${r.pp}・${r.age}歳・${esc(c.name)}</div>
@@ -2012,17 +2013,16 @@ function sheetReborn(id, again) {
   if (!p || !L) { if (S.reborn) delete S.reborn.show; return; }
   sheetState = { type: 'reborn', id: p.id };
   const c = S.clubs[S.my];
-  const kt = lum(c.c1) > 0.6 ? '#141414' : '#ffffff';
   const ghost = L.num || p.num;
   const holder = L.num && p.num !== L.num ? E.squad(S, S.my).find(q => q.id !== p.id && q.num === L.num) : null;
   const sparks = Array.from({ length: 16 }, (_, i) => `<i style="left:${(i * 61 + 7) % 100}%;animation-delay:${((i * 37) % 40) / 10}s;animation-duration:${3.2 + (i % 5) * 0.5}s"></i>`).join('');
-  openSheet(`<div class="reborn${again ? ' again' : ''}" style="--k1:${c.c1};--k2:${c.c2};--kt:${kt}">
+  openSheet(`<div class="reborn${again ? ' again' : ''}" style="${uniVars(S.my)}">
       <div class="rb-rays" aria-hidden="true"></div><div class="rb-sparks" aria-hidden="true">${sparks}</div>
       <div class="rb-head"><span>REBORN</span><span>${esc(E.seasonLabel(S.season))}</span></div>
       <div class="rb-stage">
         <div class="rb-ghost" aria-hidden="true">${ghost}</div>
         <span class="rb-ring" aria-hidden="true"></span>
-        <div class="rb-mag" aria-label="背番号${p.num}">${p.num}</div>
+        <div class="rb-mag" aria-label="背番号${p.num}">${uniSvg(uniOf(S.my), { num: p.num, font: 'var(--f-display)' })}</div>
         <div class="rb-seal" aria-label="転生">転生</div>
       </div>
       <div class="rb-epi">「${esc(L.epi)}」の魂を継ぐ者</div>
@@ -2050,10 +2050,12 @@ const TROPHY = {
 function sheetCele() {
   const ce = S.cele && S.cele[0]; if (!ce) return;
   sheetState = { type: 'cele' };
-  const c = S.clubs[S.my]; const kt = lum(c.c1) > 0.6 ? '#141414' : '#ffffff';
+  const c = S.clubs[S.my], u = uniOf(S.my);
   const league = ce.k === 'j1';
   const title = league ? 'J1リーグ' : E.CUPS[ce.k].jp;
-  const colors = [c.c1, c.c2, '#f3cf7a', '#ffffff', c.c1, '#f3cf7a'];
+  // confetti in the kit's colours (body, stripes, trim) and gold
+  const kc = [...new Set([u.b, u.pc, u.t1, u.t2].filter(Boolean))];
+  const colors = [kc[0], kc[1] || '#ffffff', '#f3cf7a', kc[2] || '#ffffff', kc[0], '#f3cf7a'];
   const conf = Array.from({ length: 36 }, (_, i) => `<i style="left:${(i * 37 + 11) % 100}%;background:${colors[i % colors.length]};animation-delay:${((i * 53) % 30) / 10 + 0.6}s;animation-duration:${3.4 + (i % 7) * 0.45}s;--r:${(i * 47) % 360}deg;--dx:${((i * 29) % 60) - 30}px"></i>`).join('');
   const opp = !league && S.clubs[ce.opp];
   const line = league
@@ -2065,12 +2067,12 @@ function sheetCele() {
   const goals = !league && ce.goals && ce.goals.length ? `<p class="ce-goals">得点　${ce.goals.map(g => `${esc(g.name)} ${g.m > 90 ? '90+' + (g.m - 90) : g.m}'`).join('、')}</p>` : '';
   const star = league && ce.top ? `<p class="ce-goals">チーム得点王　${esc(ce.top.name)}（${ce.top.g}得点）</p>` : '';
   const more = S.cele.length > 1;
-  openSheet(`<div class="cele ${league ? 'ce-league' : 'ce-cup'}" style="--k1:${c.c1};--k2:${c.c2};--kt:${kt}">
+  openSheet(`<div class="cele ${league ? 'ce-league' : 'ce-cup'}" style="${uniVars(S.my)}">
       <div class="ce-rays" aria-hidden="true"></div><div class="ce-conf" aria-hidden="true">${conf}</div>
       <div class="ce-head"><span>CHAMPIONS</span><span>${esc(E.seasonLabel(ce.season))}</span></div>
       <div class="ce-stage">
         <div class="ce-trophy">${league ? TROPHY.j1 : TROPHY.cup}</div>
-        <div class="ce-mag" aria-hidden="true">${esc(c.abbr || '')}</div>
+        <div class="ce-mag" aria-hidden="true">${uniSvg(u, { star: true })}</div>
       </div>
       <div class="ce-title"><span>${title}</span><b>優勝</b></div>
       <h2 class="ce-club">${esc(c.name)}</h2>
