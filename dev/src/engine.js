@@ -2420,10 +2420,10 @@ function finishMatch(S, M) {
     news(S, `${fxLabel(fx)}　${S.clubs[fx.h].short} ${M.hg}-${M.ag} ${S.clubs[fx.a].short}${pk}（${res[k] === 'W' ? (ko ? '勝ち抜け' : '勝利') : res[k] === 'D' ? '引き分け' : ko ? '敗退' : '敗戦'}${agg}）${giant}` + (potm ? `　チーム最高評価：${S.players[potm[0]].name}（${potm[1].final.toFixed(1)}）` : ''), res[k] === 'W' ? 'win' : res[k] === 'L' ? 'loss' : 'draw');
     // warnings on the way down (once each until it recovers)
     const lv = B.warn.filter(w => S.board <= w).length;
-    if (S.board > B.warn[0] + 10) S.boardWarn = 0;
+    if (!B.warn.length || S.board > B.warn[0] + 10) S.boardWarn = 0;
     if (lv > (S.boardWarn || 0) && S.board < b0) {
       S.boardWarn = lv;
-      news(S, lv >= 2 ? `フロントの信頼が${S.board}まで下がった。このまま負けが込むと解任もありうる。` : `フロントが成績を不安視している（信頼 ${S.board}）。`, 'warn');
+      news(S, lv >= 2 ? (boardGrace(S) ? `フロントの信頼が${S.board}まで下がった。今季は就任1年目の猶予があるが、このままでは来季が危うい。` : `フロントの信頼が${S.board}まで下がった。このまま負けが込むと解任もありうる。`) : `フロントが成績を不安視している（信頼 ${S.board}）。`, 'warn');
       S._stopNote = lv >= 2 ? 'フロントの信頼が危険水域です' : 'フロントが成績を不安視しています';
     }
   }
@@ -3863,12 +3863,15 @@ const PRIZE = [30000, 12000, 6000, 3000, 2000, 1500, 1200, 1000, 900, 800, 700, 
    keep    — a new season starts from 55 + (board − 55) × keep (the slate is partly wiped)
    fireEnd/grace — fired at the end of the season below fireEnd, except in the first `grace` seasons at a club (relegation always)
    fireMid/fireAfter/zone — fired mid-season at fireMid or below after fireAfter league games, if in the bottom `zone`
-             places of the table
-   warn    — a warning in the news (and a stop) when it falls to these */
+             places of the table (−1 = never: the board is 0..100)
+   warn    — a warning in the news (and a stop) when it falls to these
+   sub is shown as HTML in a .phr line: <wbr> marks where it may wrap (no breaks inside a word)
+   2026-10-18 (the user): やさしい fires only on relegation (fireEnd 0 and fireMid −1 can't be reached, no warnings), ふつう
+   never fires mid-season — relegation or the end-of-season verdict (from the second season); only きびしい fires mid-season */
 const BOARD_LV = {
-  easy: { jp: 'やさしい', sub: '目標に届かなくても続けやすい。解任はほぼJ2降格のときだけ。', match: 1.4, met: 20, near: 0, nearBand: 3, perPos: 3, missMax: 12, keep: 0.5, fireEnd: 5, grace: 1, fireMid: 5, fireAfter: 19, zone: 3, warn: [25, 12] },
-  mid: { jp: 'ふつう', sub: '就任1年目は猶予あり。目標を大きく下回るシーズンが続くか、降格圏で信頼が尽きると解任。', match: 1.6, met: 20, near: 0, nearBand: 3, perPos: 4, missMax: 16, keep: 0.6, fireEnd: 10, grace: 1, fireMid: 8, fireAfter: 15, zone: 4, warn: [30, 16] },
-  hard: { jp: 'きびしい', sub: '1試合ごとの評価が大きく、目標未達ならすぐ解任もある（以前のルール）。', match: 3.2, met: 20, near: -5, nearBand: 3, perPos: 0, missMax: 25, keep: 1, fireEnd: 15, grace: 0, fireMid: 8, fireAfter: 10, zone: 99, warn: [30, 16] },
+  easy: { jp: 'やさしい', sub: '解任は<wbr>J2降格の<wbr>ときだけ。<wbr>目標に<wbr>届かなくても<wbr>続けられる。', match: 1.4, met: 20, near: 0, nearBand: 3, perPos: 3, missMax: 12, keep: 0.5, fireEnd: 0, grace: 1, fireMid: -1, fireAfter: 19, zone: 3, warn: [] },
+  mid: { jp: 'ふつう', sub: 'シーズン途中の<wbr>解任は<wbr>なし。<wbr>J2降格か、<wbr>目標を<wbr>大きく<wbr>下回る<wbr>シーズンが<wbr>続くと<wbr>シーズン終了時に<wbr>解任。', match: 1.6, met: 20, near: 0, nearBand: 3, perPos: 4, missMax: 16, keep: 0.6, fireEnd: 10, grace: 1, fireMid: -1, fireAfter: 15, zone: 4, warn: [30, 16] },
+  hard: { jp: 'きびしい', sub: '1試合ごとの<wbr>評価が<wbr>大きく、<wbr>目標未達なら<wbr>すぐ<wbr>解任も<wbr>ある<wbr>（以前のルール）。', match: 3.2, met: 20, near: -5, nearBand: 3, perPos: 0, missMax: 25, keep: 1, fireEnd: 15, grace: 0, fireMid: 8, fireAfter: 10, zone: 99, warn: [30, 16] },
 };
 const BOARD = BOARD_LV.mid;  // overridable in tests (hard = the rules before 2026-10-12)
 // the points the board expects from one match (2026-10-16, 作業8の続き): fitted to the league (全クラブのリーグ戦 3,040 試合:
@@ -3879,6 +3882,9 @@ function boardExp(S, cid, opp, home) { return clamp(BOARD_EXP.c + (strength(S, c
 function boardLv(S) { const k = S.settings && S.settings.boardLv; return k && BOARD_LV[k] ? BOARD_LV[k] : BOARD; }
 // seasons in a row at this club (the season just finished included)
 function tenure(S) { let n = 0; for (const h of S.history) { if (h.club !== S.my) break; n++; } return n; }
+// true while trust can't cost the manager his job this season (only relegation can): no mid-season firing and the season
+// ends inside the grace (ふつう's first season at a club; やさしい always). Low trust still carries into next season.
+function boardGrace(S) { const B = boardLv(S); return B.fireMid < 0 && (B.fireEnd <= 0 || tenure(S) + 1 <= B.grace); }
 function endSeason(S) {
   const t = table(S);
   S.lastTable = t.map(r => r.id);   // next season's Lカップ seeds
@@ -4693,7 +4699,7 @@ const API = {
   NATIONS, NT, natJp, ntName, ntEvents, ntWindows, inNtWindow, ntNow, inNtBreak, recentNt, ntScore, ntForm, ntDay, ntCall, ntPower, abShare, EURO, euroWanted, euroOffer, euroDay, seasonDates, cupSchedule, J1_2026, AC_2027,
   LC_OLD, LC_STAGE, cupNames, roundName, fxEn, cupDepth, cupFinal, tieLegs, tieAgg, lcNew, lc1Alive,
   ABROAD, abroadOf, isAbroadClub, price, addAbroad, abroadReluct, nameKey, realNames, reservedNames, freshName, renamePlayer, genPlayer,
-  CARDS, BOARD, BOARD_LV, BOARD_EXP, boardExp, boardLv, tenure, DIST, distMonth, EXPECT, expectPower, setExpectations, CUPS, CUP_PRIZE, NATIONAL, fxLabel, cupResult, cupWinner, hypeMatch, HYPE, SUB_RATE, subRate, STYLE, GROW, RARE, INTAKE, potCap, clubBase, devWeek, shareFor, LOAN, GEM, REBORN, LEGENDS, legendOf, rebornCheck, makeReborn, rebornNum, myLoans, loanCan, loanOptions, loanOut, growthOutlook, weeksLeft, yearsTo, bigGame, rivalry, SCOUT, sendScout, playShare, marketList, ensureFreeAgents, upgrade, facCost, TOWN, townOf, built, townNext, townCan, townBuild, townDay, townUpkeep, townInfo, townSeason, townInj, townAtt, gatePer, attEst, fansLog, addMonths, fansOf, fansTarget, fansAdd, fansMatch, fansSeason, fansMonth, intakePot, takeJob, rollover, endSeason, news, fire,
+  CARDS, BOARD, BOARD_LV, BOARD_EXP, boardExp, boardLv, boardGrace, tenure, DIST, distMonth, EXPECT, expectPower, setExpectations, CUPS, CUP_PRIZE, NATIONAL, fxLabel, cupResult, cupWinner, hypeMatch, HYPE, SUB_RATE, subRate, STYLE, GROW, RARE, INTAKE, potCap, clubBase, devWeek, shareFor, LOAN, GEM, REBORN, LEGENDS, legendOf, rebornCheck, makeReborn, rebornNum, myLoans, loanCan, loanOptions, loanOut, growthOutlook, weeksLeft, yearsTo, bigGame, rivalry, SCOUT, sendScout, playShare, marketList, ensureFreeAgents, upgrade, facCost, TOWN, townOf, built, townNext, townCan, townBuild, townDay, townUpkeep, townInfo, townSeason, townInj, townAtt, gatePer, attEst, fansLog, addMonths, fansOf, fansTarget, fansAdd, fansMatch, fansSeason, fansMonth, intakePot, takeJob, rollover, endSeason, news, fire,
 };
 if (typeof module !== 'undefined' && module.exports) module.exports = API; else root.Engine = API;
 })(typeof window !== 'undefined' ? window : globalThis);

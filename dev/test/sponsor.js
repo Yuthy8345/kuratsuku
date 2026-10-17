@@ -124,7 +124,9 @@ ok(S.spon.offer.every(x => E.sponText(x) && E.sponShort(x)), `texts: ${S.spon.of
   if (T.fired) { console.log(`(skip the next season's checks: sacked at the season end — ${T.fired.reason})`); } else {
   ok(T.spon.s === T.season && T.spon.offer.length === SP.n && T.spon.months >= 11 && T.spon.months === E.payMonths(E.D.add(T.date, 1), T.spon.end) && T.spon.u23 === 0 && !T.spon.yo.length, `${E.seasonLabel(T.season)}: five new offers, ${T.spon.months} paydays to ${T.spon.end}, counters back to 0`);
   const U = clone(T); E.sponPick(U, E.sponRec(U));
-  const st = E.advance(T, 3);
+  let st = E.advance(T, 3);
+  // an offer that came in on the same day stops first now and then (2026-10-18: seen once in 4 runs)
+  for (let i = 0; i < 3 && st.stop === 'inbox'; i++) { T.inbox.forEach(x => { x.seen = true; if (x.type === 'offer' && !x.done) E.rejectOffer(T, x.id); }); st = E.advance(T, 3); }
   ok(st.stop === 'sec', `she stops the days to bring them (${st.stop} on ${T.date})`);
   const su = E.advance(U, 3);
   ok(su.stop !== 'sec', `signed before the next day: no stop for them (${su.stop})`);

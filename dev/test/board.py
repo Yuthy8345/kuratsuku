@@ -32,17 +32,33 @@ async def main():
         print('picked:', pr, '| saved', st['settings'].get('boardLv'), '|', sub); bad += [] if pr == ['きびしい'] and st['settings'].get('boardLv') == 'hard' else ['pick']
         await page.locator('[data-act="boardLv"]').first.scroll_into_view_if_needed(); await page.screenshot(path=str(OUT/'board-club.png'))
         # an old save without the setting, with low confidence: ふつう + the warning on the home screen
-        await page.goto('about:blank')
-        ed = await ctx.new_page(); await ed.route('https://**/*', route); await ed.goto('file://' + str(ROOT/'test/blank.html')); await ed.add_script_tag(content=LZ)
-        await ed.evaluate('''() => { const k='touchline.j1.save'; const st = JSON.parse(LZString.decompressFromBase64(localStorage.getItem(k).slice(3)));
-          delete st.settings.boardLv; st.board = 12; localStorage.setItem(k, 'lz:' + LZString.compressToBase64(JSON.stringify(st))); }''')
-        await ed.close()
-        await page.goto('file://' + str(ROOT/'test/page.html')); await page.wait_for_timeout(500)
-        await page.click('[data-act="continue"]'); await page.wait_for_timeout(400)
-        card = page.locator('section.card', has_text='フロントの信頼').first
-        txt = await card.inner_text(); print('home:', txt.replace('\n', ' | ')); bad += [] if '解任の危機' in txt else ['home alert']
-        await card.scroll_into_view_if_needed(); await page.screenshot(path=str(OUT/'board-home.png'))
+        async def edit(js):   # change the save while the game page is away (it saves when it leaves)
+            await page.goto('about:blank')
+            ed = await ctx.new_page(); await ed.route('https://**/*', route); await ed.goto('file://' + str(ROOT/'test/blank.html')); await ed.add_script_tag(content=LZ)
+            await ed.evaluate("() => { const k='touchline.j1.save'; const st = JSON.parse(LZString.decompressFromBase64(localStorage.getItem(k).slice(3))); " + js + "; localStorage.setItem(k, 'lz:' + LZString.compressToBase64(JSON.stringify(st))); }")
+            await ed.close()
+            await page.goto('file://' + str(ROOT/'test/page.html')); await page.wait_for_timeout(500)
+            await page.click('[data-act="continue"]'); await page.wait_for_timeout(400)
+        async def home_card():
+            card = page.locator('section.card', has_text='フロントの信頼').first
+            return card, (await card.inner_text()).replace('\n', ' | ')
+        # ふつう's first season at a club has no firing but relegation (2026-10-18: no mid-season firing), so the warning says
+        # the grace is this season only
+        await edit('delete st.settings.boardLv; st.board = 12')
+        card, txt = await home_card(); print('home (1年目):', txt); bad += [] if '猶予' in txt and '解任の危機' not in txt else ['home alert (grace)']
         await club(); pr = await pressed(); print('old save:', pr); bad += [] if pr == ['ふつう'] else ['old save']
+        # the second season at the club: the end of the season can fire
+        await edit("st.history = [{ season: '2026/27', club: st.my, pos: 15, pts: 40, champ: 'kashima', verdict: 'missed' }]")
+        card, txt = await home_card(); print('home (2年目):', txt); bad += [] if '解任の危機' in txt else ['home alert']
+        await card.scroll_into_view_if_needed(); await page.screenshot(path=str(OUT/'board-home.png'))
+        # やさしい (2026-10-18): only relegation fires, so no warning on the home screen even with low confidence
+        await club()
+        await page.click('[data-act="boardLv"][data-k="easy"]'); await page.wait_for_timeout(250)
+        sub = await page.locator('[data-act="boardLv"]').first.locator('xpath=ancestor::div[contains(@class,"ctlrow")]').locator('.fine').inner_text()
+        print('easy:', sub); bad += [] if '降格のときだけ' in sub else ['easy sub']
+        await page.click('[data-tab="home"]'); await page.wait_for_timeout(300)
+        card, txt = await home_card(); print('home (easy):', txt)
+        bad += [] if '解任' not in txt and '不安視' not in txt else ['easy home alert']
         print('\n'.join(errs) or 'no errors')
         print('ALL OK' if not bad and not errs else f'PROBLEMS: {bad}')
         await b.close()

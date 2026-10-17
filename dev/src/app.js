@@ -597,12 +597,14 @@ function viewSquad() {
 // フロントの厳しさ (how patient the board is)
 function boardLvCtl() {
   const cur = E.BOARD_LV[S.settings.boardLv] ? S.settings.boardLv : 'mid';
-  return `<div class="ctlrow"><label>フロントの厳しさ</label><div class="seg">${Object.entries(E.BOARD_LV).map(([k, b]) => `<button data-act="boardLv" data-k="${k}" aria-pressed="${cur === k}">${b.jp}</button>`).join('')}</div><span class="fine">${E.BOARD_LV[cur].sub}</span></div>`;
+  return `<div class="ctlrow"><label>フロントの厳しさ</label><div class="seg">${Object.entries(E.BOARD_LV).map(([k, b]) => `<button data-act="boardLv" data-k="${k}" aria-pressed="${cur === k}">${b.jp}</button>`).join('')}</div><span class="fine phr">${E.BOARD_LV[cur].sub}</span></div>`;
 }
 function boardAlert() {
   const B = E.boardLv(S);
-  if (S.fired || S.board > B.warn[0]) return '';
-  return `<div class="small" style="color:var(--loss);font-weight:700">${S.board <= B.warn[1] ? '解任の危機。ここから巻き返さないと解任されるおそれがあります。' : 'フロントが成績を不安視しています。'}</div>`;
+  if (S.fired || !B.warn.length || S.board > B.warn[0]) return '';   // やさしい: no warnings (only relegation fires)
+  // ふつう's first season (2026-10-18: no mid-season firing) can only end in relegation; the low trust carries on, though
+  const danger = E.boardGrace(S) ? '今季は<wbr>就任1年目の<wbr>猶予が<wbr>ありますが、<wbr>信頼が<wbr>低いまま<wbr>来季を<wbr>迎えると<wbr>解任の<wbr>おそれが<wbr>あります。' : '解任の危機。<wbr>ここから<wbr>巻き返さないと<wbr>解任される<wbr>おそれが<wbr>あります。';
+  return `<div class="small phr" style="color:var(--loss);font-weight:700">${S.board <= B.warn[1] ? danger : 'フロントが<wbr>成績を<wbr>不安視しています。'}</div>`;
 }
 // 交代の頻度 (only while 交代はおまかせ is on)
 function subRateCtl() {
@@ -1779,7 +1781,7 @@ function viewClub() {
         <div class="row"><div class="eyebrow">フロントの信頼</div><span class="spacer"></span><b class="tnum">${S.board} / 100</b></div>
         <div class="meter"><i style="left:${S.board}%"></i></div>
         <dl class="kv"><dt>今季の目標</dt><dd>${esc(c.target.jp)}</dd><dt>開幕前の予想</dt><dd>${c.pred}位</dd><dt>現在</dt><dd>${rankOf(S.my)}${rankOf(S.my) === '—' ? '' : '位'}</dd></dl>
-        <p class="fine">試合ごとに、戦力から見込まれる勝点を上回れば上がり、下回れば下がります。シーズン終了時は目標の順位との差で増減します。信頼が尽きると解任、J2降格でも解任です。</p>
+        <p class="fine phr">試合ごとに、<wbr>戦力から<wbr>見込まれる<wbr>勝点を<wbr>上回れば<wbr>上がり、<wbr>下回れば<wbr>下がります。<wbr>シーズン終了時は<wbr>目標の<wbr>順位との<wbr>差で<wbr>増減します。<wbr>解任の<wbr>条件は<wbr>下の<wbr>「フロントの厳しさ」で<wbr>変わります。</p>
         ${boardLvCtl()}
       </section>
       ${secCard()}
